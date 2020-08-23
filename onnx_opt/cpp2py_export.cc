@@ -1,8 +1,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include "onnx/py_utils.h"
 
 #include "onnx_opt/optimize.h"
-#include "onnx/py_utils.h"
 
 namespace ONNX_NAMESPACE {
 namespace py = pybind11;

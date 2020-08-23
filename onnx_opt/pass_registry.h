@@ -6,6 +6,8 @@
 #include "onnx/common/ir.h"
 #include "onnx/common/ir_pb_converter.h"
 #include "onnx/common/stl_backports.h"
+#include "onnx/proto_utils.h"
+
 #include "onnx_opt/passes/eliminate_deadend.h"
 #include "onnx_opt/passes/eliminate_identity.h"
 #include "onnx_opt/passes/eliminate_nop_dropout.h"
@@ -27,7 +29,6 @@
 #include "onnx_opt/passes/lift_lexical_references.h"
 #include "onnx_opt/passes/nop.h"
 #include "onnx_opt/passes/split.h"
-#include "onnx/proto_utils.h"
 
 #include <unordered_set>
 #include <vector>

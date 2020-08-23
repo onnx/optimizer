@@ -6,9 +6,10 @@
 #include "onnx/common/ir.h"
 #include "onnx/common/ir_pb_converter.h"
 #include "onnx/common/stl_backports.h"
+#include "onnx/proto_utils.h"
+
 #include "onnx_opt/pass_manager.h"
 #include "onnx_opt/pass_registry.h"
-#include "onnx/proto_utils.h"
 
 #include "vector"
 

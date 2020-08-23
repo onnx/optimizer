@@ -1,5 +1,6 @@
-#include "onnx_opt/pass.h"
 #include "onnx/common/assertions.h"
+
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
