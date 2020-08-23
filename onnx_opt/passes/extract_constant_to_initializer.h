@@ -11,7 +11,7 @@
 //	 this pass can handle the case satisfy all following conditions:
 //	   condition 1: A is the output of a Constant node
 #include "onnx/common/assertions.h"
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

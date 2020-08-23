@@ -3,8 +3,8 @@
 // Adventurous users should note that the APIs will probably change.
 
 #include <vector>
-#include "onnx/optimizer/pass.h"
-#include "onnx/optimizer/passes/eliminate_deadend.h"
+#include "onnx_opt/pass.h"
+#include "onnx_opt/passes/eliminate_deadend.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

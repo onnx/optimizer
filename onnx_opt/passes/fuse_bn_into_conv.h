@@ -29,7 +29,7 @@
 // $$ b' = (b_{conv} - m)\frac{s}{\sqrt{\sigma + \epsilon}} + b_{bn}$$
 
 #include "onnx/common/assertions.h"
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

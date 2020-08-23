@@ -2,7 +2,7 @@
 // Adventurous users should note that the APIs will probably change.
 #pragma once
 
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

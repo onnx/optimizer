@@ -17,7 +17,7 @@
 #include <numeric>
 
 #include "onnx/common/assertions.h"
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

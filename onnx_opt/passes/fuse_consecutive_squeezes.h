@@ -9,7 +9,7 @@
 //   Z = Squeeze(Y, axes=[0, 4]) -> shape=[2, 3, 5]
 // After:
 //   Z = Squeeze(X, axes=[0, 1, 4, 6])
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

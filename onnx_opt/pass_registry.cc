@@ -1,7 +1,7 @@
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
-#include "onnx/optimizer/pass_registry.h"
+#include "onnx_opt/pass_registry.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

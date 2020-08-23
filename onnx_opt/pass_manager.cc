@@ -1,4 +1,4 @@
-#include "onnx/optimizer/pass_manager.h"
+#include "onnx_opt/pass_manager.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

@@ -14,7 +14,7 @@
 //   condition 1: A is not used as any node's input
 //   condition 2: A is not an output
 
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

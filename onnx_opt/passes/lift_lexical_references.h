@@ -1,7 +1,7 @@
 #pragma once
 
 #include <set>
-#include "onnx/optimizer/pass.h"
+#include "onnx_opt/pass.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {

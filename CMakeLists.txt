@@ -5,7 +5,6 @@ project(onnx_optimizer C CXX)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
-option(ONNX_BUILD_OPTIMIZER "" OFF)
 add_subdirectory(${ONNX_ROOT})
 
 file(GLOB_RECURSE onnx_opt_srcs "onnx_opt/*.cc"
@@ -15,6 +14,10 @@ list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnx_opt/cpp2py_export.cc"
 
 add_library(onnx_optimizer ${onnx_opt_srcs})
 target_link_libraries(onnx_optimizer PUBLIC onnx)
+target_include_directories(onnx_optimizer PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+    )
 
 if(BUILD_ONNX_PYTHON)
   if("${PY_EXT_SUFFIX}" STREQUAL "")
@@ -34,7 +37,6 @@ if(BUILD_ONNX_PYTHON)
                         PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
   target_include_directories(onnx_opt_cpp2py_export PRIVATE
                              $<BUILD_INTERFACE:${ONNX_ROOT}>
-                             $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
                              $<INSTALL_INTERFACE:include>
                              ${PYTHON_INCLUDE_DIR})
   # pybind11 is a header only lib
@@ -108,3 +110,29 @@ if(BUILD_ONNX_PYTHON)
     add_msvc_runtime_flag(onnx_opt_cpp2py_export)
   endif()
 endif()
+
+include(GNUInstallDirs)
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnx_opt
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING
+        PATTERN "*.h")
+
+configure_file(
+  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfigVersion.cmake.in
+  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+  @ONLY)
+configure_file(
+  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfig.cmake.in
+  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+  @ONLY)
+install(FILES
+  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer
+  COMPONENT dev)
+install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
+install(TARGETS
+  onnx_optimizer
+  EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
