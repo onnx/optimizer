@@ -63,22 +63,15 @@ build_*
 # setup.py intermediates
 .eggs
 dist
-onnx_opt.egg-info
+*.egg-info
 *.ninja
 .ninja_deps
 .ninja_log
 compile_commands.json
 
 # generated files
-onnx/version.py
+onnx_opt/version.py
 compile_commands.json
-
-# test generated files
-.cache
-.coverage
-onnx/examples/.coverage.nbval
-.pytest_cache
-test_report
 
 # autocomplete
 .ycm_extra_conf.py
