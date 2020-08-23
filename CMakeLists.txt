@@ -7,6 +7,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
 add_subdirectory(${ONNX_ROOT})
 
+file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
+string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)
+
 file(GLOB_RECURSE onnx_opt_srcs "onnx_opt/*.cc"
     "onnx_opt/*.h"
     )
