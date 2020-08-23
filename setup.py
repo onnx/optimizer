@@ -23,7 +23,7 @@ import multiprocessing
 
 
 TOP_DIR = os.path.realpath(os.path.dirname(__file__))
-SRC_DIR = os.path.join(TOP_DIR, 'onnx_opt')
+SRC_DIR = os.path.join(TOP_DIR, 'onnxoptimizer')
 CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build')
 
 WINDOWS = (os.name == 'nt')
@@ -216,8 +216,8 @@ class build_py(setuptools.command.build_py.build_py):
         self.run_command('cmake_build')
 
         generated_python_files = \
-            glob.glob(os.path.join(CMAKE_BUILD_DIR, 'onnx_opt', '*.py')) + \
-            glob.glob(os.path.join(CMAKE_BUILD_DIR, 'onnx_opt', '*.pyi'))
+            glob.glob(os.path.join(CMAKE_BUILD_DIR, 'onnxoptimizer', '*.py')) + \
+            glob.glob(os.path.join(CMAKE_BUILD_DIR, 'onnxoptimizer', '*.pyi'))
 
         for src in generated_python_files:
             dst = os.path.join(
@@ -252,7 +252,7 @@ class build_ext(setuptools.command.build_ext.build_ext):
                 elif os.path.exists(release_lib_dir):
                     lib_path = release_lib_dir
             src = os.path.join(lib_path, filename)
-            dst = os.path.join(os.path.realpath(self.build_lib), "onnx_opt", filename)
+            dst = os.path.join(os.path.realpath(self.build_lib), "onnxoptimizer", filename)
             self.copy_file(src, dst)
 
 
@@ -281,7 +281,7 @@ cmdclass = {
 
 ext_modules = [
     setuptools.Extension(
-        name=str('onnx_opt.onnx_opt_cpp2py_export'),
+        name=str('onnxoptimizer.onnx_opt_cpp2py_export'),
         sources=[])
 ]
 
@@ -314,7 +314,7 @@ if sys.version_info[0] == 3:
 ################################################################################
 
 setuptools.setup(
-    name="onnx_opt",
+    name="onnxoptimizer",
     version=VersionInfo.version,
     description="Open Neural Network Exchange",
     ext_modules=ext_modules,

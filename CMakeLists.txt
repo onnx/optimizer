@@ -10,10 +10,10 @@ add_subdirectory(${ONNX_ROOT})
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
 string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)
 
-file(GLOB_RECURSE onnx_opt_srcs "onnx_opt/*.cc"
-    "onnx_opt/*.h"
+file(GLOB_RECURSE onnx_opt_srcs "onnxoptimizer/*.cc"
+    "onnxoptimizer/*.h"
     )
-list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnx_opt/cpp2py_export.cc")
+list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnxoptimizer/cpp2py_export.cc")
 
 add_library(onnx_optimizer ${onnx_opt_srcs})
 target_link_libraries(onnx_optimizer PUBLIC onnx)
@@ -31,7 +31,7 @@ if(BUILD_ONNX_PYTHON)
     endif()
   endif()
 
-  add_library(onnx_opt_cpp2py_export MODULE "onnx_opt/cpp2py_export.cc")
+  add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
   set_target_properties(onnx_opt_cpp2py_export PROPERTIES PREFIX "")
   set_target_properties(onnx_opt_cpp2py_export
                         PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
@@ -116,7 +116,7 @@ endif()
 
 include(GNUInstallDirs)
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnx_opt
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnxoptimizer
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING
         PATTERN "*.h")
