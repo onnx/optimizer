@@ -293,11 +293,7 @@ ext_modules = [
 packages = setuptools.find_packages()
 
 install_requires.extend([
-    'protobuf',
-    'numpy',
-    'six',
-    'typing>=3.6.4; python_version < "3.5"',
-    'typing-extensions>=3.6.2.1',
+    'onnx'
 ])
 
 ################################################################################
@@ -330,15 +326,8 @@ setuptools.setup(
     setup_requires=setup_requires,
     tests_require=tests_require,
     extras_require=extras_require,
-    author='ONNX',
+    author='ONNX Optimizer Authors',
     author_email='onnx-technical-discuss@lists.lfai.foundation',
-    url='https://github.com/onnx/onnx',
-    entry_points={
-        'console_scripts': [
-            'check-model = onnx.bin.checker:check_model',
-            'check-node = onnx.bin.checker:check_node',
-            'backend-test-tools = onnx.backend.test.cmd_tools:main',
-        ]
-    },
+    url='https://github.com/onnx/optimizer',
 )
 
