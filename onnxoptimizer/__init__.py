@@ -39,14 +39,16 @@ Supported pass names:
 get_available_passes = C.get_available_passes
 
 
-def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
+# type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
+def optimize(model, passes=None, fixed_point=False):
     if passes is None:
         passes = ['eliminate_nop_transpose',
                   'eliminate_nop_pad',
                   'fuse_consecutive_transposes',
                   'fuse_transpose_into_gemm']
     if not isinstance(model, ModelProto):
-        raise ValueError('Optimizer only accepts ModelProto, incorrect type: {}'.format(type(model)))
+        raise ValueError(
+            'Optimizer only accepts ModelProto, incorrect type: {}'.format(type(model)))
 
     model_str = model.SerializeToString()
     if fixed_point:
@@ -55,5 +57,6 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
         optimized_model_str = C.optimize(model_str, passes)
 
     return onnx.load_from_string(optimized_model_str)
+
 
 __all__ = ['optimize', 'get_available_passes']

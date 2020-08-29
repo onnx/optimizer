@@ -164,7 +164,8 @@ class cmake_build(setuptools.Command):
                 '-DBUILD_ONNX_PYTHON=ON',
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
                 '-DONNX_NAMESPACE={}'.format(ONNX_NAMESPACE),
-                '-DPY_EXT_SUFFIX={}'.format(sysconfig.get_config_var('EXT_SUFFIX') or ''),
+                '-DPY_EXT_SUFFIX={}'.format(
+                    sysconfig.get_config_var('EXT_SUFFIX') or ''),
             ]
             if COVERAGE:
                 cmake_args.append('-DONNX_COVERAGE=ON')
@@ -178,7 +179,8 @@ class cmake_build(setuptools.Command):
                     # we need to link with libpython on windows, so
                     # passing python version to window in order to
                     # find python in cmake
-                    '-DPY_VERSION={}'.format('{0}.{1}'.format(*sys.version_info[:2])),
+                    '-DPY_VERSION={}'.format('{0}.{1}'.format(* \
+                                                              sys.version_info[:2])),
                 ])
                 if USE_MSVC_STATIC_RUNTIME:
                     cmake_args.append('-DONNX_USE_MSVC_STATIC_RUNTIME=ON')
@@ -252,7 +254,8 @@ class build_ext(setuptools.command.build_ext.build_ext):
                 elif os.path.exists(release_lib_dir):
                     lib_path = release_lib_dir
             src = os.path.join(lib_path, filename)
-            dst = os.path.join(os.path.realpath(self.build_lib), "onnxoptimizer", filename)
+            dst = os.path.join(os.path.realpath(
+                self.build_lib), "onnxoptimizer", filename)
             self.copy_file(src, dst)
 
 
@@ -261,7 +264,8 @@ class mypy_type_check(ONNXCommand):
 
     def run(self):
         """Run command."""
-        onnx_script = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools/mypy-onnx.py"))
+        onnx_script = os.path.realpath(os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "tools/mypy-onnx.py"))
         returncode = subprocess.call([sys.executable, onnx_script])
         sys.exit(returncode)
 
@@ -330,4 +334,3 @@ setuptools.setup(
     author_email='onnx-technical-discuss@lists.lfai.foundation',
     url='https://github.com/onnx/optimizer',
 )
-
