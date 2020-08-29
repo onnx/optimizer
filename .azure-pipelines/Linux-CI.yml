@@ -64,8 +64,6 @@ jobs:
 
       # check line endings to be UNIX
       find . -type f -regextype posix-extended -regex '.*\.(py|cpp|md|h|cc|proto|proto3|in)' | xargs dos2unix --quiet
-      git status
-      git diff --exit-code
       
       # Do not hardcode onnx's namespace in the c++ source code, so that
       # other libraries who statically link with onnx can hide onnx symbols
