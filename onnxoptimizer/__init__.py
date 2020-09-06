@@ -39,8 +39,7 @@ Supported pass names:
 get_available_passes = C.get_available_passes
 
 
-# type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
-def optimize(model, passes=None, fixed_point=False):
+def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
     if passes is None:
         passes = ['eliminate_nop_transpose',
                   'eliminate_nop_pad',
