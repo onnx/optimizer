@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.1)
 
 project(onnx_optimizer C CXX)
 
+# Set C++11 as standard for the whole project
+if(NOT MSVC)
+  set(CMAKE_CXX_STANDARD 11)
+endif(NOT MSVC)
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
