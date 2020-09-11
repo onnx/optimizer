@@ -599,6 +599,28 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node[3].attribute[0].g.node) == 1
         assert optimized_model.graph.node[3].attribute[0].g.node[0].op_type == "Gemm"
 
+    def test_fuse_add_bias_into_conv_with_scalar_bias(self):  # type: () -> None
+        nodes = [helper.make_node("Conv", ["X", "Y"], ["Z"]),
+                 helper.make_node("Add", ["Z", "A"], ["B"])]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info(
+                 "Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+             helper.make_tensor_value_info("A", TensorProto.FLOAT, ())],
+            [helper.make_tensor_value_info(
+                "B", TensorProto.FLOAT, (1, 16, 1, 1))],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        # Unsqueeze, Conv
+        assert len(optimized_model.graph.node) == 4
+        assert optimized_model.graph.node[0].op_type == 'Unsqueeze'
+        assert optimized_model.graph.node[1].op_type == 'Constant'
+        assert optimized_model.graph.node[2].op_type == 'Tile'
+        assert optimized_model.graph.node[3].op_type == 'Conv'
+
     def test_fuse_add_bias_into_conv_use_weight_shape(self):  # type: () -> None
         nodes = [helper.make_node("Conv", ["X", "Y"], ["Z"]),
                  helper.make_node("Add", ["Z", "A"], ["B"])]
