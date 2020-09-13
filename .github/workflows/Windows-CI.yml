@@ -25,17 +25,17 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
     - name: Create Anaconda environment
-      run: C:\Miniconda\Scripts\conda create --yes --quiet --name py${{ matrix.python-version }} -c conda-forge python=${{ matrix.python-version }} numpy libprotobuf=3.11.3 protobuf
-      shell: cmd
+      uses: goanpeca/setup-miniconda@v1
+      with: 
+        activate-environment: py${{ matrix.python-version }}
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge
+    - run: conda install numpy libprotobuf=3.11.3 protobuf
+      shell: pwsh
     - name: Install and test ONNX Optimizer
-      shell: cmd
+      shell: cmd /C call {0}
       run: |
-        call C:\Miniconda\Scripts\activate py${{ matrix.python-version }}
         python -m pip install --upgrade pip
         # pytest 6.0 made deprecation warnings fail by default, pinning pytest to 5.4.3.
         # TODO replace deprecated function with the suggested one. https://docs.pytest.org/en/stable/deprecations.html#id5
