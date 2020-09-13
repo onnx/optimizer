@@ -1,0 +1,100 @@
+name: Linux CI
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: Ubuntu-16.04
+    strategy:
+      matrix:
+        include:
+          - python-version: '2.7'
+            onnx_ml: 0
+            onnx_debug: 0
+          - python-version: '3.6'
+            onnx_ml: 0
+            onnx_debug: 0
+          - python-version: '3.7'
+            onnx_ml: 0
+            onnx_debug: 0
+          - python-version: '3.7'
+            onnx_ml: 1
+            onnx_debug: 0
+          - python-version: '3.7'
+            onnx_ml: 1
+            onnx_debug: 1
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - name: Create Anaconda environment
+      uses: goanpeca/setup-miniconda@v1
+      with: 
+        activate-environment: py${{ matrix.python-version }}
+        python-version: ${{ matrix.python-version }}
+        channels: conda-forge
+    - run: conda install protobuf
+      shell: bash -l {0}
+    - run: |
+        python -m pip install --upgrade pip
+        sudo apt-get install -qq -o=Dpkg::Use-Pty=0 -y --no-install-recommends dos2unix
+        python -m pip install numpy
+        git submodule update --init --recursive
+        export ONNX_ML=${{ matrix.onnx_ml }}
+        export DEBUG=${{ matrix.onnx_debug }}
+        export ONNX_BUILD_TESTS=0
+        export CMAKE_ARGS="-DONNXIFI_DUMMY_BACKEND=ON"
+        export ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI
+        python setup.py --quiet install
+      shell: bash -l {0}
+      name: 'Install ONNX and dependencies'
+    - run: |
+        # lint python code
+        pip install --quiet flake8
+        flake8
+        if [ $? -ne 0 ]; then
+          echo "flake8 returned failures"
+          exit 1
+        fi
+
+        # check line endings to be UNIX
+        find . -type f -regextype posix-extended -regex '.*\.(py|cpp|md|h|cc|proto|proto3|in)' | xargs dos2unix --quiet
+        
+        # Do not hardcode onnx's namespace in the c++ source code, so that
+        # other libraries who statically link with onnx can hide onnx symbols
+        # in a private namespace.
+        ! grep -R --include='*.cc' --include='*.h' 'namespace onnx' .
+        ! grep -R --include='*.cc' --include='*.h' 'onnx::' .
+
+        # onnx python api tests
+        if [ "${{ matrix.python-version }}" == "2.7" ]; then
+          pip install --quiet pytest nbval
+        else
+          # pytest 6.0 made deprecation warnings fail by default, pinning pytest to 5.4.3.
+          # TODO replace deprecated function with the suggested one. https://docs.pytest.org/en/stable/deprecations.html#id5
+          pip install --quiet pytest==5.4.3 nbval
+        fi
+
+        pytest
+        if [ $? -ne 0 ]; then
+          echo "pytest failed"
+          exit 1
+        fi
+
+        # Mypy only works with Python 3
+        if [ "${{ matrix.python-version }}" != "2.7" ]; then
+          # Mypy only works with our generated _pb.py files when we install in develop mode, so let's do that
+          pip uninstall -y onnxoptimizer
+          ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install --no-use-pep517 -e .[mypy]
+          python setup.py --quiet typecheck
+          if [ $? -ne 0 ]; then
+            echo "type check failed"
+            exit 1
+          fi
+          pip uninstall -y onnxoptimizer
+          rm -rf .setuptools-cmake-build
+          ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install .
+        fi
+      name: 'Run ONNX Optimizer tests'
+      shell: bash -l {0}
