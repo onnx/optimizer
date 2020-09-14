@@ -98,6 +98,12 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
         squeeze->addInput(conv_3rd_input);
         conv_3rd_input = squeeze->output();
         squeeze->insertBefore(orig_conv->node());
+      } else if (bias_shape.size() == 0) {
+        Node* unsqueeze = graph.create(kUnsqueeze, 1);
+        unsqueeze->is_(kaxes, {0});
+        unsqueeze->addInput(conv_3rd_input);
+        conv_3rd_input = unsqueeze->output();
+        unsqueeze->insertBefore(orig_conv->node());
       }
       if (M > 1) {
         Node* constant = graph.create(kConstant, 1);
