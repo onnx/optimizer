@@ -6,7 +6,6 @@ jobs:
 - job: linux
   pool: {vmImage: 'Ubuntu-16.04'}
   variables:
-    CIBW_MANYLINUX_X86_64_IMAGE: manylinux1
     CIBW_BEFORE_BUILD: pip install cmake && mkdir temp && curl -L https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-all-3.13.0.tar.gz -o protobuf.tar.gz && tar xvf protobuf.tar.gz -C temp && rm -rf protobuf.tar.gz && cd temp/* && mkdir cmake/build && cd cmake/build && cmake -Dprotobuf_BUILD_TESTS=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && cmake --build . -j4 && cmake -P cmake_install.cmake && cd ../../../.. && rm -rf temp
     CIBW_BUILD: 'cp3*-manylinux_x86_64'
   steps:
