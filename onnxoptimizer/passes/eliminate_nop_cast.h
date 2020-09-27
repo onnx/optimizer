@@ -20,7 +20,8 @@ struct EliminateNopCast final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return (node->kind() == kCast && node->hasAttribute(kto) && node->input()->elemType() == node->i(kto));
+    return (node->kind() == kCast && node->hasAttribute(kto) &&
+      node->input()->elemType() == node->i(kto));
   }
 
   bool runTransform(Node* node, Graph&, NodeDestroyType& destroy_current)
