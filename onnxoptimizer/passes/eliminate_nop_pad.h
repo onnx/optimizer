@@ -67,6 +67,10 @@ struct EliminateNopPad final : public PredicateBasedPass {
     if (node->output()->has_sizes()) {
         node->inputs()[0]->setSizes(node->output()->sizes());
     }
+    if (std::find(graph.outputs().rbegin(), graph.outputs().rend(),
+                  node->output()) != graph.outputs().rend()) {
+      node->inputs()[0]->setUniqueName(node->output()->uniqueName());
+    }
     node->output()->replaceAllUsesWith(node->inputs()[0]);
     destroy_current = NodeDestroyType::DestroyOne;
     return true;

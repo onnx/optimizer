@@ -27,7 +27,7 @@ struct EliminateNopDropout final : public PredicateBasedPass {
         node->f(kratio) == 0.0;
   }
 
-  bool runTransform(Node* node, Graph&, NodeDestroyType& destroy_current)
+  bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
       override {
     // Don't assume that theres only one output.
     for (size_t i = 0; i < node->outputs().size(); ++i) {
@@ -35,6 +35,10 @@ struct EliminateNopDropout final : public PredicateBasedPass {
     }
     if (node->outputs()[0]->has_sizes()) {
         node->input()->setSizes(node->outputs()[0]->sizes());
+    }
+    if (std::find(graph.outputs().rbegin(), graph.outputs().rend(),
+                  node->output()) != graph.outputs().rend()) {
+      node->input()->setUniqueName(node->outputs()[0]->uniqueName());
     }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
