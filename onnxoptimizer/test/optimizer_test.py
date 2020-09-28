@@ -123,11 +123,11 @@ class TestOptimizer(unittest.TestCase):
         # Use of the output from the Identity node in the main graph should
         # have been replaced with the input to the identity node
         assert len(optimized_model.graph.output) == 2
-        assert optimized_model.graph.output[0].name == "X"
+        assert optimized_model.graph.output[0].name == "Y"
         # Use of the output from the Identity node in the loop graph should
         # have been replaced with the input to that identity node
         assert len(optimized_model.graph.node[2].attribute[0].g.output) == 2
-        assert optimized_model.graph.node[2].attribute[0].g.output[1].name == "_Y"
+        assert optimized_model.graph.node[2].attribute[0].g.output[1].name == "_Y2"
 
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
@@ -142,6 +142,7 @@ class TestOptimizer(unittest.TestCase):
 
         for node in optimized_model.graph.node:
             assert node.op_type != "Identity"
+        assert len(optimized_model.graph.output) == 1 and optimized_model.graph.output[0].name == 'B'
         assert len(optimized_model.graph.node) == 1
 
     def test_eliminate_identity_multiple_uses(self):  # type: () -> None
@@ -197,11 +198,11 @@ class TestOptimizer(unittest.TestCase):
         # Use of the output from the Transpose node in the main graph should
         # have been replaced with the input to the identity node
         assert len(optimized_model.graph.output) == 2
-        assert optimized_model.graph.output[0].name == "X"
+        assert optimized_model.graph.output[0].name == "Y"
         # Use of the output from the Transpose node in the loop graph should
         # have been replaced with the input to that identity node
         assert len(optimized_model.graph.node[2].attribute[0].g.output) == 2
-        assert optimized_model.graph.node[2].attribute[0].g.output[1].name == "_Y"
+        assert optimized_model.graph.node[2].attribute[0].g.output[1].name == "_Y2"
 
     def test_nop_transpose_default(self):  # type: () -> None
         trans = helper.make_node("Transpose", ["X"], ["Y"])
@@ -230,7 +231,7 @@ class TestOptimizer(unittest.TestCase):
             assert node.op_type != "Pad"
         self._visit_all_nodes_recursive(optimized_model.graph, check_pad)
         assert len(optimized_model.graph.output) == 1
-        assert optimized_model.graph.output[0].name == "X"
+        assert optimized_model.graph.output[0].name == "Y"
         assert len(optimized_model.graph.node) == 0
 
     def test_nop_pad_graph_output(self):  # type: () -> None
@@ -276,7 +277,7 @@ class TestOptimizer(unittest.TestCase):
             assert node.op_type != "Pad"
         self._visit_all_nodes_recursive(optimized_model.graph, check_pad)
         assert len(optimized_model.graph.output) == 1
-        assert optimized_model.graph.output[0].name == "X"
+        assert optimized_model.graph.output[0].name == "Y"
         assert len(optimized_model.graph.node) == 0
 
     def test_nop_pad_default_opset10(self):  # type: () -> None
