@@ -10,6 +10,7 @@
 
 #include "onnxoptimizer/passes/eliminate_deadend.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
+#include "onnxoptimizer/passes/eliminate_nop_cast.h"
 #include "onnxoptimizer/passes/eliminate_nop_dropout.h"
 #include "onnxoptimizer/passes/eliminate_nop_monotone_argmax.h"
 #include "onnxoptimizer/passes/eliminate_nop_pad.h"
@@ -44,6 +45,7 @@ struct GlobalPassRegistry {
     // Register the optimization passes to the optimizer.
     registerPass<NopEmptyPass>();
     registerPass<EliminateDeadEnd>();
+    registerPass<EliminateNopCast>();
     registerPass<EliminateNopDropout>();
     registerPass<EliminateIdentity>();
     registerPass<EliminateNopMonotoneArgmax>();

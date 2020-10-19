@@ -161,6 +161,18 @@ class TestOptimizer(unittest.TestCase):
             assert node.op_type != "Identity"
         assert len(optimized_model.graph.node) == 2
 
+    def test_nop_cast(self):
+        cast = helper.make_node("Cast", ["A"], ["B"], to=TensorProto.FLOAT)
+        graph = helper.make_graph(
+            [cast],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3))],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (2, 3))])
+
+        optimized_model = self._optimized(graph, ["eliminate_nop_cast"])
+
+        assert len(optimized_model.graph.node) == 0
+
     def test_nop_transpose_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         trans = helper.make_node("Transpose", ["A"], ["B"], perm=[0, 1])
