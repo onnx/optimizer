@@ -454,9 +454,6 @@ class TestOptimizer(unittest.TestCase):
         )
         optimized_model = self._optimized(
             graph, ["extract_constant_to_initializer"])
-        self.assertEqual(
-            set(vi.name for vi in optimized_model.graph.input),
-            {'X', 'Y', 'A'})
 
         self.assertEqual(len(optimized_model.graph.initializer), 1)
         init = optimized_model.graph.initializer[0]
@@ -1593,13 +1590,7 @@ class TestOptimizer(unittest.TestCase):
             graph = helper.make_graph(
                 [conv, bn],
                 "test",
-                [helper.make_tensor_value_info("X", tensor_type, (5, 2, 28, 28)),
-                 helper.make_tensor_value_info("W", tensor_type, (3, 2, 5, 5)),
-                 helper.make_tensor_value_info("B", tensor_type, (3,)),
-                 helper.make_tensor_value_info("scale", tensor_type, (3,)),
-                 helper.make_tensor_value_info("b", tensor_type, (3,)),
-                 helper.make_tensor_value_info("mean", tensor_type, (3,)),
-                 helper.make_tensor_value_info("var", tensor_type, (3,))],
+                [helper.make_tensor_value_info("X", tensor_type, (5, 2, 28, 28))],
                 [helper.make_tensor_value_info(
                     "Z", tensor_type, (5, 3, 24, 24))],
                 initializer=initializers,
