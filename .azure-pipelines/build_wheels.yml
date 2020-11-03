@@ -40,7 +40,7 @@ jobs:
   variables:
     CIBW_ENVIRONMENT: CMAKE_PREFIX_PATH=C:/Miniconda/envs/protobuf/Library/ CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=ON -DProtobuf_USE_STATIC_LIBS=OFF -DONNX_USE_LITE_PROTO=ON" USE_MSVC_STATIC_RUNTIME=0
     CIBW_BEFORE_BUILD: pip install cmake
-    CIBW_BUILD: 'cp3*win_amd64'
+    CIBW_BUILD: 'cp36win_amd64'
   steps:
     - script: git submodule update --init --recursive
     - powershell: Write-Host "##vso[task.prependpath]$env:CONDA\Scripts"
@@ -52,4 +52,4 @@ jobs:
         pip install cibuildwheel==1.5.5
         cibuildwheel --output-dir wheelhouse .
     - task: PublishBuildArtifacts@1
-      inputs: {pathtoPublish: 'wheelhouse'}
+      inputs: {pathtoPublish: '.'}
