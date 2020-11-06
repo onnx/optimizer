@@ -8,9 +8,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - python-version: '2.7'
-            onnx_ml: 0
-            onnx_debug: 0
           - python-version: '3.6'
             onnx_ml: 0
             onnx_debug: 0

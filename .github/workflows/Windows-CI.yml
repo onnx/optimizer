@@ -24,7 +24,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        submodules: true
+        submodules: recursive
     - name: Create Anaconda environment
       uses: goanpeca/setup-miniconda@v1
       with: 
