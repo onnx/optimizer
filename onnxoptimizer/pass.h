@@ -193,6 +193,15 @@ class PredicateBasedPass : public Pass {
   std::shared_ptr<PostPassAnalysis> runPass(Graph& graph) override;
   PassAnalysisType getPassAnalysisType() const override;
 
+  static int getOpsetVersion(Graph &g) {
+    for (const OpSetID &opset : g.opset_versions_mutable()) {
+      if (opset.domain() == "") {
+        return opset.version();
+      }
+    }
+    return 0;
+  }
+
  private:
   unsigned int _runPassInternal(Graph& graph);
 };
