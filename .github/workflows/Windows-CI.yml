@@ -24,14 +24,14 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        submodules: true
+        submodules: recursive
     - name: Create Anaconda environment
       uses: goanpeca/setup-miniconda@v1
       with: 
         activate-environment: py${{ matrix.python-version }}
         python-version: ${{ matrix.python-version }}
         channels: conda-forge
-    - run: conda install numpy libprotobuf=3.11.3 protobuf
+    - run: conda install numpy libprotobuf=3.13.0 protobuf
       shell: pwsh
     - name: Install and test ONNX Optimizer
       shell: cmd /C call {0}

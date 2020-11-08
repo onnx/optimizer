@@ -54,8 +54,8 @@
 ## ONNX
 
 # build, distribute, and bins (+ python proto bindings)
-build
-build_*
+build/
+build_*/
 .build_debug/*
 .build_release/*
 .setuptools-cmake-build/*
