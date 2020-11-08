@@ -31,7 +31,7 @@ jobs:
         activate-environment: py${{ matrix.python-version }}
         python-version: ${{ matrix.python-version }}
         channels: conda-forge
-    - run: conda install protobuf
+    - run: conda install libprotobuf=3.13.0 protobuf
       shell: bash -l {0}
     - run: |
         python -m pip install --upgrade pip
@@ -65,13 +65,9 @@ jobs:
         ! grep -R --include='*.cc' --include='*.h' 'onnx::' .
 
         # onnx python api tests
-        if [ "${{ matrix.python-version }}" == "2.7" ]; then
-          pip install --quiet pytest nbval
-        else
-          # pytest 6.0 made deprecation warnings fail by default, pinning pytest to 5.4.3.
-          # TODO replace deprecated function with the suggested one. https://docs.pytest.org/en/stable/deprecations.html#id5
-          pip install --quiet pytest==5.4.3 nbval
-        fi
+        # pytest 6.0 made deprecation warnings fail by default, pinning pytest to 5.4.3.
+        # TODO replace deprecated function with the suggested one. https://docs.pytest.org/en/stable/deprecations.html#id5
+        pip install --quiet pytest==5.4.3 nbval
 
         pytest
         if [ $? -ne 0 ]; then
@@ -79,19 +75,16 @@ jobs:
           exit 1
         fi
 
-        # Mypy only works with Python 3
-        if [ "${{ matrix.python-version }}" != "2.7" ]; then
-          # Mypy only works with our generated _pb.py files when we install in develop mode, so let's do that
-          pip uninstall -y onnxoptimizer
-          ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install --no-use-pep517 -e .[mypy]
-          python setup.py --quiet typecheck
-          if [ $? -ne 0 ]; then
-            echo "type check failed"
-            exit 1
-          fi
-          pip uninstall -y onnxoptimizer
-          rm -rf .setuptools-cmake-build
-          ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install .
+        # Mypy only works with our generated _pb.py files when we install in develop mode, so let's do that
+        pip uninstall -y onnxoptimizer
+        ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install --no-use-pep517 -e .[mypy]
+        python setup.py --quiet typecheck
+        if [ $? -ne 0 ]; then
+          echo "type check failed"
+          exit 1
         fi
+        pip uninstall -y onnxoptimizer
+        rm -rf .setuptools-cmake-build
+        ONNX_NAMESPACE=ONNX_NAMESPACE_FOO_BAR_FOR_CI pip install .
       name: 'Run ONNX Optimizer tests'
       shell: bash -l {0}
