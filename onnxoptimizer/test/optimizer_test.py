@@ -1403,8 +1403,8 @@ class TestOptimizer(unittest.TestCase):
         x_shape = [1, 1, 1, 3, 4, 1, 6, 1, 1, 9]
         s1_one_indices = [i for i, a in enumerate(x_shape) if a == 1]
         s1_axes = np.random.choice(s1_one_indices,
-                                   size=np.random.randint(low=1, high=len(s1_one_indices) - 1, dtype=np.int64),
-                                   replace=False)
+                                   size=np.random.randint(low=1, high=len(s1_one_indices) - 1),
+                                   replace=False).astype(np.int64)
         s2_x_shape = [a for i, a in enumerate(x_shape) if i not in s1_axes]
         s2_one_indices = [i for i, a in enumerate(s2_x_shape) if a == 1]
         s2_axes = np.array(s2_one_indices).astype(np.int64)
