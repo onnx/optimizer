@@ -1402,11 +1402,12 @@ class TestOptimizer(unittest.TestCase):
     def test_fuse_consecutive_squeezes_random(self):  # type: () -> None
         x_shape = [1, 1, 1, 3, 4, 1, 6, 1, 1, 9]
         s1_one_indices = [i for i, a in enumerate(x_shape) if a == 1]
-        s1_axes = np.random.choice(s1_one_indices, size=np.random.randint(low=1, high=len(s1_one_indices) - 1),
+        s1_axes = np.random.choice(s1_one_indices,
+                                   size=np.random.randint(low=1, high=len(s1_one_indices) - 1, dtype=np.int64),
                                    replace=False)
         s2_x_shape = [a for i, a in enumerate(x_shape) if i not in s1_axes]
         s2_one_indices = [i for i, a in enumerate(s2_x_shape) if a == 1]
-        s2_axes = s2_one_indices
+        s2_axes = np.array(s2_one_indices).astype(np.int64)
 
         squeeze1 = helper.make_node("Squeeze", ["X", "X_axes"], ["Y"])
         squeeze2 = helper.make_node("Squeeze", ["Y", "Y_axes"], ["Z"])
@@ -1414,7 +1415,7 @@ class TestOptimizer(unittest.TestCase):
             helper.make_tensor(name, TensorProto.INT64,
                                npa.shape, npa.tobytes(), raw=True)
             for name, npa in [('X_axes', s1_axes),
-                              ('Y_axes', np.array(s2_axes))]
+                              ('Y_axes', s2_axes)]
         ]
         nodes = [squeeze1, squeeze2]
         graph = helper.make_graph(
@@ -1422,7 +1423,7 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, x_shape),
              helper.make_tensor_value_info("X_axes", TensorProto.INT64, s1_axes.shape),
-             helper.make_tensor_value_info("Y_axes", TensorProto.INT64, np.array(s2_axes).shape)],
+             helper.make_tensor_value_info("Y_axes", TensorProto.INT64, s2_axes.shape)],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (3, 4, 6, 9))],
             initializer=initializers
         )
