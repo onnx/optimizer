@@ -34,6 +34,25 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
         node->inputs()[0]->node()->inputs().size() == 2;
   }
+  static Node *makeSqueeze(Graph &graph, std::vector<int64_t> &axes,
+                           Value *input, Node *target_node, BuiltinSymbol k) {
+    Node *squeeze = graph.create(k, 1);
+    int opset_version = getOpsetVersion(graph);
+    squeeze->addInput(input);
+    int version_threshold = k == kSqueeze ? 5 : 11;
+    if (opset_version <= version_threshold && opset_version != 0) {
+      squeeze->is_(kaxes, std::move(axes));
+    } else {
+      Tensor t;
+      t.sizes().push_back(axes.size());
+      t.int64s() = axes;
+      t.elem_type() = TensorProto_DataType_INT64;
+      Value *tv = graph.addInitializerAndInput(t);
+      squeeze->addInput(tv);
+    }
+    squeeze->insertBefore(target_node);
+    return squeeze;
+  }
   bool runTransform(Node* n, Graph& graph, NodeDestroyType& destroy_current)
       override {
     // due to current broadcasting's constraint, Conv has to be the first
@@ -91,19 +110,16 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       }
       Value* conv_3rd_input = orig_bias;
       if (bias_shape.size() > 1) {
-        Node* squeeze = graph.create(kSqueeze, 1);
         std::vector<int64_t> axes(bias_shape.size() - 1);
         std::iota(axes.begin(), axes.end(), 0);
-        squeeze->is_(kaxes, std::move(axes));
-        squeeze->addInput(conv_3rd_input);
+        Node *squeeze = makeSqueeze(graph, axes, conv_3rd_input,
+                                    orig_conv->node(), kSqueeze);
         conv_3rd_input = squeeze->output();
-        squeeze->insertBefore(orig_conv->node());
       } else if (bias_shape.size() == 0) {
-        Node* unsqueeze = graph.create(kUnsqueeze, 1);
-        unsqueeze->is_(kaxes, {0});
-        unsqueeze->addInput(conv_3rd_input);
+        std::vector<int64_t> axes = {0};
+        Node *unsqueeze = makeSqueeze(graph, axes, conv_3rd_input,
+                                      orig_conv->node(), kUnsqueeze);
         conv_3rd_input = unsqueeze->output();
-        unsqueeze->insertBefore(orig_conv->node());
       }
       if (M > 1) {
         Node* constant = graph.create(kConstant, 1);
@@ -135,14 +151,12 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
           orig_conv->node()->isBefore(orig_bias->node())) {
         orig_bias->node()->moveBefore(orig_conv->node());
       }
-      Node* squeeze = graph.create(kSqueeze, 1);
       std::vector<int64_t> axes(bias_shape.size());
       std::iota(axes.begin(), axes.end(), static_cast<int64_t>(0));
-      axes.erase(
-          axes.begin() + (1 + bias_shape.size() - static_cast<unsigned>(rank)));
-      squeeze->is_(kaxes, std::move(axes));
-      squeeze->addInput(orig_bias);
-      squeeze->insertBefore(orig_conv->node());
+      axes.erase(axes.begin() +
+                 (1 + bias_shape.size() - static_cast<unsigned>(rank)));
+      Node *squeeze =
+          makeSqueeze(graph, axes, orig_bias, orig_conv->node(), kSqueeze);
       orig_conv->node()->addInput(squeeze->output());
     } else {
       return false;

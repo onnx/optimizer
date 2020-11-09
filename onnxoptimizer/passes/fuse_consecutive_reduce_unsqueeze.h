@@ -29,33 +29,66 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   std::string getPassName() const override {
     return "fuse_consecutive_reduce_unsqueeze";
   }
-  bool patternMatchPredicate(Node* node) override {
+  static void getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
+    int opset_version = getOpsetVersion(graph);
+    int opset_threshold;
+    if (n->kind() == kUnsqueeze || n->kind() == kReduceSum) {
+      opset_threshold = 12;
+    } else {
+      opset_threshold = opset_version;
+    }
+    if (opset_version <= opset_threshold && opset_version != 0) {
+      axes = n->is(kaxes);
+    } else {
+      auto axes_value = n->inputs()[1];
+      if ((axes_value->node()->kind() != kConstant &&
+           axes_value->node()->kind() != kParam)) {
+        return;
+      }
+      Tensor axes_t;
+      if (axes_value->node()->kind() == kConstant) {
+        axes_t = axes_value->node()->t(kvalue);
+      } else {
+        const auto axes_i = graph.getInitializer(axes_value->uniqueName());
+        axes_t = *axes_i;
+      }
+      axes = ParseData<int64_t>(&axes_t);
+    }
+  }
+  bool patternMatchPredicate(Node *node) override {
     // check that the current node is of type Unsqueeze and has defined axes
-    bool cur_node_check =
-        node->kind() == kUnsqueeze && node->hasAttribute(kaxes);
+    bool cur_node_check = node->kind() == kUnsqueeze;
     if (cur_node_check) {
-      Node* prev_node = node->input()->node();
+      Node *prev_node = node->inputs()[0]->node();
       // check that the previous node a reduction operator and has defined
       // axes/keepdims
       bool reduction_node_check = reduction_operators.find(prev_node->kind()) !=
-              reduction_operators.end() &&
-          prev_node->hasAttribute(kaxes) && prev_node->hasAttribute(kkeepdims);
+                                      reduction_operators.end() &&
+                                  prev_node->hasAttribute(kkeepdims);
       if (reduction_node_check) {
         // insure that keepdims is set to false currently
-        return prev_node->i(kkeepdims) == 0 && node->is(kaxes) == prev_node->is(kaxes);
+        return prev_node->i(kkeepdims) == 0;
       }
     }
     return false;
   }
-  bool runTransform(Node* node, Graph&, NodeDestroyType& destroy_current)
-      override {
-    Node* reduction_op = node->input()->node();
+  bool runTransform(Node *node, Graph &graph,
+                    NodeDestroyType &destroy_current) override {
+    Node *prev_node = node->inputs()[0]->node();
+    std::vector<int64_t> axes;
+    getAxes(node, graph, axes);
+    std::vector<int64_t> prev_axes;
+    getAxes(prev_node, graph, prev_axes);
+    if (axes != prev_axes) {
+      return false;
+    }
+    Node *reduction_op = node->inputs()[0]->node();
     // set keepdims flag to be true
     reduction_op->i_(kkeepdims, 1);
     // remove unnecessary unsqueeze
     reduction_op->output()->setSizes(node->output()->sizes());
     reduction_op->output()->setElemType(node->output()->elemType());
-    node->output()->replaceAllUsesWith(node->input());
+    node->output()->replaceAllUsesWith(node->inputs()[0]);
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
