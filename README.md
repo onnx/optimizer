@@ -1,5 +1,9 @@
 # ONNX Optimizer
 
+[![PyPI version](https://img.shields.io/pypi/v/onnxoptimizer.svg)](https://pypi.python.org/pypi/onnxoptimizer/)
+[![PyPI license](https://img.shields.io/pypi/l/onnxoptimizer.svg)](https://pypi.python.org/pypi/onnxoptimizer/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/onnx/optimizer/pulls)
+
 ## Introduction
 
 ONNX provides a C++ library for performing arbitrary optimizations on ONNX models, as well as a growing list of prepackaged optimization passes.
@@ -10,7 +14,7 @@ You may be interested in invoking the provided passes, or in implementing new on
 
 ## Installation
 
-You can install onnxoptimizer from PyPI by
+You can install onnxoptimizer from PyPI:
 
 ```bash
 pip3 install onnxoptimizer
@@ -28,13 +32,13 @@ Note that you need to install protobuf before building from source.
 
 ## Roadmap
 
-* Command-line API (e.g. python3 -m onnxoptimizer model.onnx output.onnx)
+* Command-line API (e.g. `python3 -m onnxoptimizer model.onnx output.onnx`)
 * More built-in pass
-* Separate graph rewriting and constant folding (or a pure graph rewriting mode, see https://github.com/onnx/optimizer/issues/9 for the details)
+* Separate graph rewriting and constant folding (or a pure graph rewriting mode, see [issue #9](https://github.com/onnx/optimizer/issues/9) for the details)
 
 ## Relevant tools
 
-[onnx-simplifier](https://github.com/daquexian/onnx-simplifier): A handy and popular tool based on onnxoptimizer
+* [onnx-simplifier](https://github.com/daquexian/onnx-simplifier): A handy and popular tool based on onnxoptimizer
 
 ## Code of Conduct
 
