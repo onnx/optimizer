@@ -24,9 +24,9 @@ jobs:
     steps:
     - uses: actions/checkout@v2
       with:
-        submodules: true
+        submodules: recursive
     - name: Create Anaconda environment
-      uses: goanpeca/setup-miniconda@v1
+      uses: conda-incubator/setup-miniconda@v2
       with: 
         activate-environment: py${{ matrix.python-version }}
         python-version: ${{ matrix.python-version }}
