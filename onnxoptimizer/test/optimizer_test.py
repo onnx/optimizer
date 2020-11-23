@@ -163,6 +163,25 @@ class TestOptimizer(unittest.TestCase):
             assert node.op_type != "Identity"
         assert len(optimized_model.graph.node) == 2
 
+    def test_nop_flatten_axis0_graph_output(self):
+        add = helper.make_node("Add", ["X", "Y"], ["A"])
+        flatten = helper.make_node("Flatten", ["A"], ["B"], axis=0)
+        graph = helper.make_graph(
+            [add, flatten],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 10)),
+             helper.make_tensor_value_info("Y", TensorProto.FLOAT, (1, 10)),
+             ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 10))],
+            # the tensor_value_info of "A" ix necessary to this optimizer
+            value_info=[helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 10))]
+            )
+        # The existence of shape infos of graoh outputs is checked in _optimized
+        optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type != 'Flatten'
+
     def test_nop_flatten_axis0(self):
         flatten = helper.make_node("Flatten", ["A"], ["B"], axis=0)
         graph = helper.make_graph(
