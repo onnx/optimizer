@@ -173,14 +173,14 @@ class TestOptimizer(unittest.TestCase):
              helper.make_tensor_value_info("Y", TensorProto.FLOAT, (1, 10)),
              ],
             [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 10))],
-            # the tensor_value_info of "A" ix necessary to this optimizer
+            # the tensor_value_info of "A" is necessary to this optimizer
             value_info=[helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 10))]
             )
         # The existence of shape infos of graoh outputs is checked in _optimized
         optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
 
         assert len(optimized_model.graph.node) == 1
-        assert optimized_model.graph.node[0].op_type != 'Flatten'
+        assert optimized_model.graph.node[0].op_type == 'Add'
 
     def test_nop_flatten_axis0(self):
         flatten = helper.make_node("Flatten", ["A"], ["B"], axis=0)
