@@ -144,7 +144,8 @@ class TestOptimizer(unittest.TestCase):
 
         for node in optimized_model.graph.node:
             assert node.op_type != "Identity"
-        assert len(optimized_model.graph.output) == 1 and optimized_model.graph.output[0].name == 'B'
+        assert len(
+            optimized_model.graph.output) == 1 and optimized_model.graph.output[0].name == 'B'
         assert len(optimized_model.graph.node) == 1
 
     def test_eliminate_identity_multiple_uses(self):  # type: () -> None
@@ -162,6 +163,63 @@ class TestOptimizer(unittest.TestCase):
         for node in optimized_model.graph.node:
             assert node.op_type != "Identity"
         assert len(optimized_model.graph.node) == 2
+
+    def test_not_fuse_non_nop_flatten(self):
+        flatten = helper.make_node("Flatten", ["A"], ["B"], axis=2)
+        graph = helper.make_graph(
+            [flatten],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 10, 3, 1, 1))],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (10, 3))])
+
+        optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == 'Flatten'
+
+    def test_nop_flatten_axis0_graph_output(self):
+        add = helper.make_node("Add", ["X", "Y"], ["A"])
+        flatten = helper.make_node("Flatten", ["A"], ["B"], axis=0)
+        graph = helper.make_graph(
+            [add, flatten],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 10)),
+             helper.make_tensor_value_info("Y", TensorProto.FLOAT, (1, 10)),
+             ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 10))],
+            # the tensor_value_info of "A" is necessary to this optimizer
+            value_info=[helper.make_tensor_value_info(
+                "A", TensorProto.FLOAT, (1, 10))]
+        )
+        # The existence of shape infos of graoh outputs is checked in _optimized
+        optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == 'Add'
+
+    def test_nop_flatten_axis0(self):
+        flatten = helper.make_node("Flatten", ["A"], ["B"], axis=0)
+        graph = helper.make_graph(
+            [flatten],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 10))],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 10))])
+
+        optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
+
+        assert len(optimized_model.graph.node) == 0
+
+    def test_nop_flatten_axis1(self):
+        flatten = helper.make_node("Flatten", ["A"], ["B"], axis=1)
+        graph = helper.make_graph(
+            [flatten],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3))],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (2, 3))])
+
+        optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
+
+        assert len(optimized_model.graph.node) == 0
 
     def test_nop_cast(self):
         cast = helper.make_node("Cast", ["A"], ["B"], to=TensorProto.FLOAT)
@@ -1358,7 +1416,8 @@ class TestOptimizer(unittest.TestCase):
                 "X", TensorProto.FLOAT, (1, 1, 2, 3, 1, 1, 1, 1, 8, 9)),
                 helper.make_tensor_value_info("X_axes", TensorProto.INT64, [3]),
                 helper.make_tensor_value_info("Y_axes", TensorProto.INT64, [2])],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (2, 3, 1, 8, 9))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (2, 3, 1, 8, 9))],
             initializer=initializers)
         optimized_model = self._optimized(graph, ["fuse_consecutive_squeezes"])
 
@@ -1389,7 +1448,8 @@ class TestOptimizer(unittest.TestCase):
                 helper.make_tensor_value_info("X_axes", TensorProto.INT64, [3]),
                 helper.make_tensor_value_info("Y_axes", TensorProto.INT64, [2]),
                 helper.make_tensor_value_info("Z_axes", TensorProto.INT64, [1])],
-            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3, 8, 9))],
+            [helper.make_tensor_value_info(
+                "A", TensorProto.FLOAT, (2, 3, 8, 9))],
             initializer=initializers)
         optimized_model = self._optimized(graph, ["fuse_consecutive_squeezes"])
 
@@ -1403,7 +1463,8 @@ class TestOptimizer(unittest.TestCase):
         x_shape = [1, 1, 1, 3, 4, 1, 6, 1, 1, 9]
         s1_one_indices = [i for i, a in enumerate(x_shape) if a == 1]
         s1_axes = np.random.choice(s1_one_indices,
-                                   size=np.random.randint(low=1, high=len(s1_one_indices) - 1),
+                                   size=np.random.randint(
+                                       low=1, high=len(s1_one_indices) - 1),
                                    replace=False).astype(np.int64)
         s2_x_shape = [a for i, a in enumerate(x_shape) if i not in s1_axes]
         s2_one_indices = [i for i, a in enumerate(s2_x_shape) if a == 1]
@@ -1422,9 +1483,11 @@ class TestOptimizer(unittest.TestCase):
             nodes,
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, x_shape),
-             helper.make_tensor_value_info("X_axes", TensorProto.INT64, s1_axes.shape),
+             helper.make_tensor_value_info(
+                 "X_axes", TensorProto.INT64, s1_axes.shape),
              helper.make_tensor_value_info("Y_axes", TensorProto.INT64, s2_axes.shape)],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (3, 4, 6, 9))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (3, 4, 6, 9))],
             initializer=initializers
         )
         optimized_model = self._optimized(graph, ["fuse_consecutive_squeezes"])
@@ -1950,7 +2013,8 @@ class TestOptimizer(unittest.TestCase):
                             [node, node1],
                             "test",
                             graph_input,
-                            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, output_shape)],
+                            [helper.make_tensor_value_info(
+                                "Z", TensorProto.FLOAT, output_shape)],
                             initializer=graph_initializer
                         )
                         optimized_model = self._optimized(
