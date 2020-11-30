@@ -23,6 +23,8 @@ struct EliminateDeadEnd final : public FullGraphBasedPass {
     for (auto it = nodes.begin(); it != nodes.end(); it++) {
       auto node = *it;
       if (!node->hasUses()) {
+          std::cout << "remove " << node->name() << std::endl;
+          std::cout << "output " << node->outputs()[0]->uniqueName() << std::endl;
         nodes_removed++;
         it.destroyCurrent();
       }

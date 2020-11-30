@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "onnx/defs/tensor_proto_util.h"
 #include "onnxoptimizer/pass.h"
 
 namespace ONNX_NAMESPACE {
@@ -29,17 +30,27 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   std::string getPassName() const override {
     return "fuse_consecutive_reduce_unsqueeze";
   }
-  static void getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
+  static bool IsAxesAnAttr(const Graph& graph, const Node& n) {
     int opset_version = getOpsetVersion(graph);
     int opset_threshold;
-    if (n->kind() == kUnsqueeze || n->kind() == kReduceSum) {
+    std::cout << n.kind().toString() << std::endl;
+    std::cout << opset_version << std::endl;
+    if (n.kind() == kUnsqueeze || n.kind() == kReduceSum) {
       opset_threshold = 12;
-    } else {
-      opset_threshold = opset_version;
+      return opset_version <= opset_threshold && opset_version != 0;
     }
-    if (opset_version <= opset_threshold && opset_version != 0) {
+    return true;
+  }
+  static void getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
+    if (IsAxesAnAttr(graph, *n)) {
+      if (!n->hasAttribute(kaxes)) {
+        return;
+      }
       axes = n->is(kaxes);
     } else {
+      if (n->inputs().size() < 2) {
+        return;
+      }
       auto axes_value = n->inputs()[1];
       if ((axes_value->node()->kind() != kConstant &&
            axes_value->node()->kind() != kParam)) {

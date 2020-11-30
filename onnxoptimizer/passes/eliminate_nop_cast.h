@@ -26,6 +26,9 @@ struct EliminateNopCast final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
       override {
+          std::cout << "name: " << node->name()  << std::endl; 
+          std::cout << "input: " << node->input()->uniqueName()  << std::endl; 
+          std::cout << "output: " << node->output()->uniqueName()  << std::endl; 
     if (node->output()->has_sizes()) {
         node->input()->setSizes(node->output()->sizes());
     }
