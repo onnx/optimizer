@@ -9,6 +9,7 @@
 #include "onnx/proto_utils.h"
 
 #include "onnxoptimizer/passes/eliminate_deadend.h"
+#include "onnxoptimizer/passes/eliminate_duplicate_initializer.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
 #include "onnxoptimizer/passes/eliminate_nop_cast.h"
 #include "onnxoptimizer/passes/eliminate_nop_dropout.h"
@@ -46,6 +47,7 @@ struct GlobalPassRegistry {
     // Register the optimization passes to the optimizer.
     registerPass<NopEmptyPass>();
     registerPass<EliminateDeadEnd>();
+    registerPass<EliminateDuplicateInitializer>();
     registerPass<EliminateNopCast>();
     registerPass<EliminateNopDropout>();
     registerPass<EliminateNopFlatten>();
