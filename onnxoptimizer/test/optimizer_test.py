@@ -221,7 +221,32 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 0
 
-    def test_nop_cast(self):
+    def test_eliminate_duplicate_initializer(self):  # type: () -> None
+        add_1 = helper.make_node("Add", ["A", "I_0"], ["B"])
+        add_2 = helper.make_node("Add", ["B", "I_1"], ["C"])
+        i = np.random.rand(5).astype(np.float32)
+        graph = helper.make_graph(
+            [add_1, add_2],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,)),
+             helper.make_tensor_value_info("I_0", TensorProto.FLOAT, (5,)),
+             helper.make_tensor_value_info("I_1", TensorProto.FLOAT, (5,)),],
+            [helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor("I_0", TensorProto.FLOAT,
+                                dims=(5,),
+                                vals=i.tobytes(),
+                                raw=True),
+             helper.make_tensor("I_1", TensorProto.FLOAT,
+                                dims=(5,),
+                                vals=i.tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["eliminate_duplicate_initializer"])
+        assert len(optimized_model.graph.node) == 2
+        assert len(optimized_model.graph.initializer) == 1
+        assert len(optimized_model.graph.input) == 2
+        assert optimized_model.graph.node[0].input[1] == "I_0"
+
+    def test_nop_cast(self):  # type: () -> None
         cast = helper.make_node("Cast", ["A"], ["B"], to=TensorProto.FLOAT)
         graph = helper.make_graph(
             [cast],
