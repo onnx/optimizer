@@ -230,7 +230,7 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,)),
              helper.make_tensor_value_info("I_0", TensorProto.FLOAT, (5,)),
-             helper.make_tensor_value_info("I_1", TensorProto.FLOAT, (5,)),],
+             helper.make_tensor_value_info("I_1", TensorProto.FLOAT, (5,))],
             [helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))],
             [helper.make_tensor("I_0", TensorProto.FLOAT,
                                 dims=(5,),
