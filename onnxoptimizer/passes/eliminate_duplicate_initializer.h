@@ -21,30 +21,28 @@ namespace optimization {
 
 struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
   explicit EliminateDuplicateInitializer()
-      : FullGraphBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : FullGraphBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Memory) {}
   std::string getPassName() const override {
     return "eliminate_duplicate_initializer";
   }
   PassAnalysisType getPassAnalysisType() const override {
     return PassAnalysisType::CountBased;
   }
-  unsigned int EliminateInitializer(Graph& graph) {
+  unsigned int EliminateInitializer(Graph &graph) {
     unsigned int initializers_removed = 0;
-    const std::vector<Tensor>& initializers = graph.initializers();
+    const std::vector<Tensor> &initializers = graph.initializers();
     std::map<std::vector<int64_t>, std::vector<std::string>> init_dict_by_shape;
 
     // Make {name : Value} map
-    std::map<std::string, Value*> input_map;
+    std::map<std::string, Value *> input_map;
     for (auto inp : graph.inputs()) {
       if (inp->has_unique_name()) {
         input_map[inp->uniqueName()] = inp;
       }
     }
 
-    std::map<std::string, Value*> output_map;
+    std::map<std::string, Value *> output_map;
     for (auto out : graph.outputs()) {
       if (out->has_unique_name()) {
         output_map[out->uniqueName()] = out;
@@ -89,61 +87,52 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
           continue;
         }
         Tensor i_tensor = *iter_i_initializer;
-        int32_t i_type = i_tensor.elem_type();
+        Value *i_value = input_map.find(i_tensor.name())->second;
 
-        Value* i_value = input_map.find(i_tensor.name())->second;
-
-#define DO_COMPARISON(data_type)                                             \
-  const std::vector<data_type> i_data = ParseData<data_type>(&i_tensor);     \
-  for (auto iter_j = iter_i + 1; iter_j != pair.second.end(); ++iter_j) {    \
-    if (visited.find(*iter_i) != visited.end()) {                            \
-      continue;                                                              \
-    }                                                                        \
-    const auto iter_j_initializer = graph.getInitializer(*iter_j);           \
-    if (iter_j_initializer == graph.initializers().end()) {                  \
-      visited.insert(*iter_j);                                               \
-      continue;                                                              \
-    }                                                                        \
-    Tensor j_tensor = *iter_j_initializer;                                   \
-    if (i_tensor.elem_type() != j_tensor.elem_type()) {                      \
-      continue;                                                              \
-    } else {                                                                 \
-      const std::vector<data_type> j_data = ParseData<data_type>(&j_tensor); \
-      if (std::equal(i_data.begin(), i_data.end(), j_data.begin())) {        \
-        visited.insert(*iter_j);                                             \
-        Value* j_value = input_map.find(j_tensor.name())->second;            \
-        j_value->replaceAllUsesWith(i_value);                                \
-        graph.eraseInitializerAndInput(j_value);                             \
-        initializers_removed++;                                              \
-      }                                                                      \
-    }                                                                        \
+#define DO_COMPARISON(data_type)                                               \
+  const std::vector<data_type> i_data = ParseData<data_type>(&i_tensor);       \
+  for (auto iter_j = iter_i + 1; iter_j != pair.second.end(); ++iter_j) {      \
+    if (visited.find(*iter_i) != visited.end()) {                              \
+      continue;                                                                \
+    }                                                                          \
+    const auto iter_j_initializer = graph.getInitializer(*iter_j);             \
+    if (iter_j_initializer == graph.initializers().end()) {                    \
+      visited.insert(*iter_j);                                                 \
+      continue;                                                                \
+    }                                                                          \
+    Tensor j_tensor = *iter_j_initializer;                                     \
+    if (i_tensor.elem_type() != j_tensor.elem_type()) {                        \
+      continue;                                                                \
+    } else {                                                                   \
+      const std::vector<data_type> j_data = ParseData<data_type>(&j_tensor);   \
+      if (std::equal(i_data.begin(), i_data.end(), j_data.begin())) {          \
+        visited.insert(*iter_j);                                               \
+        Value *j_value = input_map.find(j_tensor.name())->second;              \
+        j_value->replaceAllUsesWith(i_value);                                  \
+        graph.eraseInitializerAndInput(j_value);                               \
+        initializers_removed++;                                                \
+      }                                                                        \
+    }                                                                          \
+  }
+#define CASE_DO_COMPARISON(ONNX_DTYPE_SUFFIX, CPP_DTYPE)                       \
+  case ONNX_NAMESPACE::TensorProto_DataType_##ONNX_DTYPE_SUFFIX: {             \
+    DO_COMPARISON(CPP_DTYPE)                                                   \
+    break;                                                                     \
   }
         switch (i_tensor.elem_type()) {
-          case ONNX_NAMESPACE::TensorProto_DataType_FLOAT: {
-            DO_COMPARISON(float)
-            break;
-          }
-          case ONNX_NAMESPACE::TensorProto_DataType_DOUBLE: {
-            DO_COMPARISON(double)
-            break;
-          }
-          case ONNX_NAMESPACE::TensorProto_DataType_INT32: {
-            DO_COMPARISON(int32_t)
-            break;
-          }
-          case ONNX_NAMESPACE::TensorProto_DataType_INT64: {
-            DO_COMPARISON(int64_t)
-            break;
-          }
-          default:
-            break;
+          CASE_DO_COMPARISON(FLOAT, float)
+          CASE_DO_COMPARISON(DOUBLE, double)
+          CASE_DO_COMPARISON(INT32, int32_t)
+          CASE_DO_COMPARISON(INT64, int64_t)
+        default:
+          break;
         }
 #undef DO_COMPARISON
       }
     }
     return initializers_removed;
   }
-  std::shared_ptr<PostPassAnalysis> runPass(Graph& graph) override {
+  std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) override {
     auto initializers_removed = this->EliminateInitializer(graph);
     return std::shared_ptr<PostPassAnalysis>(
         new CountBasedPassAnalysis(this, initializers_removed, false, false));
