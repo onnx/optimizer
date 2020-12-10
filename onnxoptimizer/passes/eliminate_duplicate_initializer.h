@@ -127,6 +127,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
         default:
           break;
         }
+#undef CASE_DO_COMPARISON
 #undef DO_COMPARISON
       }
     }
