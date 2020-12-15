@@ -79,9 +79,6 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       // Use iter_i, iter_j to loop it
       for (auto iter_i = pair.second.begin(); iter_i != pair.second.end();
            ++iter_i) {
-        if (visited.find(*iter_i) != visited.end()) {
-          continue;
-        }
         const auto iter_i_initializer = graph.getInitializer(*iter_i);
         if (iter_i_initializer == graph.initializers().end()) {
           continue;
