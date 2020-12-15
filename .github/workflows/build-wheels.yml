@@ -9,7 +9,7 @@ jobs:
       CIBW_BEFORE_ALL_MACOS: pip install cmake && git clone https://github.com/protocolbuffers/protobuf.git && cd protobuf && git checkout v3.13.0 && cd cmake && mkdir build && cd build && cmake -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_EXAMPLES=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_BUILD_TYPE=Release .. && cmake --build . -j4 && cmake -P cmake_install.cmake
       CIBW_BEFORE_ALL_WINDOWS: git clone https://github.com/protocolbuffers/protobuf.git && cd protobuf && git checkout v3.13.0 && cd cmake && mkdir build && cd build && cmake -G "Visual Studio 15 2017 Win64" -Dprotobuf_MSVC_STATIC_RUNTIME=OFF -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_EXAMPLES=OFF -DCMAKE_INSTALL_PREFIX=C:/protobuf_install -DBUILD_SHARED_LIBS=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON .. && cmake --build . --config Release -j4 && cmake -P cmake_install.cmake --config Release
       CIBW_TEST_REQUIRES: pytest==5.4.3 nbval flake8 mypy
-      CIBW_TEST_COMMAND: cd {project} && flake8 && grep -R --include='*.cc' --include='*.h' 'namespace onnx' . && grep -R --include='*.cc' --include='*.h' 'onnx::' . && python setup.py typecheck && pytest
+      CIBW_TEST_COMMAND: cd {project} && flake8 && ! grep -R --include='*.cc' --include='*.h' 'namespace onnx' . && ! grep -R --include='*.cc' --include='*.h' 'onnx::' . && python setup.py typecheck && pytest
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       CIBW_ENVIRONMENT_WINDOWS: CMAKE_PREFIX_PATH=C:/protobuf_install USE_MSVC_STATIC_RUNTIME=0
       # Only build on Python 3 and skip 32-bit builds
