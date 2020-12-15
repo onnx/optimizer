@@ -79,6 +79,9 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       // Use iter_i, iter_j to loop it
       for (auto iter_i = pair.second.begin(); iter_i != pair.second.end();
            ++iter_i) {
+        if (visited.find(*iter_i) != visited.end()) {
+          continue;
+        }
         const auto iter_i_initializer = graph.getInitializer(*iter_i);
         if (iter_i_initializer == graph.initializers().end()) {
           continue;
@@ -89,9 +92,6 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
 #define DO_COMPARISON(data_type)                                               \
   const std::vector<data_type> i_data = ParseData<data_type>(&i_tensor);       \
   for (auto iter_j = iter_i + 1; iter_j != pair.second.end(); ++iter_j) {      \
-    if (visited.find(*iter_i) != visited.end()) {                              \
-      continue;                                                                \
-    }                                                                          \
     const auto iter_j_initializer = graph.getInitializer(*iter_j);             \
     if (iter_j_initializer == graph.initializers().end()) {                    \
       visited.insert(*iter_j);                                                 \
