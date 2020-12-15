@@ -11,7 +11,7 @@ jobs:
       CIBW_TEST_REQUIRES: pytest==5.4.3 nbval flake8 mypy
       CIBW_TEST_COMMAND: cd {project} && flake8 && ! grep -R --include='*.cc' --include='*.h' 'namespace onnx' . && ! grep -R --include='*.cc' --include='*.h' 'onnx::' . && python setup.py typecheck && pytest
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
-      CIBW_ENVIRONMENT_WINDOWS: CMAKE_PREFIX_PATH=C:/protobuf_install USE_MSVC_STATIC_RUNTIME=0
+      CIBW_ENVIRONMENT_WINDOWS: CMAKE_PREFIX_PATH=C:/protobuf_install USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       # Only build on Python 3 and skip 32-bit builds
       CIBW_BUILD: cp3?-*
       CIBW_SKIP: "*-win32 *-manylinux_i686"
