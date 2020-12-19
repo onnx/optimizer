@@ -24,18 +24,40 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
   std::string getPassName() const override {
     return "fuse_consecutive_squeezes";
   }
+  static void getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
+    int opset_version = getOpsetVersion(graph);
+    if (opset_version <= 12 && opset_version != 0) {
+      axes = n->is(kaxes);
+    } else {
+      auto axes_value = n->inputs()[1];
+      if ((axes_value->node()->kind() != kConstant &&
+           axes_value->node()->kind() != kParam)) {
+        return;
+      }
+      Tensor axes_t;
+      if (axes_value->node()->kind() == kConstant) {
+        axes_t = axes_value->node()->t(kvalue);
+      } else {
+        const auto axes_i = graph.getInitializer(axes_value->uniqueName());
+        axes_t = *axes_i;
+      }
+      axes = ParseData<int64_t>(&axes_t);
+    }
+  }
   // returns a vector `ret` such that squeeze by `ret` is equivalent
   // to squeeze by `axes_1` and then by `axes_2`
-  std::vector<int64_t> compose_squeezes(
-      const std::vector<int64_t>& axes_1,
-      const std::vector<int64_t>& axes_2) {
+  static std::vector<int64_t> compose_squeezes(const Node *input_n,
+                                               const Node *n, Graph &graph) {
     std::vector<int64_t> ret;
+    std::vector<int64_t> axes_1;
+    std::vector<int64_t> axes_2;
+    getAxes(input_n, graph, axes_1);
+    getAxes(n, graph, axes_2);
     ret.reserve(axes_1.size() + axes_2.size());
-
     std::vector<int64_t> sorted_axes_1(axes_1.begin(), axes_1.end());
     std::sort(sorted_axes_1.begin(), sorted_axes_1.end());
-    std::copy(
-        sorted_axes_1.begin(), sorted_axes_1.end(), std::back_inserter(ret));
+    std::copy(sorted_axes_1.begin(), sorted_axes_1.end(),
+              std::back_inserter(ret));
 
     for (int64_t i : axes_2) {
       for (auto iter = sorted_axes_1.begin(); iter != sorted_axes_1.end();
@@ -58,18 +80,29 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
     return ret;
   }
 
-  bool patternMatchPredicate(Node* node) override {
+  bool patternMatchPredicate(Node *node) override {
     return node->kind() == kSqueeze &&
-        node->input()->node()->kind() == kSqueeze;
+           node->inputs()[0]->node()->kind() == kSqueeze;
   }
-  bool runTransform(Node* n, Graph&, NodeDestroyType& destroy_current)
-      override {
-    auto orig_input = n->input();
-    n->is_(
-        kaxes, compose_squeezes(orig_input->node()->is(kaxes), n->is(kaxes)));
-    n->replaceInput(0, orig_input->node()->input());
+  bool runTransform(Node *n, Graph &graph,
+                    NodeDestroyType &destroy_current) override {
+    auto orig_input = n->inputs()[0];
+    std::vector<int64_t> rs = compose_squeezes(orig_input->node(), n, graph);
+    auto axes_v = n->inputs()[1];
+    Tensor t;
+    t.sizes().push_back(rs.size());
+    t.int64s() = rs;
+    t.elem_type() = TensorProto_DataType_INT64;
+    Value *tv = graph.addInitializerAndInput(t);
+    n->replaceInput(0, orig_input->node()->inputs()[0]);
+    n->replaceInput(1, tv);
     if (orig_input->uses().size() == 0) {
       orig_input->node()->destroy();
+    }
+    if (axes_v->node()->kind() == kConstant) {
+      axes_v->node()->destroy();
+    } else {
+      graph.eraseInitializer(axes_v->uniqueName());
     }
     destroy_current = NodeDestroyType::DestroyZero;
     return true;
