@@ -33,8 +33,6 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   static bool IsAxesAnAttr(const Graph& graph, const Node& n) {
     int opset_version = getOpsetVersion(graph);
     int opset_threshold;
-    std::cout << n.kind().toString() << std::endl;
-    std::cout << opset_version << std::endl;
     if (n.kind() == kUnsqueeze || n.kind() == kReduceSum) {
       opset_threshold = 12;
       return opset_version <= opset_threshold && opset_version != 0;

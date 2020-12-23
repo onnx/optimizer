@@ -197,8 +197,6 @@ class PredicateBasedPass : public Pass {
     // this hack is due to `opset_versions_mutable` doesn't have a const version
     Graph &mut_g = const_cast<Graph&>(g);
     for (const OpSetID &opset : mut_g.opset_versions_mutable()) {
-      std::cout << "m domain: " << opset.domain() << std::endl;
-      std::cout << "m version: " << opset.version() << std::endl;
       if (opset.domain() == "") {
         return opset.version();
       }
