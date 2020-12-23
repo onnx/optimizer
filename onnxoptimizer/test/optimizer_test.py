@@ -24,7 +24,7 @@ TensorShapes = Dict[Optional[str], TensorShape]
 
 class TestOptimizer(unittest.TestCase):
     def _compare(self, model_opt: onnx.ModelProto, model_ori: onnx.ModelProto, n_times: int = 5,
-              input_shapes: Optional[TensorShapes] = None, verbose=True) -> bool:
+                 input_shapes: Optional[TensorShapes] = None, verbose=True) -> bool:
         """
         :param input_shapes: Shapes of generated random inputs
         :param model_opt: The simplified ONNX model
@@ -74,15 +74,16 @@ class TestOptimizer(unittest.TestCase):
             return size
 
         def get_input_names(model: onnx.ModelProto) -> List[str]:
-            input_names = list(set([ipt.name for ipt in model.graph.input]) -
-                               set([x.name for x in model.graph.initializer]))
+            input_names = list(set([ipt.name for ipt in model.graph.input])
+                               - set([x.name for x in model.graph.initializer]))
             return input_names
 
         def generate_rand_input(model, input_shapes: Optional[TensorShapes] = None):
             if input_shapes is None:
                 input_shapes = {}
             input_names = get_input_names(model)
-            full_input_shapes = {ipt: get_shape(model, ipt) for ipt in input_names}
+            full_input_shapes = {ipt: get_shape(
+                model, ipt) for ipt in input_names}
             assert None not in input_shapes
             full_input_shapes.update(input_shapes)  # type: ignore
             for key in full_input_shapes:
@@ -117,7 +118,8 @@ class TestOptimizer(unittest.TestCase):
             input_shapes = {}
         onnx.checker.check_model(model_opt)
         for i in range(n_times):
-            rand_input = generate_rand_input(model_opt, input_shapes=input_shapes)
+            rand_input = generate_rand_input(
+                model_opt, input_shapes=input_shapes)
             res_ori = forward(model_ori, inputs=rand_input)
             res_opt = forward(model_opt, inputs=rand_input)
 
@@ -243,7 +245,7 @@ class TestOptimizer(unittest.TestCase):
             self._optimized(graph, [pass_name])
 
     def test_eliminate_identity_single_use(self):  # type: () -> None
-        nodes = [helper.make_node("Add", ["X", "Y"], ["A"]), 
+        nodes = [helper.make_node("Add", ["X", "Y"], ["A"]),
                  helper.make_node("Identity", ["A"], ["B"])]
         nodes.extend(self._make_fake_loop_op(
             [helper.make_node("Identity", ["_B"], ["_B2"])],
@@ -309,7 +311,8 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [flatten],
             "test",
-            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 10, 3, 1, 1))],
+            [helper.make_tensor_value_info(
+                "A", TensorProto.FLOAT, (1, 10, 3, 1, 1))],
             [helper.make_tensor_value_info("B", TensorProto.FLOAT, (10, 3))])
 
         optimized_model = self._optimized(graph, ["eliminate_nop_flatten"])
@@ -380,7 +383,8 @@ class TestOptimizer(unittest.TestCase):
                                 dims=(5,),
                                 vals=i.tobytes(),
                                 raw=True)])
-        optimized_model = self._optimized(graph, ["eliminate_duplicate_initializer"])
+        optimized_model = self._optimized(
+            graph, ["eliminate_duplicate_initializer"])
         assert len(optimized_model.graph.node) == 2
         assert len(optimized_model.graph.initializer) == 1
         assert len(optimized_model.graph.input) == 2
@@ -1820,7 +1824,8 @@ class TestOptimizer(unittest.TestCase):
              helper.make_tensor_value_info("Y2", TensorProto.FLOAT, (5,))])
         # "lift_lexical_references" pass produces a graph that does not conform to
         # the ONNX spec. Disable checking.
-        optimized_model = self._optimized(graph, ["lift_lexical_references"], compare_result=False)
+        optimized_model = self._optimized(
+            graph, ["lift_lexical_references"], compare_result=False)
         assert len(optimized_model.graph.node) == 4
         # body_graph, __control_inputs
         assert len(optimized_model.graph.node[3].attribute) == 2
@@ -1844,7 +1849,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,)),
              helper.make_tensor_value_info("Y2", TensorProto.FLOAT, (5,))])
         # "If" node now diverges from ONNX schema. Disable checking.
-        optimized_model = self._optimized(graph, ["lift_lexical_references"], compare_result=False)
+        optimized_model = self._optimized(
+            graph, ["lift_lexical_references"], compare_result=False)
 
         # Identity, Constant (condition), If
         assert len(optimized_model.graph.node) == 3
@@ -1938,15 +1944,16 @@ class TestOptimizer(unittest.TestCase):
         output_shape = tuple(output_shape)
         return output_shape
 
-
     # type: () -> None
+
     def test_eliminate_nop_monotone_argmax_basic_no_node_axis(self):
         input_shape = (5, 7, 11)
         for node_name in ["Exp"]:
             for axis in range(3):
                 node = helper.make_node(node_name, ["X"], ["Y"])
                 argmax = helper.make_node("ArgMax", ["Y"], ["Z"], axis=axis)
-                output_shape = self._get_argmax_output_shape(input_shape, axis, True)
+                output_shape = self._get_argmax_output_shape(
+                    input_shape, axis, True)
                 graph = helper.make_graph(
                     [node, argmax],
                     "test",
@@ -1972,7 +1979,8 @@ class TestOptimizer(unittest.TestCase):
                         node_name, ["X"], ["Y"], axis=axis_n)
                     argmax = helper.make_node(
                         "ArgMax", ["Y"], ["Z"], axis=axis_max)
-                    output_shape = self._get_argmax_output_shape(input_shape, axis_max, True)
+                    output_shape = self._get_argmax_output_shape(
+                        input_shape, axis_max, True)
                     graph = helper.make_graph(
                         [node, argmax],
                         "test",
@@ -1999,7 +2007,8 @@ class TestOptimizer(unittest.TestCase):
                 node = helper.make_node(node_name, ["X"], ["Y"])
                 node2 = helper.make_node(node_name, ["Y"], ["Z1"])
                 argmax = helper.make_node("ArgMax", ["Y"], ["Z"], axis=axis)
-                argmax_output_shape = self._get_argmax_output_shape(input_shape, axis, True)
+                argmax_output_shape = self._get_argmax_output_shape(
+                    input_shape, axis, True)
                 graph = helper.make_graph(
                     [node, node2, argmax],
                     "test",
@@ -2015,6 +2024,7 @@ class TestOptimizer(unittest.TestCase):
     def test_eliminate_nop_monotone_argmax_consecutive(self):
         # type: (GraphProto, ModelProto, bool, int) -> None
         input_shape = (5, 7, 11)
+
         def _assertion(graph, optimized_model, axis_aligned, true_axis):
             if axis_aligned:
                 assert len(optimized_model.graph.output) == 1
@@ -2033,7 +2043,8 @@ class TestOptimizer(unittest.TestCase):
                     node2 = helper.make_node(node_name_1, ["Y"], ["Y1"])
                     argmax = helper.make_node(
                         "ArgMax", ["Y1"], ["Z"], axis=axis)
-                    output_shape = self._get_argmax_output_shape(input_shape, axis, True)
+                    output_shape = self._get_argmax_output_shape(
+                        input_shape, axis, True)
                     graph = helper.make_graph(
                         [node, node2, argmax],
                         "test",
@@ -2053,7 +2064,8 @@ class TestOptimizer(unittest.TestCase):
                             node_name_1, ["Y"], ["Y1"], axis=axis_0)
                         argmax = helper.make_node(
                             "ArgMax", ["Y1"], ["Z"], axis=axis_1)
-                        output_shape = self._get_argmax_output_shape(input_shape, axis_1, True)
+                        output_shape = self._get_argmax_output_shape(
+                            input_shape, axis_1, True)
                         graph = helper.make_graph(
                             [node, node2, argmax],
                             "test",
@@ -2076,7 +2088,8 @@ class TestOptimizer(unittest.TestCase):
                                 node_name_1, ["Y"], ["Y1"], axis=axis_1)
                             argmax = helper.make_node(
                                 "ArgMax", ["Y1"], ["Z"], axis=axis_2)
-                            output_shape = self._get_argmax_output_shape(input_shape, axis_2, True)
+                            output_shape = self._get_argmax_output_shape(
+                                input_shape, axis_2, True)
                             graph = helper.make_graph(
                                 [node, node2, argmax],
                                 "test",
