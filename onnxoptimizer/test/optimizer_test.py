@@ -146,12 +146,7 @@ class TestOptimizer(unittest.TestCase):
         orig_model = helper.make_model(
             graph, producer_name='onnx-test', **kwargs)
         checker.check_model(orig_model)
-        onnx.save(orig_model, 'temp.onnx')
         optimized_model = onnxoptimizer.optimize(orig_model, opts, fixed_point)
-        with open('opt.txt', 'w') as f:
-            f.write(str(optimized_model))
-        with open('ori.txt', 'w') as f:
-            f.write(str(orig_model))
         checker.check_model(optimized_model)
         if compare_result and len(optimized_model.graph.node) > 0:
             assert self._compare(optimized_model, orig_model)
