@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 from collections import OrderedDict
 from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict
 import unittest
+import os
 
 import numpy as np  # type: ignore
 
@@ -13,7 +14,11 @@ import onnx
 from onnx import checker, helper, ModelProto, TensorProto, GraphProto, NodeProto, shape_inference
 from onnx import numpy_helper
 from onnx.numpy_helper import to_array
-import onnxruntime as rt
+try:
+    import onnxruntime as rt
+    has_ort = True
+except:
+    has_ort = False
 
 import onnxoptimizer
 
@@ -149,7 +154,10 @@ class TestOptimizer(unittest.TestCase):
         optimized_model = onnxoptimizer.optimize(orig_model, opts, fixed_point)
         checker.check_model(optimized_model)
         if compare_result and len(optimized_model.graph.node) > 0:
-            assert self._compare(optimized_model, orig_model)
+            if has_ort:
+                assert self._compare(optimized_model, orig_model)
+            else:
+                print("Skip onnxruntime test because it is not installed.")
         return optimized_model
 
     # input_types and output_types are lists of triples of (name, type, shape)
