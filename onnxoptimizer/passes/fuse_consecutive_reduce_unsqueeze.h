@@ -39,20 +39,20 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
     }
     return true;
   }
-  static void getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
+  static bool getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
     if (IsAxesAnAttr(graph, *n)) {
       if (!n->hasAttribute(kaxes)) {
-        return;
+        return false;
       }
       axes = n->is(kaxes);
     } else {
       if (n->inputs().size() < 2) {
-        return;
+        return false;
       }
       auto axes_value = n->inputs()[1];
       if ((axes_value->node()->kind() != kConstant &&
            axes_value->node()->kind() != kParam)) {
-        return;
+        return false;
       }
       Tensor axes_t;
       if (axes_value->node()->kind() == kConstant) {
@@ -63,6 +63,7 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
       }
       axes = ParseData<int64_t>(&axes_t);
     }
+    return true;
   }
   bool patternMatchPredicate(Node *node) override {
     // check that the current node is of type Unsqueeze and has defined axes
@@ -85,9 +86,15 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     Node *prev_node = node->inputs()[0]->node();
     std::vector<int64_t> axes;
-    getAxes(node, graph, axes);
+    bool success = getAxes(node, graph, axes);
+    if (!success) {
+      return false;
+    }
     std::vector<int64_t> prev_axes;
-    getAxes(prev_node, graph, prev_axes);
+    success = getAxes(prev_node, graph, prev_axes);
+    if (!success) {
+      return false;
+    }
     if (axes != prev_axes) {
       return false;
     }
