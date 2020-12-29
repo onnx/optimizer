@@ -30,17 +30,17 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   std::string getPassName() const override {
     return "fuse_consecutive_reduce_unsqueeze";
   }
-  static bool IsAxesAnAttr(const Graph& graph, const Node& n) {
+  static bool IsAxesAnAttr(const Graph &graph, const Node *n) {
     int opset_version = getOpsetVersion(graph);
     int opset_threshold;
-    if (n.kind() == kUnsqueeze || n.kind() == kReduceSum) {
+    if (n->kind() == kUnsqueeze || n->kind() == kReduceSum) {
       opset_threshold = 12;
       return opset_version <= opset_threshold && opset_version != 0;
     }
     return true;
   }
   static bool getAxes(const Node *n, Graph &graph, std::vector<int64_t> &axes) {
-    if (IsAxesAnAttr(graph, *n)) {
+    if (IsAxesAnAttr(graph, n)) {
       if (!n->hasAttribute(kaxes)) {
         return false;
       }

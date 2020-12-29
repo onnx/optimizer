@@ -27,7 +27,7 @@ target_include_directories(onnx_optimizer PUBLIC
     $<INSTALL_INTERFACE:include>
     )
 
-add_executable(onnx_optimizer_exec examples/example.cpp)
+add_executable(onnx_optimizer_exec examples/onnx_optimizer_exec.cpp)
 target_link_libraries(onnx_optimizer_exec onnx_optimizer)
 
 if(BUILD_ONNX_PYTHON)
