@@ -7,6 +7,8 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
+// Note for log and sqrt this optimization is not always right,
+// because it is a undefined behavior when the input is negative
 const std::unordered_set<NodeKind> monotone_node_no_axis_kind{kLog,
                                                               kExp,
                                                               kSqrt};

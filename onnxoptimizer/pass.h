@@ -193,8 +193,10 @@ class PredicateBasedPass : public Pass {
   std::shared_ptr<PostPassAnalysis> runPass(Graph& graph) override;
   PassAnalysisType getPassAnalysisType() const override;
 
-  static int getOpsetVersion(Graph &g) {
-    for (const OpSetID &opset : g.opset_versions_mutable()) {
+  static int getOpsetVersion(const Graph &g) {
+    // this hack is due to `opset_versions_mutable` doesn't have a const version
+    Graph &mut_g = const_cast<Graph&>(g);
+    for (const OpSetID &opset : mut_g.opset_versions_mutable()) {
       if (opset.domain() == "") {
         return opset.version();
       }
