@@ -1,3 +1,5 @@
+<!--- SPDX-License-Identifier: Apache-2.0 -->
+
 # ONNX Optimizer
 
 [![PyPI version](https://img.shields.io/pypi/v/onnxoptimizer.svg)](https://pypi.python.org/pypi/onnxoptimizer/)
