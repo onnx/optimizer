@@ -6,7 +6,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from collections import OrderedDict
-from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict
+from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict, Union
 import tempfile
 import unittest
 import os
