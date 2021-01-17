@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include "onnx/py_utils.h"

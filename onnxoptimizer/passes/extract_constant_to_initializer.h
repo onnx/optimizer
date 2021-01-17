@@ -1,3 +1,7 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
@@ -39,7 +43,7 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
       new_init = graph.addInitializerAndInput(t, node->output()->uniqueName());
       node->output()->setUniqueName(ONNX_NAMESPACE::to_string(graph.getNextUnique()), false);
     } else {
-      // the unique_name will be set in `replaceAllUsesWith` if 
+      // the unique_name will be set in `replaceAllUsesWith` if
       // node->output() is in graph output
       new_init = graph.addInitializerAndInput(t);
     }
