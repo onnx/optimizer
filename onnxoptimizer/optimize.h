@@ -86,6 +86,8 @@ struct Optimizer {
 
 const std::vector<std::string> GetAvailablePasses();
 
+const std::vector<std::string> GetFuseAndEliminationPass();
+
 ModelProto Optimize(
     const ModelProto& mp_in,
     const std::vector<std::string>& names);

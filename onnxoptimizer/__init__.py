@@ -17,36 +17,24 @@ import onnxoptimizer.onnx_opt_cpp2py_export as C
 from onnx import ModelProto
 from typing import Text, Sequence, Optional
 
-"""Apply the optimization on the serialized ModelProto.
-
-Arguments:
-    input (ModelProto): model
-    names (list of string): list of optimization names
-
-Return:
-    return (ModelProto) optimized model
-
-Supported pass names:
-    -- nop
-    -- eliminate_identity
-    -- eliminate_nop_transpose
-    -- eliminate_nop_pad
-    -- eliminate_unused_initializer
-    -- fuse_consecutive_squeezes
-    -- fuse_consecutive_transposes
-    -- fuse_add_bias_into_conv
-    -- fuse_transpose_into_gemm
-"""
-
 get_available_passes = C.get_available_passes
+
+get_fuse_and_elimination_passes = C.get_fuse_and_elimination_passes
 
 
 def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
+    """Apply the optimization on the serialized ModelProto.
+
+    Arguments:
+        input (ModelProto): model
+        names (list of string): list of optimization names
+
+    Return:
+        return (ModelProto) optimized model
+    """
+
     if passes is None:
-        passes = ['eliminate_nop_transpose',
-                  'eliminate_nop_pad',
-                  'fuse_consecutive_transposes',
-                  'fuse_transpose_into_gemm']
+        passes = get_fuse_and_elimination_passes()
     if not isinstance(model, ModelProto):
         raise ValueError(
             'Optimizer only accepts ModelProto, incorrect type: {}'.format(type(model)))
@@ -60,4 +48,4 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
     return onnx.load_from_string(optimized_model_str)
 
 
-__all__ = ['optimize', 'get_available_passes']
+__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes']

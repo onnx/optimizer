@@ -44,6 +44,9 @@ ModelProto OptimizeFixed(
 const std::vector<std::string> GetAvailablePasses() {
   return Optimizer::passes.GetAvailablePasses();
 }
+const std::vector<std::string> GetFuseAndEliminationPass() {
+  return Optimizer::passes.GetFuseAndEliminationPass();
+}
 
 } // namespace optimization
 } // namespace ONNX_NAMESPACE

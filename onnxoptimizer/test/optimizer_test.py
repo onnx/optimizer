@@ -7,10 +7,18 @@ from __future__ import unicode_literals
 
 from collections import OrderedDict
 from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict
+import tempfile
 import unittest
 import os
 
 import numpy as np  # type: ignore
+
+try:
+    import torch
+    import torchvision as tv
+    has_tv = True
+except:
+    has_tv = False
 
 import onnx
 from onnx import checker, helper, ModelProto, TensorProto, GraphProto, NodeProto, shape_inference
@@ -131,11 +139,6 @@ class TestOptimizer(unittest.TestCase):
             res_opt = forward(model_opt, inputs=rand_input)
 
             for name in res_opt.keys():
-                print("After optimization:")
-                print(res_opt[name])
-                print("Before optimization:")
-                print(res_ori[name])
-                print("----------------")
                 if not np.allclose(res_opt[name], res_ori[name], rtol=1e-4, atol=1e-5):
                     if verbose:
                         print("Tensor {} changes after optimization. The max diff is {}.".format(
@@ -148,10 +151,13 @@ class TestOptimizer(unittest.TestCase):
                     return False
         return True
 
-    # type: (GraphProto, Sequence[Text], bool, **Any) -> ModelProto
-    def _optimized(self, graph, opts, fixed_point=False, compare_result=True, **kwargs):
-        orig_model = helper.make_model(
-            graph, producer_name='onnx-test', **kwargs)
+    # type: (Union[GraphProto, ModelProto], Sequence[Text], bool, **Any) -> ModelProto
+    def _optimized(self, graph_or_model, opts, fixed_point=False, compare_result=True, **kwargs):
+        if isinstance(graph_or_model, ModelProto):
+            orig_model = graph_or_model
+        else:
+            orig_model = helper.make_model(
+                graph_or_model, producer_name='onnx-test', **kwargs)
         checker.check_model(orig_model)
         optimized_model = onnxoptimizer.optimize(orig_model, opts, fixed_point)
         checker.check_model(optimized_model)
@@ -2225,7 +2231,6 @@ class TestOptimizer(unittest.TestCase):
                             assert len(optimized_model.graph.node) == 1
                             assert optimized_model.graph.output[0].type.tensor_type.elem_type == TensorProto.FLOAT
                             assert optimized_model.graph.node[-1].op_type == reduction
-                            print(optimized_model.graph.node[-1])
 
                             if reduction in ("ReduceSum"):
                                 for init in optimized_model.graph.initializer:
@@ -2237,6 +2242,60 @@ class TestOptimizer(unittest.TestCase):
                             optimized_output_shape = tuple(
                                 x.dim_value for x in optimized_model.graph.output[0].type.tensor_type.shape.dim)
                             assert optimized_output_shape == output_shape
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_fasterrcnn_fpn(self):    # type: () -> None
+        model = tv.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
+        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_maskrcnn_fpn(self):    # type: () -> None
+        model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
+        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_keypointrcnn_fpn(self):    # type: () -> None
+        model = tv.models.detection.keypointrcnn_resnet50_fpn(pretrained=False)
+        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_shufflenet_v2(self):    # type: () -> None
+        model = tv.models.shufflenet_v2_x1_0(pretrained=False)
+        x = torch.rand(1, 3, 224, 224)
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_mnasnet(self):    # type: () -> None
+        model = tv.models.mnasnet1_0(pretrained=False)
+        x = torch.rand(1, 3, 224, 224)
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+
+    @unittest.skipUnless(has_tv, "This test needs torchvision")
+    def test_torchvision_deeplabv3(self):    # type: () -> None
+        model = tv.models.segmentation.deeplabv3_resnet50(pretrained=False)
+        x = torch.rand(1, 3, 224, 224)
+        with tempfile.NamedTemporaryFile() as f:
+            torch.onnx.export(model, x, f, opset_version=11)
+            model = onnx.load(f.name)
+            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
 
 if __name__ == '__main__':

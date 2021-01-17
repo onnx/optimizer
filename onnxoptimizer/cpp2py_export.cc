@@ -37,5 +37,6 @@ PYBIND11_MODULE(onnx_opt_cpp2py_export, onnx_opt_cpp2py_export) {
         return py::bytes(out);
       });
   onnx_opt_cpp2py_export.def("get_available_passes", &optimization::GetAvailablePasses);
+  onnx_opt_cpp2py_export.def("get_fuse_and_elimination_passes", &optimization::GetFuseAndEliminationPass);
 }
 }
