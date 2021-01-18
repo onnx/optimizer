@@ -156,8 +156,12 @@ class TestOptimizer(unittest.TestCase):
         if isinstance(graph_or_model, ModelProto):
             orig_model = graph_or_model
         else:
+            opset_imports = kwargs.pop('opset_imports', None)
+            if opset_imports is None:
+                opset_imports = [helper.make_opsetid("", 13)]
+
             orig_model = helper.make_model(
-                graph_or_model, producer_name='onnx-test', **kwargs)
+                graph_or_model, producer_name='onnx-test', opset_imports=opset_imports, **kwargs)
         checker.check_model(orig_model)
         optimized_model = onnxoptimizer.optimize(orig_model, opts, fixed_point)
         checker.check_model(optimized_model)
@@ -2252,8 +2256,9 @@ class TestOptimizer(unittest.TestCase):
             model = onnx.load(f.name)
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
+    # maskrcnn is only supported in opset 11 and higher
     @unittest.skipUnless(has_tv, "This test needs torchvision")
-    def test_torchvision_maskrcnn_fpn(self):    # type: () -> None
+    def test_torchvision_maskrcnn_fpn_opset11(self):    # type: () -> None
         model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
         x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
         with tempfile.NamedTemporaryFile() as f:
@@ -2261,6 +2266,7 @@ class TestOptimizer(unittest.TestCase):
             model = onnx.load(f.name)
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
+    # keypointrcnn is only supported in opset 11 and higher
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_keypointrcnn_fpn(self):    # type: () -> None
         model = tv.models.detection.keypointrcnn_resnet50_fpn(pretrained=False)
@@ -2275,7 +2281,7 @@ class TestOptimizer(unittest.TestCase):
         model = tv.models.shufflenet_v2_x1_0(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
         with tempfile.NamedTemporaryFile() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f)
             model = onnx.load(f.name)
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
@@ -2284,7 +2290,7 @@ class TestOptimizer(unittest.TestCase):
         model = tv.models.mnasnet1_0(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
         with tempfile.NamedTemporaryFile() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f)
             model = onnx.load(f.name)
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
@@ -2293,7 +2299,7 @@ class TestOptimizer(unittest.TestCase):
         model = tv.models.segmentation.deeplabv3_resnet50(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
         with tempfile.NamedTemporaryFile() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f)
             model = onnx.load(f.name)
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
