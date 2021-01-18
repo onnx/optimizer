@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 
 from collections import OrderedDict
 from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict, Union
-import tempfile
+import io
 import unittest
 import os
 
@@ -2251,9 +2251,9 @@ class TestOptimizer(unittest.TestCase):
     def test_torchvision_fasterrcnn_fpn(self):    # type: () -> None
         model = tv.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
         x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     # maskrcnn is only supported in opset 11 and higher
@@ -2261,9 +2261,9 @@ class TestOptimizer(unittest.TestCase):
     def test_torchvision_maskrcnn_fpn_opset11(self):    # type: () -> None
         model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
         x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     # keypointrcnn is only supported in opset 11 and higher
@@ -2271,36 +2271,36 @@ class TestOptimizer(unittest.TestCase):
     def test_torchvision_keypointrcnn_fpn(self):    # type: () -> None
         model = tv.models.detection.keypointrcnn_resnet50_fpn(pretrained=False)
         x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_shufflenet_v2(self):    # type: () -> None
         model = tv.models.shufflenet_v2_x1_0(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_mnasnet(self):    # type: () -> None
         model = tv.models.mnasnet1_0(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_deeplabv3(self):    # type: () -> None
         model = tv.models.segmentation.deeplabv3_resnet50(pretrained=False)
         x = torch.rand(1, 3, 224, 224)
-        with tempfile.NamedTemporaryFile() as f:
+        with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
-            model = onnx.load(f.name)
+            model = onnx.load_model_from_string(f.getvalue())
             self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
 
