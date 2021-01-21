@@ -36,6 +36,8 @@ import onnxoptimizer
 TensorShape = List[int]
 TensorShapes = Dict[Optional[str], TensorShape]
 
+LATEST_STABLE_OPSET_VERSION = 13
+
 
 class TestOptimizer(unittest.TestCase):
     def _compare(self, model_opt: onnx.ModelProto, model_ori: onnx.ModelProto, n_times: int = 5,
@@ -158,7 +160,7 @@ class TestOptimizer(unittest.TestCase):
         else:
             opset_imports = kwargs.pop('opset_imports', None)
             if opset_imports is None:
-                opset_imports = [helper.make_opsetid("", 13)]
+                opset_imports = [helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)]
 
             orig_model = helper.make_model(
                 graph_or_model, producer_name='onnx-test', opset_imports=opset_imports, **kwargs)
