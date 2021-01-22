@@ -22,7 +22,13 @@ You can install onnxoptimizer from PyPI:
 pip3 install onnxoptimizer
 ```
 
-Or build it from source:
+Note that you may need to upgrade your pip first if you have trouble:
+
+```bash
+pip3 install -U pip
+```
+
+If you want to build from source:
 
 ```bash
 git clone --recursive https://github.com/onnx/optimizer onnxoptimizer

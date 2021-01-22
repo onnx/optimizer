@@ -35,7 +35,6 @@ MAKE = find_executable('make')
 
 install_requires = []
 setup_requires = []
-tests_require = []
 extras_require = {}
 
 ################################################################################
@@ -307,9 +306,6 @@ install_requires.extend([
 ################################################################################
 
 setup_requires.append('pytest-runner')
-tests_require.append('pytest')
-tests_require.append('nbval')
-tests_require.append('onnxruntime==1.6.0')
 
 if sys.version_info[0] == 3:
     # Mypy doesn't work with Python 2
@@ -330,7 +326,6 @@ setuptools.setup(
     include_package_data=True,
     install_requires=install_requires,
     setup_requires=setup_requires,
-    tests_require=tests_require,
     extras_require=extras_require,
     author='ONNX Optimizer Authors',
     author_email='onnx-technical-discuss@lists.lfai.foundation',

@@ -88,6 +88,8 @@ struct GlobalPassRegistry {
   }
   const std::vector<std::string> GetAvailablePasses();
 
+  const std::vector<std::string> GetFuseAndEliminationPass();
+
   template <typename T>
   void registerPass() {
     static_assert(std::is_base_of<Pass, T>::value, "T must inherit from Pass");

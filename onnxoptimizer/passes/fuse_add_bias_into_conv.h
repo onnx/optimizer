@@ -38,12 +38,13 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
         node->inputs()[0]->node()->inputs().size() == 2;
   }
-  static Node *makeSqueeze(Graph &graph, std::vector<int64_t> &axes,
+  static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                            Value *input, Node *target_node, BuiltinSymbol k) {
+    assert(k == kSqueeze || k == kUnsqueeze);
     Node *squeeze = graph.create(k, 1);
     int opset_version = getOpsetVersion(graph);
     squeeze->addInput(input);
-    int version_threshold = k == kSqueeze ? 5 : 11;
+    int version_threshold = 11;
     if (opset_version <= version_threshold && opset_version != 0) {
       squeeze->is_(kaxes, std::move(axes));
     } else {
@@ -116,12 +117,12 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       if (bias_shape.size() > 1) {
         std::vector<int64_t> axes(bias_shape.size() - 1);
         std::iota(axes.begin(), axes.end(), 0);
-        Node *squeeze = makeSqueeze(graph, axes, conv_3rd_input,
+        Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
                                     orig_conv->node(), kSqueeze);
         conv_3rd_input = squeeze->output();
       } else if (bias_shape.size() == 0) {
         std::vector<int64_t> axes = {0};
-        Node *unsqueeze = makeSqueeze(graph, axes, conv_3rd_input,
+        Node *unsqueeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
                                       orig_conv->node(), kUnsqueeze);
         conv_3rd_input = unsqueeze->output();
       }
@@ -160,7 +161,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       axes.erase(axes.begin() +
                  (1 + bias_shape.size() - static_cast<unsigned>(rank)));
       Node *squeeze =
-          makeSqueeze(graph, axes, orig_bias, orig_conv->node(), kSqueeze);
+          makeSqueezeOrUnsqueeze(graph, axes, orig_bias, orig_conv->node(), kSqueeze);
       orig_conv->node()->addInput(squeeze->output());
     } else {
       return false;
