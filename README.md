@@ -48,7 +48,7 @@ Note that you need to install protobuf before building from source.
 
 * [onnx-simplifier](https://github.com/daquexian/onnx-simplifier): A handy and popular tool based on onnxoptimizer
 
-* [convertmodel.com](convertmodel.com): onnx optimizer compiled as WebAssembly so that it can be used out-of-the-box
+* [convertmodel.com](https://convertmodel.com/#outputFormat=onnx&inputFormat=onnx): onnx optimizer compiled as WebAssembly so that it can be used out-of-the-box
 
 ## Code of Conduct
 
