@@ -42,7 +42,8 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
     log_softmax_node->output()->setSizes(log_node_output->sizes());
     log_softmax_node->output()->setElemType(log_node_output->elemType());
 
-    log_node->replaceAllUsesWith(log_softmax_node);
+    const bool replacing_success = tryReplacingAllUsesWith(log_node, log_softmax_node);
+    if (!replacing_success) { return false; }
     log_node->removeAllInputs();
     destroy_current = NodeDestroyType::DestroyTwo;
     return true;

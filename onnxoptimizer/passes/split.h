@@ -160,10 +160,10 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
     }
     for (Value* v : new_interface) {
       if (v->node()->kind() == kUndefined) {
-        v->replaceAllUsesWith(optionalInputDummyNode->outputs()[0]);
+        ONNX_ASSERT(tryReplacingAllUsesWith(v, optionalInputDummyNode->outputs()[0]));
       } else {
         Value* newv = graph.addInput()->copyMetadata(v);
-        v->replaceAllUsesWith(newv);
+        ONNX_ASSERT(tryReplacingAllUsesWith(v, newv));
       }
     }
 

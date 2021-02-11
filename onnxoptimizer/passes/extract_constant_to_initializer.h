@@ -47,7 +47,8 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
       // node->output() is in graph output
       new_init = graph.addInitializerAndInput(t);
     }
-    node->output()->replaceAllUsesWith(new_init);
+    const bool replacing_success = tryReplacingAllUsesWith(node->output(), new_init);
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }

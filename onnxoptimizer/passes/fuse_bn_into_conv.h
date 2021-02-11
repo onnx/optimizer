@@ -184,7 +184,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
         graph.eraseInitializerAndInput(input);
       }
     }
-    bn->output()->replaceAllUsesWith(origInput);
+    const bool replacing_success = tryReplacingAllUsesWith(bn->output(), origInput);
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }

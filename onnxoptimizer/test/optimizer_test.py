@@ -265,7 +265,8 @@ class TestOptimizer(unittest.TestCase):
         nodes = [helper.make_node("Add", ["X", "Y"], ["A"]),
                  helper.make_node("Identity", ["A"], ["B"])]
         nodes.extend(self._make_fake_loop_op(
-            [helper.make_node("Identity", ["_B"], ["_B2"])],
+            [helper.make_node("Relu", ["_B"], ["_B1"]),
+             helper.make_node("Identity", ["_B1"], ["_B2"])],
             [(TensorProto.FLOAT, (5,), "B")],
             [(TensorProto.FLOAT, (5,), "B2")]))
         graph = helper.make_graph(
@@ -289,6 +290,20 @@ class TestOptimizer(unittest.TestCase):
         # have been replaced with the input to that identity node
         assert len(optimized_model.graph.node[3].attribute[0].g.output) == 2
         assert optimized_model.graph.node[3].attribute[0].g.output[1].name == "_B2"
+
+    def test_eliminate_identity_both_graph_input_and_output(self):  # type: () -> None
+        # We should not eliminate an op when its input is also graph input,
+        # and its output is also graph output, because we want to always keep
+        # the name of graph input and output unchanged.
+        identity = helper.make_node("Identity", ["A"], ["B"])
+        graph = helper.make_graph(
+            [identity],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (5,))])
+        optimized_model = self._optimized(graph, ["eliminate_identity"])
+
+        assert optimized_model.graph == graph
 
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])

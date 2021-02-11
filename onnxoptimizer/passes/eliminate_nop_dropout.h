@@ -35,7 +35,8 @@ struct EliminateNopDropout final : public PredicateBasedPass {
       override {
     // Don't assume that theres only one output.
     for (size_t i = 0; i < node->outputs().size(); ++i) {
-      node->outputs()[i]->replaceAllUsesWith(node->input());
+      const bool replacing_success = tryReplacingAllUsesWith(node->outputs()[i], node->input());
+      if (!replacing_success) { return false; }
     }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;

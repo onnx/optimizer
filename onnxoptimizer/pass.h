@@ -223,5 +223,45 @@ class FullGraphBasedPass : public Pass {
   ~FullGraphBasedPass() override;
 };
 
+// If both value1 and value2 are input/output,
+// we cannot replace one with another and also keeping the
+// input/output names unchanged.
+inline bool areTwoValuesBothInputOrOutput(const Value *value1,
+                                          const Value *value2) {
+  const auto IsInputOrOutput = [](const Value *value) {
+    const auto graph = value->owningGraph();
+    const bool is_output =
+        std::find(graph->outputs().rbegin(), graph->outputs().rend(), value) !=
+        graph->outputs().rend();
+    const bool is_input =
+        std::find(graph->inputs().rbegin(), graph->inputs().rend(), value) !=
+        graph->inputs().rend();
+    return is_output || is_input;
+  };
+  return IsInputOrOutput(value1) && IsInputOrOutput(value2);
+}
+
+inline bool tryReplacingAllUsesWith(Value *oldValue, Value *newValue) {
+  if (areTwoValuesBothInputOrOutput(oldValue, newValue)) {
+    return false;
+  }
+  oldValue->replaceAllUsesWith(newValue);
+  return true;
+}
+
+inline bool tryReplacingAllUsesWith(Node *oldNode, Node *newNode) {
+  ONNX_ASSERT(oldNode->outputs().size() == newNode->outputs().size());
+  size_t nOutputs = oldNode->outputs().size();
+  for (size_t i = 0; i < nOutputs; i++) {
+    const auto *oldValue = oldNode->outputs()[i];
+    const auto *newValue = newNode->outputs()[i];
+    if (areTwoValuesBothInputOrOutput(oldValue, newValue)) {
+      return false;
+    }
+  }
+  oldNode->replaceAllUsesWith(newNode);
+  return true;
+}
+
 } // namespace optimization
 } // namespace ONNX_NAMESPACE

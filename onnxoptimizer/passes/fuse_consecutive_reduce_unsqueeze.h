@@ -108,7 +108,8 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
     // remove unnecessary unsqueeze
     reduction_op->output()->setSizes(node->output()->sizes());
     reduction_op->output()->setElemType(node->output()->elemType());
-    node->output()->replaceAllUsesWith(node->inputs()[0]);
+    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
