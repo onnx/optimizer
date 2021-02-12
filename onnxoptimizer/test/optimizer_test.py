@@ -305,8 +305,7 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph([
             helper.make_node("Constant", [], ["condition"], value=true),
             helper.make_node("If", ["condition"], ["result"], then_branch=true_graph,
-                             else_branch=false_graph)
-            ],
+                             else_branch=false_graph)],
             "test",
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
             [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))])
@@ -315,7 +314,7 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Sin"
         assert optimized_model.graph.node[2].op_type == "HardSigmoid"
-        
+
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         identity = helper.make_node("Identity", ["A"], ["B"])
