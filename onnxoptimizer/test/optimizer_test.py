@@ -290,6 +290,32 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node[3].attribute[0].g.output) == 2
         assert optimized_model.graph.node[3].attribute[0].g.output[1].name == "_B2"
 
+    def test_eliminate_if_with_const_cond(self):  # type: () -> None
+        true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
+
+        subgraph_output_info = helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))
+
+        sin = helper.make_node("Sin", ["A"], ["B"])
+        hard_sigmoid = helper.make_node("HardSigmoid", ["B"], ["C"], alpha=0.4, beta=0.6)
+        true_graph = helper.make_graph([sin, hard_sigmoid], "true_graph", [], [subgraph_output_info])
+
+        identity = helper.make_node("Identity", ["A"], ["C"])
+        false_graph = helper.make_graph([identity], "false_graph", [], [subgraph_output_info])
+
+        graph = helper.make_graph([
+            helper.make_node("Constant", [], ["condition"], value=true),
+            helper.make_node("If", ["condition"], ["result"], then_branch=true_graph,
+                             else_branch=false_graph)
+            ],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))])
+        optimized_model = self._optimized(graph, ["eliminate_if_with_const_cond"])
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Sin"
+        assert optimized_model.graph.node[2].op_type == "HardSigmoid"
+        
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         identity = helper.make_node("Identity", ["A"], ["B"])
