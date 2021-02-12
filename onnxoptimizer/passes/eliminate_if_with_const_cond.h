@@ -55,7 +55,7 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
     } else {
       cond_tensor = *graph.getInitializer(cond_value->uniqueName());
     }
-    const bool cond = static_cast<bool>(cond_tensor.int32s()[0]);
+    const bool cond = static_cast<bool>(cond_tensor.data<int32_t>()[0]);
     auto &parent_graph = graph;
     const auto subgraph = if_node->g(cond ? kthen_branch : kelse_branch);
 
