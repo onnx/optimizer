@@ -119,7 +119,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       if (std::equal(i_data.begin(), i_data.end(), j_data.begin())) {          \
         visited.insert(*iter_j);                                               \
         Value *j_value = input_map.find(j_tensor.name())->second;              \
-        j_value->replaceAllUsesWith(i_value);                             \
+        j_value->replaceAllUsesWith(i_value);                                  \
         graph.eraseInitializerAndInput(j_value);                               \
         initializers_removed++;                                                \
       }                                                                        \
