@@ -304,7 +304,7 @@ class TestOptimizer(unittest.TestCase):
         optimized_model = self._optimized(graph, ["eliminate_identity"])
 
         assert optimized_model.graph == graph
-        
+
     def test_eliminate_if_with_const_cond(self):  # type: () -> None
         true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
 
