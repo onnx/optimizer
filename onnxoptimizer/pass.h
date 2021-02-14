@@ -234,6 +234,7 @@ inline bool areTwoValuesBothInputOrOutput(const Value *value1,
         std::find(graph->outputs().rbegin(), graph->outputs().rend(), value) !=
         graph->outputs().rend();
     const bool is_input =
+        value->node()->kind() == kCaptured ||
         std::find(graph->inputs().rbegin(), graph->inputs().rend(), value) !=
         graph->inputs().rend();
     return is_output || is_input;
