@@ -8,7 +8,6 @@
 
 #include <vector>
 #include "onnxoptimizer/pass.h"
-#include "onnxoptimizer/passes/eliminate_deadend.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
