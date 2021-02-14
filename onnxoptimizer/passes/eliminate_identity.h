@@ -29,7 +29,8 @@ struct EliminateIdentity final : public PredicateBasedPass {
   bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
       override {
 
-    node->output()->replaceAllUsesWith(node->input());
+    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->input());
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }

@@ -60,7 +60,8 @@ struct EliminateNopMonotoneArgmax final : public PredicateBasedPass {
       override {
     Node* monotone_node = node->input()->node();
     if (monotone_node->output()->uses().size() == 1) {
-      monotone_node->output()->replaceAllUsesWith(monotone_node->input());
+      const bool replacing_success = tryReplacingAllUsesWith(monotone_node->output(), monotone_node->input());
+      if (!replacing_success) { return false; }
       monotone_node->destroy();
       return true;
     }

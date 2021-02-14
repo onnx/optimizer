@@ -68,7 +68,8 @@ struct EliminateNopPad final : public PredicateBasedPass {
       override {
     if (!is_nop_pad(node, graph))
       return false;
-    node->output()->replaceAllUsesWith(node->inputs()[0]);
+    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }

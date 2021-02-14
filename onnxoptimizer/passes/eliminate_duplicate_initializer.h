@@ -16,6 +16,16 @@
 //   E = Add(D, A)
 //   F = Add(F, A)
 //   G = Add(E, F)
+//
+// NOTE: ONNX IR has an bug that an initializer must also
+// be an graph input. Currently we are using a workaround
+// that adds initializers to inputs before optimization
+// and removes the added initializers from inputs after
+// optimization. That makes us cannot distinguish the
+// initializers really in the inputs and the initializers
+// not in the inputs. While only the latter can be eliminated, 
+// we eliminate all duplicated initializers instead. That
+// may cause unexpected behavior in some rare cases.
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"

@@ -55,7 +55,8 @@ struct FuseConsecutiveTransposes final : public PredicateBasedPass {
       if (n->output()->has_sizes()) {
           origInput->node()->input()->setSizes(n->output()->sizes());
       }
-      n->replaceAllUsesWith(origInput->node()->input()->node());
+      const bool replacing_success = tryReplacingAllUsesWith(n, origInput->node()->input()->node());
+      if (!replacing_success) { return false; }
       destroy_current = NodeDestroyType::DestroyTwo;
       return true;
     }

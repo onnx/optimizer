@@ -172,7 +172,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     if (n->output()->elemType() != TensorProto_DataType_UNDEFINED) {
       orig_conv->setElemType(n->output()->elemType());
     }
-    n->replaceAllUsesWith(orig_conv->node());
+    const bool replacing_success = tryReplacingAllUsesWith(n, orig_conv->node());
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }

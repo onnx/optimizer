@@ -5,6 +5,7 @@
 #include <onnxoptimizer/optimize.h>
 
 #include <onnx/onnx_pb.h>
+#include <onnx/checker.h>
 
 #include <fstream>
 
@@ -16,10 +17,12 @@ int main(int argc, char **argv) {
     std::cout << "load failed" << std::endl;
     return -1;
   }
+  onnx::checker::check_model(model);
   const auto new_model = onnx::optimization::Optimize(
       model,
       onnx::optimization::GetFuseAndEliminationPass()
       );
+  onnx::checker::check_model(new_model);
   std::ofstream ofs(argv[2]);
   success = new_model.SerializePartialToOstream(&ofs);
   if (!success) {

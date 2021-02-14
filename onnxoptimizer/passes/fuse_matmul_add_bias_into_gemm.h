@@ -101,7 +101,8 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     gemm->i_(ktransA, 0);
     gemm->i_(ktransB, 0);
     gemm->insertBefore(orig_matmul->node());
-    n->replaceAllUsesWith(gemm);
+    const bool replacing_success = tryReplacingAllUsesWith(n, gemm);
+    if (!replacing_success) { return false; }
     destroy_current = NodeDestroyType::DestroyTwo;
     return true;
   }
