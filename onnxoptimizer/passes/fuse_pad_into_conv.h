@@ -8,8 +8,8 @@
 #pragma once
 
 // Before:
-//   P = Pad(X) - opset 10 and below (or) Pad(X, Pads, [Constant_value]) - opset 11 and
-//   above Z = Conv(P, Y)
+//   P = Pad(X) - opset 10 and below (or) Pad(X, Pads, [Constant_value]) - opset
+//   11 and above Z = Conv(P, Y)
 // After:
 //   Z = Conv(X, Y) with "pads" attribute set
 //
@@ -26,18 +26,16 @@ namespace optimization {
 
 struct FusePadIntoConv final : public PredicateBasedPass {
   explicit FusePadIntoConv()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "fuse_pad_into_conv";
   }
   bool patternMatchPredicate(Node* node) override {
     return node->kind() == kConv && node->inputs()[0]->node()->kind() == kPad;
   }
-  bool runTransform(Node* n, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* n, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
     destroy_current = NodeDestroyType::DestroyZero;
 
     // check if Pad is only used by Conv
@@ -88,56 +86,61 @@ struct FusePadIntoConv final : public PredicateBasedPass {
 
     // Process 'Constant_value'
     // opset 10 and below
-    if (pad->hasAttribute(kvalue) && static_cast<double>(pad->f(kvalue)) != 0.0) {
+    if (pad->hasAttribute(kvalue) &&
+        static_cast<double>(pad->f(kvalue)) != 0.0) {
       return false;
     } else if (pad->inputs().size() == 3) {
-      // opset 11 and above - check if the 'pad' node has the optional 'Constant_value'
-      // input check if it has data initialized
+      // opset 11 and above - check if the 'pad' node has the optional
+      // 'Constant_value' input check if it has data initialized
       const auto& value_name = pad->inputs()[2]->uniqueName();
       const auto value_initializer = graph.getInitializer(value_name);
 
-      // 'pad' node has the 'Constant_value' input which has not been initialized -
-      // can't proceed with fusing
+      // 'pad' node has the 'Constant_value' input which has not been
+      // initialized - can't proceed with fusing
       if (value_initializer == graph.initializers().end()) {
         return false;
       }
 
-      // parse 'Constant_value' data from the initialized input and stop optimizer if the
-      // Constant_value is non-zero
+      // parse 'Constant_value' data from the initialized input and stop
+      // optimizer if the Constant_value is non-zero
       switch (value_initializer->elem_type()) {
         case TensorProto::FLOAT:
           if (ParseData<float>(&*value_initializer)[0] != 0)
-            return false; // cannot fuse Pad into Conv
+            return false;  // cannot fuse Pad into Conv
           else
             break;
 
         case TensorProto::DOUBLE:
           if (ParseData<double>(&*value_initializer)[0] != 0)
-            return false; // cannot fuse Pad into Conv
+            return false;  // cannot fuse Pad into Conv
           else
             break;
 
         case TensorProto::INT32:
           if (ParseData<int32_t>(&*value_initializer)[0] != 0)
-            return false; // cannot fuse Pad into Conv
+            return false;  // cannot fuse Pad into Conv
           else
             break;
 
         case TensorProto::INT64:
           if (ParseData<int64_t>(&*value_initializer)[0] != 0)
-            return false; // cannot fuse Pad into Conv
+            return false;  // cannot fuse Pad into Conv
           else
             break;
 
-        // TODO: Support more uncommon but valid types for Pad op (int8, uint8, int16, uint16, etc.)
+        // TODO: Support more uncommon but valid types for Pad op (int8, uint8,
+        // int16, uint16, etc.)
 
         default:
-          return false; // Either type of Constant_value is invalid or not yet supported by data parsing logic.
-                        // Since we canot validate the data present in 'Constant_value', we exit the optimizer
+          return false;  // Either type of Constant_value is invalid or not yet
+                         // supported by data parsing logic. Since we canot
+                         // validate the data present in 'Constant_value', we
+                         // exit the optimizer
       }
     }
 
-    // check if some values in 'pads' prevents us from fusing it into 'Conv' node
+    // check if some values in 'pads' prevents us from fusing it into 'Conv'
+    // node
     int pads_size = static_cast<int>(pads.size());
 
     // check if padding is applied only on feature dims
@@ -147,9 +150,8 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     }
 
     // check if padding is only positive
-    if (std::any_of(pads.begin(), pads.end(), [](int64_t local_value) {
-          return local_value < 0;
-        })) {
+    if (std::any_of(pads.begin(), pads.end(),
+                    [](int64_t local_value) { return local_value < 0; })) {
       return false;
     }
 
@@ -173,5 +175,5 @@ struct FusePadIntoConv final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

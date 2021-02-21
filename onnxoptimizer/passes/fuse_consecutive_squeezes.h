@@ -20,19 +20,18 @@ namespace optimization {
 
 struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
   explicit FuseConsecutiveSqueezes()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "fuse_consecutive_squeezes";
   }
-  static bool IsAxesAnAttr(const Graph& graph) {
+  static bool IsAxesAnAttr(const Graph &graph) {
     const int opset_version = getOpsetVersion(graph);
     return opset_version <= 12 && opset_version != 0;
   }
-  static bool getAxes(const Node *n, const Graph &graph, std::vector<int64_t> &axes) {
+  static bool getAxes(const Node *n, const Graph &graph,
+                      std::vector<int64_t> &axes) {
     if (IsAxesAnAttr(graph)) {
       axes = n->is(kaxes);
     } else {
@@ -47,7 +46,7 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
         axes_t = axes_value->node()->t(kvalue);
       } else {
         // this hack is due to `getInitializer` lacks a const version
-        Graph &mut_graph = const_cast<Graph&>(graph);
+        Graph &mut_graph = const_cast<Graph &>(graph);
         const auto axes_i = mut_graph.getInitializer(axes_value->uniqueName());
         axes_t = *axes_i;
       }
@@ -57,9 +56,9 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
   }
   // modify the vector `composed_axes` such that squeeze by it is equivalent
   // to squeeze by `axes_1` and then by `axes_2`
-  static bool compose_squeezes(const Node *input_n,
-      const Node *n, const Graph &graph,
-      std::vector<int64_t> &composed_axes) {
+  static bool compose_squeezes(const Node *input_n, const Node *n,
+                               const Graph &graph,
+                               std::vector<int64_t> &composed_axes) {
     std::vector<int64_t> axes_1;
     std::vector<int64_t> axes_2;
     bool success = getAxes(input_n, graph, axes_1);
@@ -138,5 +137,5 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

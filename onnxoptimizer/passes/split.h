@@ -13,12 +13,9 @@ namespace ONNX_NAMESPACE {
 namespace optimization {
 
 static constexpr const char* impure_operators[] = {
-    "RandomNormal",
-    "RandomNormalLike",
-    "RandomUniform",
-    "RandomUniformLike",
-    "Loop",
-    "If",
+    "RandomNormal",  "RandomNormalLike",
+    "RandomUniform", "RandomUniformLike",
+    "Loop",          "If",
     "Scan",
 };
 
@@ -65,10 +62,8 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
   };
   auto node_belongs_to_predict_net = [&](Node* n) {
     return !is_pure_operator(n) ||
-        std::any_of(
-            n->inputs().begin(),
-            n->inputs().end(),
-            value_belongs_to_predict_net);
+           std::any_of(n->inputs().begin(), n->inputs().end(),
+                       value_belongs_to_predict_net);
   };
 
   {
@@ -193,10 +188,8 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
 
 struct SplitInit final : public FullGraphBasedPass {
   explicit SplitInit()
-      : FullGraphBasedPass(
-            PassType::Separate,
-            PassEfficiency::Complete,
-            PassOptimizationType::Memory) {}
+      : FullGraphBasedPass(PassType::Separate, PassEfficiency::Complete,
+                           PassOptimizationType::Memory) {}
 
   std::string getPassName() const override {
     return "split_init";
@@ -212,10 +205,8 @@ struct SplitInit final : public FullGraphBasedPass {
 
 struct SplitPredict final : public FullGraphBasedPass {
   explicit SplitPredict()
-      : FullGraphBasedPass(
-            PassType::Separate,
-            PassEfficiency::Complete,
-            PassOptimizationType::Memory) {}
+      : FullGraphBasedPass(PassType::Separate, PassEfficiency::Complete,
+                           PassOptimizationType::Memory) {}
   std::string getPassName() const override {
     return "split_predict";
   }
@@ -228,5 +219,5 @@ struct SplitPredict final : public FullGraphBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

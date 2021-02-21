@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 #pragma once
@@ -11,10 +10,8 @@ namespace ONNX_NAMESPACE {
 namespace optimization {
 struct EliminateDeadEnd final : public FullGraphBasedPass {
   explicit EliminateDeadEnd()
-      : FullGraphBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : FullGraphBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "eliminate_deadend";
   }
@@ -39,5 +36,5 @@ struct EliminateDeadEnd final : public FullGraphBasedPass {
         new CountBasedPassAnalysis(this, nodes_removed, false, false));
   }
 };
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

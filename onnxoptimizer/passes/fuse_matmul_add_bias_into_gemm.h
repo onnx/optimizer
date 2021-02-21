@@ -28,19 +28,16 @@ namespace optimization {
 
 struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
   explicit FuseMatMulAddBiasIntoGemm()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "fuse_matmul_add_bias_into_gemm";
   }
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kAdd &&
-        node->inputs()[0]->node()->kind() == kMatMul;
+    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kMatMul;
   }
-  bool runTransform(Node* n, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* n, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
     // due to current broadcasting's constraint, MatMul has to be the first
     // operand
     destroy_current = NodeDestroyType::DestroyZero;
@@ -86,12 +83,11 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
       return false;
     }
     if ((bias_N != z_N && bias_N != 1) || bias_M != z_M) {
-        return false;
+      return false;
     }
     // proceed to fuse MatMul and Add into Gemm
-    Node* gemm = graph.create(kGemm,
-        orig_matmul->node()->inputs(),
-        n->outputs().size());
+    Node* gemm =
+        graph.create(kGemm, orig_matmul->node()->inputs(), n->outputs().size());
     gemm->addInput(n->inputs()[1]);
     for (int i = 0; i < static_cast<int64_t>(gemm->outputs().size()); ++i) {
       gemm->outputs()[i]->copyMetadata(n->outputs()[i]);
@@ -102,11 +98,13 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     gemm->i_(ktransB, 0);
     gemm->insertBefore(orig_matmul->node());
     const bool replacing_success = tryReplacingAllUsesWith(n, gemm);
-    if (!replacing_success) { return false; }
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyTwo;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

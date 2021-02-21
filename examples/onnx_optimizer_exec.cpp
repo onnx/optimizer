@@ -4,8 +4,8 @@
 
 #include <onnxoptimizer/optimize.h>
 
-#include <onnx/onnx_pb.h>
 #include <onnx/checker.h>
+#include <onnx/onnx_pb.h>
 
 #include <fstream>
 
@@ -19,9 +19,7 @@ int main(int argc, char **argv) {
   }
   onnx::checker::check_model(model);
   const auto new_model = onnx::optimization::Optimize(
-      model,
-      onnx::optimization::GetFuseAndEliminationPass()
-      );
+      model, onnx::optimization::GetFuseAndEliminationPass());
   onnx::checker::check_model(new_model);
   std::ofstream ofs(argv[2]);
   success = new_model.SerializePartialToOstream(&ofs);

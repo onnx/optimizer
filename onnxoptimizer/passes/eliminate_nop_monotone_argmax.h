@@ -13,8 +13,7 @@ namespace optimization {
 
 // Note for log and sqrt this optimization is not always right,
 // because it is a undefined behavior when the input is negative
-const std::unordered_set<NodeKind> monotone_node_no_axis_kind{kLog,
-                                                              kExp,
+const std::unordered_set<NodeKind> monotone_node_no_axis_kind{kLog, kExp,
                                                               kSqrt};
 
 const std::unordered_set<NodeKind> monotone_node_axis_kind{kSoftmax,
@@ -22,10 +21,8 @@ const std::unordered_set<NodeKind> monotone_node_axis_kind{kSoftmax,
 
 struct EliminateNopMonotoneArgmax final : public PredicateBasedPass {
   explicit EliminateNopMonotoneArgmax()
-      : PredicateBasedPass(
-            PassType::Nop,
-            PassEfficiency::Partial,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Nop, PassEfficiency::Partial,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "eliminate_nop_monotone_argmax";
@@ -50,18 +47,20 @@ struct EliminateNopMonotoneArgmax final : public PredicateBasedPass {
       if (node->hasAttribute(kaxis)) {
         auto node_axis = node->i(kaxis);
         return node->inputs().size() == 1 &&
-            satisfies_monotone_condition(node_axis, node->input()->node());
+               satisfies_monotone_condition(node_axis, node->input()->node());
       }
     }
     return false;
   }
 
-  bool runTransform(Node* node, Graph&, NodeDestroyType&)
-      override {
+  bool runTransform(Node* node, Graph&, NodeDestroyType&) override {
     Node* monotone_node = node->input()->node();
     if (monotone_node->output()->uses().size() == 1) {
-      const bool replacing_success = tryReplacingAllUsesWith(monotone_node->output(), monotone_node->input());
-      if (!replacing_success) { return false; }
+      const bool replacing_success = tryReplacingAllUsesWith(
+          monotone_node->output(), monotone_node->input());
+      if (!replacing_success) {
+        return false;
+      }
       monotone_node->destroy();
       return true;
     }
@@ -69,5 +68,5 @@ struct EliminateNopMonotoneArgmax final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

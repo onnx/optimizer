@@ -25,10 +25,8 @@ namespace optimization {
 
 struct EliminateUnusedInitializer final : public FullGraphBasedPass {
   explicit EliminateUnusedInitializer()
-      : FullGraphBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Memory) {}
+      : FullGraphBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Memory) {}
 
   std::string getPassName() const override {
     return "eliminate_unused_initializer";
@@ -39,8 +37,7 @@ struct EliminateUnusedInitializer final : public FullGraphBasedPass {
   }
 
   void erase_used_initializers(
-      Graph& g,
-      std::unordered_set<std::string>* initializer_names) {
+      Graph& g, std::unordered_set<std::string>* initializer_names) {
     for (auto output : g.outputs()) {
       initializer_names->erase(output->uniqueName());
     }
@@ -65,9 +62,8 @@ struct EliminateUnusedInitializer final : public FullGraphBasedPass {
     for (std::string name : initializer_names) {
       graph.eraseInitializer(name);
       auto iter = std::find_if(
-          graph.inputs().begin(), graph.inputs().end(), [&name](Value* input) {
-            return input->uniqueName() == name;
-          });
+          graph.inputs().begin(), graph.inputs().end(),
+          [&name](Value* input) { return input->uniqueName() == name; });
       if (iter != graph.inputs().end()) {
         graph.eraseInput(std::distance(graph.inputs().begin(), iter));
       }
@@ -80,5 +76,5 @@ struct EliminateUnusedInitializer final : public FullGraphBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

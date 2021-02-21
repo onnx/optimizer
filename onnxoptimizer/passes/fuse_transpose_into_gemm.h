@@ -14,18 +14,16 @@ namespace optimization {
 
 struct FuseTransposeIntoGemm final : public PredicateBasedPass {
   explicit FuseTransposeIntoGemm()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "fuse_transpose_into_gemm";
   }
   bool patternMatchPredicate(Node* node) override {
     return node->kind() == kGemm;
   }
-  bool runTransform(Node* n, Graph&, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* n, Graph&,
+                    NodeDestroyType& destroy_current) override {
     const std::vector<int64_t> simple_trans_perm({1, 0});
     destroy_current = NodeDestroyType::DestroyZero;
     bool ret_val = false;
@@ -46,5 +44,5 @@ struct FuseTransposeIntoGemm final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

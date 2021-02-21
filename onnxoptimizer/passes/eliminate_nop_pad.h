@@ -15,10 +15,8 @@ namespace optimization {
 
 struct EliminateNopPad final : public PredicateBasedPass {
   explicit EliminateNopPad()
-      : PredicateBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "eliminate_nop_pad";
@@ -64,16 +62,19 @@ struct EliminateNopPad final : public PredicateBasedPass {
     return node->kind() == kPad;
   }
 
-  bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* node, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
     if (!is_nop_pad(node, graph))
       return false;
-    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
-    if (!replacing_success) { return false; }
+    const bool replacing_success =
+        tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

@@ -24,7 +24,7 @@ struct Optimizer {
   static GlobalPassRegistry passes;
 
  public:
-  Optimizer(const std::vector<std::string>& names, const bool fixed_point);
+  Optimizer(const std::vector<std::string> &names, const bool fixed_point);
   ~Optimizer();
 
   ModelProto optimize(const ModelProto &mp_in) {
@@ -88,12 +88,10 @@ const std::vector<std::string> GetAvailablePasses();
 
 const std::vector<std::string> GetFuseAndEliminationPass();
 
-ModelProto Optimize(
-    const ModelProto& mp_in,
-    const std::vector<std::string>& names);
+ModelProto Optimize(const ModelProto &mp_in,
+                    const std::vector<std::string> &names);
 
-ModelProto OptimizeFixed(
-    const ModelProto& mp_in,
-    const std::vector<std::string>& names);
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+ModelProto OptimizeFixed(const ModelProto &mp_in,
+                         const std::vector<std::string> &names);
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

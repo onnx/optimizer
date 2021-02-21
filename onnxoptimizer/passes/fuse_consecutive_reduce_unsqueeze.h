@@ -13,23 +13,14 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-const std::unordered_set<NodeKind> reduction_operators{kReduceL1,
-                                                       kReduceL2,
-                                                       kReduceLogSum,
-                                                       kReduceLogSumExp,
-                                                       kReduceMax,
-                                                       kReduceMean,
-                                                       kReduceMin,
-                                                       kReduceProd,
-                                                       kReduceSum,
-                                                       kReduceSumSquare};
+const std::unordered_set<NodeKind> reduction_operators{
+    kReduceL1,   kReduceL2,  kReduceLogSum, kReduceLogSumExp, kReduceMax,
+    kReduceMean, kReduceMin, kReduceProd,   kReduceSum,       kReduceSumSquare};
 
 struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   explicit FuseConsecutiveReduceUnsqueeze()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "fuse_consecutive_reduce_unsqueeze";
@@ -108,12 +99,15 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
     // remove unnecessary unsqueeze
     reduction_op->output()->setSizes(node->output()->sizes());
     reduction_op->output()->setElemType(node->output()->elemType());
-    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
-    if (!replacing_success) { return false; }
+    const bool replacing_success =
+        tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

@@ -12,9 +12,9 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-// This optimization works well especially when used together with 
+// This optimization works well especially when used together with
 // constant folding (onnx-simplifier), for example, the if node
-// introduced by PyTorch squeeze op will be eliminated when the input 
+// introduced by PyTorch squeeze op will be eliminated when the input
 // shape is known.
 // Ideally eliminate_if_with_const_cond + eliminate_deadend + constant
 // folding can be replaced by the more powerful sparse conditional
@@ -42,7 +42,8 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
     return false;
   }
 
-  // step 2: inline the subgraph (for example, inline then_branch when cond === true)
+  // step 2: inline the subgraph (for example, inline then_branch when cond ===
+  // true)
   //         by re-creating all subgraph nodes in parent graph
   //         note: handle captured value
   // step 3: Delete "if" node itself
@@ -106,5 +107,5 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

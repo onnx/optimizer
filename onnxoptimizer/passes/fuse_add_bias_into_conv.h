@@ -27,19 +27,18 @@ namespace optimization {
 
 struct FuseAddBiasIntoConv final : public PredicateBasedPass {
   explicit FuseAddBiasIntoConv()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "fuse_add_bias_into_conv";
   }
-  bool patternMatchPredicate(Node* node) override {
+  bool patternMatchPredicate(Node *node) override {
     return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
-        node->inputs()[0]->node()->inputs().size() == 2;
+           node->inputs()[0]->node()->inputs().size() == 2;
   }
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
-                           Value *input, Node *target_node, BuiltinSymbol k) {
+                                      Value *input, Node *target_node,
+                                      BuiltinSymbol k) {
     assert(k == kSqueeze || k == kUnsqueeze);
     Node *squeeze = graph.create(k, 1);
     int opset_version = getOpsetVersion(graph);
@@ -58,8 +57,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     squeeze->insertBefore(target_node);
     return squeeze;
   }
-  bool runTransform(Node* n, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node *n, Graph &graph,
+                    NodeDestroyType &destroy_current) override {
     // due to current broadcasting's constraint, Conv has to be the first
     // operand
     destroy_current = NodeDestroyType::DestroyZero;
@@ -88,8 +87,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     if (weight_shape.size() > 0 && weight_shape[0].is_int) {
       ONNX_ASSERT(M == -1 || M == weight_shape[0].dim);
       M = weight_shape[0].dim;
-      ONNX_ASSERT(
-          rank == -1 || rank == static_cast<int64_t>(weight_shape.size()));
+      ONNX_ASSERT(rank == -1 ||
+                  rank == static_cast<int64_t>(weight_shape.size()));
       rank = weight_shape.size();
     }
     int64_t num_el = 1;
@@ -113,21 +112,21 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
           orig_conv->node()->isBefore(orig_bias->node())) {
         orig_bias->node()->moveBefore(orig_conv->node());
       }
-      Value* conv_3rd_input = orig_bias;
+      Value *conv_3rd_input = orig_bias;
       if (bias_shape.size() > 1) {
         std::vector<int64_t> axes(bias_shape.size() - 1);
         std::iota(axes.begin(), axes.end(), 0);
         Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
-                                    orig_conv->node(), kSqueeze);
+                                               orig_conv->node(), kSqueeze);
         conv_3rd_input = squeeze->output();
       } else if (bias_shape.size() == 0) {
         std::vector<int64_t> axes = {0};
         Node *unsqueeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
-                                      orig_conv->node(), kUnsqueeze);
+                                                 orig_conv->node(), kUnsqueeze);
         conv_3rd_input = unsqueeze->output();
       }
       if (M > 1) {
-        Node* constant = graph.create(kConstant, 1);
+        Node *constant = graph.create(kConstant, 1);
         Tensor t;
         t.sizes().push_back(static_cast<int64_t>(1));
         t.int64s().push_back(M);
@@ -138,7 +137,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
         constant->output()->setSizes(s);
         constant->output()->setElemType(TensorProto_DataType_INT64);
         constant->insertBefore(orig_conv->node());
-        Node* tile = graph.create(kTile, 1);
+        Node *tile = graph.create(kTile, 1);
         tile->addInput(conv_3rd_input);
         tile->addInput(constant->output());
         conv_3rd_input = tile->output();
@@ -147,10 +146,9 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       orig_conv->node()->addInput(conv_3rd_input);
     } else if (rank > static_cast<int64_t>(bias_shape.size()) + 1) {
       return false;
-    } else if (
-        num_el == M &&
-        bias_shape[1 + bias_shape.size() - static_cast<unsigned>(rank)].dim ==
-            M) {
+    } else if (num_el == M &&
+               bias_shape[1 + bias_shape.size() - static_cast<unsigned>(rank)]
+                       .dim == M) {
       ONNX_ASSERT(bias_shape.size() > 1);
       if (orig_bias->node()->kind() != kParam &&
           orig_conv->node()->isBefore(orig_bias->node())) {
@@ -160,8 +158,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       std::iota(axes.begin(), axes.end(), static_cast<int64_t>(0));
       axes.erase(axes.begin() +
                  (1 + bias_shape.size() - static_cast<unsigned>(rank)));
-      Node *squeeze =
-          makeSqueezeOrUnsqueeze(graph, axes, orig_bias, orig_conv->node(), kSqueeze);
+      Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, orig_bias,
+                                             orig_conv->node(), kSqueeze);
       orig_conv->node()->addInput(squeeze->output());
     } else {
       return false;
@@ -172,12 +170,15 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     if (n->output()->elemType() != TensorProto_DataType_UNDEFINED) {
       orig_conv->setElemType(n->output()->elemType());
     }
-    const bool replacing_success = tryReplacingAllUsesWith(n, orig_conv->node());
-    if (!replacing_success) { return false; }
+    const bool replacing_success =
+        tryReplacingAllUsesWith(n, orig_conv->node());
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE
