@@ -84,8 +84,8 @@ struct GlobalPassRegistry {
 
   std::shared_ptr<Pass> find(std::string pass_name) {
     auto it = this->passes.find(pass_name);
-    ONNX_ASSERTM(
-        it != this->passes.end(), "pass %s is unknown.", pass_name.c_str());
+    ONNX_ASSERTM(it != this->passes.end(), "pass %s is unknown.",
+                 pass_name.c_str());
     return it->second;
   }
   const std::vector<std::string> GetAvailablePasses();
@@ -99,5 +99,5 @@ struct GlobalPassRegistry {
     passes[pass->getPassName()] = pass;
   }
 };
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

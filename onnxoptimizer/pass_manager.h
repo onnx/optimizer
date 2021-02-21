@@ -50,5 +50,5 @@ class FixedPointPassManager : public GeneralPassManager {
   std::shared_ptr<PassManagerAnalysis> run(Graph& graph) override;
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

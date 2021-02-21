@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
@@ -40,10 +39,8 @@ namespace optimization {
 // TODO: Currently broken for complex values and float16
 struct FuseBNIntoConv final : public PredicateBasedPass {
   explicit FuseBNIntoConv()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "fuse_bn_into_conv";
@@ -85,22 +82,18 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     }
 
     ONNX_ASSERT(s_iter->sizes().size() == 1);
-    ONNX_ASSERT(
-        bbn_iter->sizes().size() == 1 &&
-        bbn_iter->sizes()[0] == s_iter->sizes()[0]);
-    ONNX_ASSERT(
-        m_iter->sizes().size() == 1 &&
-        m_iter->sizes()[0] == s_iter->sizes()[0]);
-    ONNX_ASSERT(
-        var_iter->sizes().size() == 1 &&
-        var_iter->sizes()[0] == s_iter->sizes()[0]);
-    ONNX_ASSERT(
-        W_iter->sizes().size() > 2 && W_iter->sizes()[0] == s_iter->sizes()[0]);
-    ONNX_ASSERT(
-        s_iter->elem_type() == bbn_iter->elem_type() &&
-        s_iter->elem_type() == m_iter->elem_type() &&
-        s_iter->elem_type() == var_iter->elem_type() &&
-        s_iter->elem_type() == W_iter->elem_type());
+    ONNX_ASSERT(bbn_iter->sizes().size() == 1 &&
+                bbn_iter->sizes()[0] == s_iter->sizes()[0]);
+    ONNX_ASSERT(m_iter->sizes().size() == 1 &&
+                m_iter->sizes()[0] == s_iter->sizes()[0]);
+    ONNX_ASSERT(var_iter->sizes().size() == 1 &&
+                var_iter->sizes()[0] == s_iter->sizes()[0]);
+    ONNX_ASSERT(W_iter->sizes().size() > 2 &&
+                W_iter->sizes()[0] == s_iter->sizes()[0]);
+    ONNX_ASSERT(s_iter->elem_type() == bbn_iter->elem_type() &&
+                s_iter->elem_type() == m_iter->elem_type() &&
+                s_iter->elem_type() == var_iter->elem_type() &&
+                s_iter->elem_type() == W_iter->elem_type());
     if (s_iter->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_FLOAT &&
         s_iter->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_DOUBLE) {
       return false;
@@ -113,8 +106,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
         return false;
       }
       bc = *bc_iter;
-      ONNX_ASSERT(
-          bc.sizes().size() == 1 && bc.sizes()[0] == s_iter->sizes()[0]);
+      ONNX_ASSERT(bc.sizes().size() == 1 &&
+                  bc.sizes()[0] == s_iter->sizes()[0]);
     }
 
     Tensor s = *s_iter;
@@ -165,10 +158,10 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
 
   bool patternMatchPredicate(Node* node) override {
     return node->kind() == kBatchNormalization &&
-        node->inputs()[0]->node()->kind() == kConv;
+           node->inputs()[0]->node()->kind() == kConv;
   }
-  bool runTransform(Node* n, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* n, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
     Node* bn = n;
     Node* conv = n->inputs()[0]->node();
     auto origInput = bn->inputs()[0];
@@ -184,12 +177,15 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
         graph.eraseInitializerAndInput(input);
       }
     }
-    const bool replacing_success = tryReplacingAllUsesWith(bn->output(), origInput);
-    if (!replacing_success) { return false; }
+    const bool replacing_success =
+        tryReplacingAllUsesWith(bn->output(), origInput);
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

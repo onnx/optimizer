@@ -14,10 +14,8 @@ namespace optimization {
 
 struct EliminateNopDropout final : public PredicateBasedPass {
   explicit EliminateNopDropout()
-      : PredicateBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "eliminate_nop_dropout";
@@ -28,20 +26,23 @@ struct EliminateNopDropout final : public PredicateBasedPass {
     // however we don't want to to remove Dropout fro opset 12+, since it
     // supports training-friendly models, for which the Dropout ops are required
     return (node->kind() == kDropout && node->hasAttribute(kratio)) &&
-        node->f(kratio) == 0.0;
+           node->f(kratio) == 0.0;
   }
 
-  bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* node, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
     // Don't assume that theres only one output.
     for (size_t i = 0; i < node->outputs().size(); ++i) {
-      const bool replacing_success = tryReplacingAllUsesWith(node->outputs()[i], node->input());
-      if (!replacing_success) { return false; }
+      const bool replacing_success =
+          tryReplacingAllUsesWith(node->outputs()[i], node->input());
+      if (!replacing_success) {
+        return false;
+      }
     }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

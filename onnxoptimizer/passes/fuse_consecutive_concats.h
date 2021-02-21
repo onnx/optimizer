@@ -14,10 +14,8 @@ namespace optimization {
 
 struct FuseConsecutiveConcats final : public PredicateBasedPass {
   explicit FuseConsecutiveConcats()
-      : PredicateBasedPass(
-            PassType::Fuse,
-            PassEfficiency::Partial,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Partial,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "fuse_consecutive_concats";
@@ -48,8 +46,8 @@ struct FuseConsecutiveConcats final : public PredicateBasedPass {
     // match condition.
     return node->kind() == kConcat && node->hasAttribute(kaxis);
   }
-  bool runTransform(Node* concat_node, Graph&, NodeDestroyType& destroy_current)
-      override {
+  bool runTransform(Node* concat_node, Graph&,
+                    NodeDestroyType& destroy_current) override {
     destroy_current = NodeDestroyType::DestroyZero;
     bool transform_ran = false;
     for (size_t i = 0; i < concat_node->inputs().size(); i++) {
@@ -76,5 +74,5 @@ struct FuseConsecutiveConcats final : public PredicateBasedPass {
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

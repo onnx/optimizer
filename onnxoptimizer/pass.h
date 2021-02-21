@@ -87,10 +87,8 @@ class Pass {
   PassOptimizationType pass_optimization_type;
 
  public:
-  Pass(
-      PassType pass_type,
-      PassEfficiency pass_efficiency,
-      PassOptimizationType pass_optimization_type);
+  Pass(PassType pass_type, PassEfficiency pass_efficiency,
+       PassOptimizationType pass_optimization_type);
   virtual ~Pass();
 
   PassType getPassType() const {
@@ -105,34 +103,30 @@ class Pass {
   virtual PassAnalysisType getPassAnalysisType() const = 0;
   virtual std::string getPassName() const = 0;
 
-  virtual bool initializePass(Graph&) {
+  virtual bool initializePass(Graph &) {
     return false;
   }
-  virtual bool finalizePass(Graph&) {
+  virtual bool finalizePass(Graph &) {
     return false;
   }
-  virtual std::shared_ptr<PostPassAnalysis> runPass(Graph& graph) = 0;
+  virtual std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) = 0;
 
  protected:
   // Iterates through the elements in the graph and counts the number of times
   // the transform is successfully run.
   unsigned int DescendOnGraphAttributesAndCount(
-      Node* n,
-      std::function<unsigned int(Graph&)> fn);
+      Node *n, std::function<unsigned int(Graph &)> fn);
   // A more general version of the function above that doesn't constrain the
   // return type of fn.
-  void DescendOnGraphAttributesUnconstrained(
-      Node* n,
-      std::function<void(Graph&)> fn);
+  void DescendOnGraphAttributesUnconstrained(Node *n,
+                                             std::function<void(Graph &)> fn);
 };
 
 class ImmutablePass : Pass {
  public:
   explicit ImmutablePass()
-      : Pass(
-            PassType::Immutable,
-            PassEfficiency::Complete,
-            PassOptimizationType::None) {}
+      : Pass(PassType::Immutable, PassEfficiency::Complete,
+             PassOptimizationType::None) {}
   ~ImmutablePass() override;
 };
 
@@ -143,17 +137,16 @@ struct CountBasedPassAnalysis : PostPassAnalysis {
   // but this complicates the memory model. Also since all passes come from
   // GlobalPassRegistry which already utilizes smart pointers we don't have to
   // worry about memory leaks from passes.
-  Pass* pass;
+  Pass *pass;
   unsigned int num_positive_transforms;
   bool initialization_done;
   bool finalization_done;
 
  public:
-  explicit CountBasedPassAnalysis(
-      Pass* pass,
-      unsigned int num_positive_transforms,
-      bool initialization_done,
-      bool finalization_done);
+  explicit CountBasedPassAnalysis(Pass *pass,
+                                  unsigned int num_positive_transforms,
+                                  bool initialization_done,
+                                  bool finalization_done);
 
   bool graphChanged() {
     return this->num_positive_transforms > 0;
@@ -165,7 +158,7 @@ struct CountBasedPassAnalysis : PostPassAnalysis {
   // Whether or not a repeated application of the pass might be useful.
   bool fixedPointOptimizationNeeded() {
     return this->graphChanged() &&
-        pass->getPassEfficiency() == PassEfficiency::Partial;
+           pass->getPassEfficiency() == PassEfficiency::Partial;
   }
 };
 
@@ -177,29 +170,28 @@ struct CountBasedPassAnalysis : PostPassAnalysis {
 // patternMatchPredicate.
 class PredicateBasedPass : public Pass {
  public:
-  explicit PredicateBasedPass(
-      PassType pass_type,
-      PassEfficiency pass_efficiency,
-      PassOptimizationType pass_optimization_type)
+  explicit PredicateBasedPass(PassType pass_type,
+                              PassEfficiency pass_efficiency,
+                              PassOptimizationType pass_optimization_type)
       : Pass(pass_type, pass_efficiency, pass_optimization_type) {}
   ~PredicateBasedPass() override;
 
-  virtual bool patternMatchPredicate(Node* node) = 0;
+  virtual bool patternMatchPredicate(Node *node) = 0;
   // Run transform is given the current node in the iterator, a reference to the
   // current graph as well as a reference describing how to treat the current
   // node in the iterator post transform. Run transform is then responsible for
   // running the actual transform as well as describing how to treat the
   // iterator node. By default the current node will not call destroy. Do not
   // internally delete node instead set the correct destroy_current type.
-  virtual bool
-  runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current) = 0;
+  virtual bool runTransform(Node *node, Graph &graph,
+                            NodeDestroyType &destroy_current) = 0;
 
-  std::shared_ptr<PostPassAnalysis> runPass(Graph& graph) override;
+  std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) override;
   PassAnalysisType getPassAnalysisType() const override;
 
   static int getOpsetVersion(const Graph &g) {
     // this hack is due to `opset_versions_mutable` doesn't have a const version
-    Graph &mut_g = const_cast<Graph&>(g);
+    Graph &mut_g = const_cast<Graph &>(g);
     for (const OpSetID &opset : mut_g.opset_versions_mutable()) {
       if (opset.domain() == "") {
         return opset.version();
@@ -209,16 +201,15 @@ class PredicateBasedPass : public Pass {
   }
 
  private:
-  unsigned int _runPassInternal(Graph& graph);
+  unsigned int _runPassInternal(Graph &graph);
 };
 
 // The most general pass which allows the user to run a pass given only a graph.
 class FullGraphBasedPass : public Pass {
  public:
-  explicit FullGraphBasedPass(
-      PassType pass_type,
-      PassEfficiency pass_efficiency,
-      PassOptimizationType pass_optimization_type)
+  explicit FullGraphBasedPass(PassType pass_type,
+                              PassEfficiency pass_efficiency,
+                              PassOptimizationType pass_optimization_type)
       : Pass(pass_type, pass_efficiency, pass_optimization_type) {}
   ~FullGraphBasedPass() override;
 };
@@ -236,7 +227,7 @@ inline bool areTwoValuesBothInputOrOutput(const Value *value1,
     const bool is_input =
         value->node()->kind() == kCaptured ||
         std::find(graph->inputs().rbegin(), graph->inputs().rend(), value) !=
-        graph->inputs().rend();
+            graph->inputs().rend();
     return is_output || is_input;
   };
   return IsInputOrOutput(value1) && IsInputOrOutput(value2);
@@ -264,5 +255,5 @@ inline bool tryReplacingAllUsesWith(Node *oldNode, Node *newNode) {
   return true;
 }
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE

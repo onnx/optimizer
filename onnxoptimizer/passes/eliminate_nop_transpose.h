@@ -14,10 +14,8 @@ namespace optimization {
 
 struct EliminateNopTranspose final : public PredicateBasedPass {
   explicit EliminateNopTranspose()
-      : PredicateBasedPass(
-            PassType::Nop,
-            PassEfficiency::Complete,
-            PassOptimizationType::Compute) {}
+      : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
+                           PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
     return "eliminate_nop_transpose";
@@ -32,17 +30,20 @@ struct EliminateNopTranspose final : public PredicateBasedPass {
 
   bool patternMatchPredicate(Node* node) override {
     return (node->kind() == kTranspose && node->hasAttribute(kperm)) &&
-        is_nop_transpose(node->is(kperm));
+           is_nop_transpose(node->is(kperm));
   }
 
-  bool runTransform(Node* node, Graph& graph, NodeDestroyType& destroy_current)
-      override {
-    const bool replacing_success = tryReplacingAllUsesWith(node->output(), node->input());
-    if (!replacing_success) { return false; }
+  bool runTransform(Node* node, Graph& graph,
+                    NodeDestroyType& destroy_current) override {
+    const bool replacing_success =
+        tryReplacingAllUsesWith(node->output(), node->input());
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE
