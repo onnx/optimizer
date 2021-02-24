@@ -115,7 +115,7 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
       orig_input->node()->destroy();
     }
     if (IsAxesAnAttr(graph)) {
-      n->is_(kaxis, std::move(rs));
+      n->is_(kaxes, std::move(rs));
     } else {
       Tensor t;
       t.sizes().push_back(rs.size());
