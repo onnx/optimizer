@@ -43,8 +43,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     Node *squeeze = graph.create(k, 1);
     int opset_version = getOpsetVersion(graph);
     squeeze->addInput(input);
-    int version_threshold = 11;
-    if (opset_version <= version_threshold && opset_version != 0) {
+    int version_threshold = 13;
+    if (opset_version < version_threshold && opset_version != 0) {
       squeeze->is_(kaxes, std::move(axes));
     } else {
       Tensor t;
