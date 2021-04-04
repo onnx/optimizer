@@ -1125,6 +1125,66 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == 'Conv'
         assert optimized_model.graph.node[1].op_type == 'Add'
 
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_with_non_constant_bias(self):
+        nodes = [helper.make_node("Conv", ["X", "Y"], ["Z"]),
+                 helper.make_node("Sin", ["A"], ["B"]),
+                 helper.make_node("Add", ["Z", "B"], ["C"])]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info(
+                 "Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+             helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1))],
+            [helper.make_tensor_value_info(
+                "C", TensorProto.FLOAT, (1, 16, 1, 1))],
+            value_info=[helper.make_tensor_value_info(
+                "B", TensorProto.FLOAT, (16, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(list(optimized_model.graph.node)) == 3
+        assert optimized_model.graph.node[0].op_type == 'Sin'
+        assert optimized_model.graph.node[1].op_type == 'Squeeze'
+        assert optimized_model.graph.node[2].op_type == 'Conv'
+        assert optimized_model.graph.output[0].name == 'C'
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_with_quanted_bias(self):
+        nodes = [helper.make_node("Conv", ["X", "Y"], ["Z"]),
+                 helper.make_node("QuantizeLinear", ["A", "scale", "zero_point"], ["B"], axis=0),
+                 helper.make_node("DequantizeLinear", ["B", "scale", "zero_point"], ["C"], axis=0),
+                 helper.make_node("Add", ["Z", "C"], ["D"])]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info(
+                 "Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+             helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1))],
+            [helper.make_tensor_value_info(
+                "D", TensorProto.FLOAT, (1, 16, 1, 1))],
+            [helper.make_tensor("scale", TensorProto.FLOAT,
+                                dims=(16,),
+                                vals=np.random.rand(16).astype(np.float32).tobytes(),
+                                raw=True),
+             helper.make_tensor("zero_point", TensorProto.INT8,
+                                             dims=(16,),
+                                             vals=np.zeros([16]).astype(np.int8).tobytes(),
+                                             raw=True)],
+            value_info=[helper.make_tensor_value_info(
+                "C", TensorProto.FLOAT, (16, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"], opset_imports=[helper.make_opsetid("", 13)])
+
+        assert len(list(optimized_model.graph.node)) == 4
+        assert optimized_model.graph.node[0].op_type == 'Squeeze'
+        assert optimized_model.graph.node[1].op_type == 'QuantizeLinear'
+        assert optimized_model.graph.node[2].op_type == 'DequantizeLinear'
+        assert optimized_model.graph.node[3].op_type == 'Conv'
+        assert optimized_model.graph.output[0].name == 'D'
+
     def test_fuse_matmul_add_bias_into_gemm(self):  # type: () -> None
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
