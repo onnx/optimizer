@@ -38,11 +38,22 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
   }
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                                       Value *input, Node *target_node,
-                                      BuiltinSymbol k) {
+                                      BuiltinSymbol k, bool is_input_qdq) {
     assert(k == kSqueeze || k == kUnsqueeze);
     Node *squeeze = graph.create(k, 1);
-    int opset_version = getOpsetVersion(graph);
+    Node *dequant_node = nullptr;
+    Node *quant_node = nullptr;
+    // insert squeeze op before qdq
+    if (is_input_qdq) {
+      dequant_node = input->node();
+      quant_node = dequant_node->input(0)->node();
+      target_node = quant_node;
+      input = target_node->input(0);
+      dequant_node->output()->clearMetadata();
+      quant_node->output()->clearMetadata();
+    }
     squeeze->addInput(input);
+    int opset_version = getOpsetVersion(graph);
     int version_threshold = 13;
     if (opset_version < version_threshold && opset_version != 0) {
       squeeze->is_(kaxes, std::move(axes));
@@ -54,7 +65,13 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       Value *tv = graph.addInitializerAndInput(t);
       squeeze->addInput(tv);
     }
+    if (is_input_qdq) {
+      quant_node->replaceInput(0, squeeze->output());
+    }
     squeeze->insertBefore(target_node);
+    if (is_input_qdq) {
+      return dequant_node;
+    }
     return squeeze;
   }
   bool runTransform(Node *n, Graph &graph,
@@ -115,13 +132,13 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       if (bias_shape.size() > 1) {
         std::vector<int64_t> axes(bias_shape.size() - 1);
         std::iota(axes.begin(), axes.end(), 0);
-        Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
-                                               orig_conv->node(), kSqueeze);
+        Node *squeeze = makeSqueezeOrUnsqueeze(
+            graph, axes, conv_3rd_input, orig_conv->node(), kSqueeze, false);
         conv_3rd_input = squeeze->output();
       } else if (bias_shape.size() == 0) {
         std::vector<int64_t> axes = {0};
-        Node *unsqueeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
-                                                 orig_conv->node(), kUnsqueeze);
+        Node *unsqueeze = makeSqueezeOrUnsqueeze(
+            graph, axes, conv_3rd_input, orig_conv->node(), kUnsqueeze, false);
         conv_3rd_input = unsqueeze->output();
       }
       if (M > 1) {
@@ -149,17 +166,25 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
                bias_shape[1 + bias_shape.size() - static_cast<unsigned>(rank)]
                        .dim == M) {
       ONNX_ASSERT(bias_shape.size() > 1);
+      const bool is_input_qdq =
+          orig_bias->node()->kind() == Symbol("DequantizeLinear") &&
+          orig_bias->node()->input(0)->node()->kind() ==
+              Symbol("QuantizeLinear");
       if (orig_bias->node()->kind() != kParam &&
           orig_conv->node()->isBefore(orig_bias->node())) {
+        if (is_input_qdq) {
+          orig_bias->node()->input(0)->node()->moveBefore(orig_conv->node());
+        }
         orig_bias->node()->moveBefore(orig_conv->node());
       }
       std::vector<int64_t> axes(bias_shape.size());
       std::iota(axes.begin(), axes.end(), static_cast<int64_t>(0));
       axes.erase(axes.begin() +
                  (1 + bias_shape.size() - static_cast<unsigned>(rank)));
-      Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, orig_bias,
-                                             orig_conv->node(), kSqueeze);
-      orig_conv->node()->addInput(squeeze->output());
+
+      Node *new_bias = makeSqueezeOrUnsqueeze(
+          graph, axes, orig_bias, orig_conv->node(), kSqueeze, is_input_qdq);
+      orig_conv->node()->addInput(new_bias->output());
     } else {
       return false;
     }
