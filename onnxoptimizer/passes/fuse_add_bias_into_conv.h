@@ -64,16 +64,15 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     destroy_current = NodeDestroyType::DestroyZero;
     auto orig_conv = n->inputs()[0];
     auto orig_bias = n->inputs()[1];
-    // check if bias is Const or in graph's initializers
-    if (orig_bias->node()->kind() != kConstant &&
-        orig_bias->node()->kind() != kParam) {
-      return false;
-    }
     // check if conv is only used by Add
     if (orig_conv->uses().size() > 1) {
       return false;
     }
     auto conv_shape = orig_conv->sizes();
+    // We need the size of bias
+    if (!orig_bias->has_sizes()) {
+      return false;
+    }
     auto bias_shape = orig_bias->sizes();
     auto weight_shape = orig_conv->node()->inputs()[1]->sizes();
     int64_t M = -1;
