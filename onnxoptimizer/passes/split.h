@@ -217,6 +217,7 @@ struct SplitPredict final : public FullGraphBasedPass {
     split_init_and_predict(graph, false, true);
     return std::shared_ptr<PostPassAnalysis>(new PostPassAnalysis());
   }
+  //test ci
 };
 
 }  // namespace optimization
