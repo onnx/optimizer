@@ -162,18 +162,6 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       }
     }
 
-    // Delete nodes that aren't in the predict net, in reverse
-    // topological order.
-    for (auto it = graph.nodes().rbegin(); it != graph.nodes().rend(); it++) {
-      if (*it == optionalInputDummyNode) {
-        continue;
-      }
-      if (node_belongs_to_predict_net(*it)) {
-        continue;
-      }
-      it.destroyCurrent();
-    }
-
     // Remove inputs that aren't used by the predict net.
     for (auto i = graph.inputs().size(); i--;) {
       if (graph.inputs()[i]->uses().empty()) {
