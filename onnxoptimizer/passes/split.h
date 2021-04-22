@@ -28,6 +28,16 @@ static bool is_pure_operator(Node* n) {
   return true;
 }
 
+static bool has_uses(Node* n){
+
+  for(auto output: n->outputs()){
+    if (!output->uses().empty())
+      return true;
+  }
+
+  return false;
+
+}
 // Split the graph into 'init' and 'predict' nets. This is kind of
 // like constant folding, except that rather than actually execute the
 // constant computations, we simply split them out into a separate
@@ -162,6 +172,20 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       }
     }
 
+    // Delete nodes that aren't in the predict net, in reverse
+    // topological order.
+    for (auto it = graph.nodes().rbegin(); it != graph.nodes().rend(); it++) {
+      if (*it == optionalInputDummyNode) {
+        continue;
+      }
+      if (node_belongs_to_predict_net(*it)) {
+        continue;
+      }
+
+      if (!has_uses(*it))
+        it.destroyCurrent();
+    }
+
     // Remove inputs that aren't used by the predict net.
     for (auto i = graph.inputs().size(); i--;) {
       if (graph.inputs()[i]->uses().empty()) {
@@ -205,7 +229,6 @@ struct SplitPredict final : public FullGraphBasedPass {
     split_init_and_predict(graph, false, true);
     return std::shared_ptr<PostPassAnalysis>(new PostPassAnalysis());
   }
-  //test ci
 };
 
 }  // namespace optimization
