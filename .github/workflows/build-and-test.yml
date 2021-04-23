@@ -20,7 +20,7 @@ jobs:
       CIBW_ENVIRONMENT_WINDOWS: CMAKE_PREFIX_PATH=C:/protobuf_install USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       # Only build on Python 3 and skip 32-bit builds
       CIBW_BUILD: cp3?-*
-      CIBW_SKIP: "cp39-* *-win32 *-manylinux_i686"
+      CIBW_SKIP: "cp35-* *-win32 *-manylinux_i686"
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
