@@ -28,6 +28,16 @@ static bool is_pure_operator(Node* n) {
   return true;
 }
 
+static bool has_uses(Node* n){
+
+  for(auto output: n->outputs()){
+    if (!output->uses().empty())
+      return true;
+  }
+
+  return false;
+
+}
 // Split the graph into 'init' and 'predict' nets. This is kind of
 // like constant folding, except that rather than actually execute the
 // constant computations, we simply split them out into a separate
@@ -171,7 +181,9 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       if (node_belongs_to_predict_net(*it)) {
         continue;
       }
-      it.destroyCurrent();
+
+      if (!has_uses(*it))
+        it.destroyCurrent();
     }
 
     // Remove inputs that aren't used by the predict net.
