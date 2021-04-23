@@ -154,19 +154,25 @@ class TestOptimizer(unittest.TestCase):
         return True
 
     # type: (Union[GraphProto, ModelProto], Sequence[Text], bool, **Any) -> ModelProto
-    def _optimized(self, graph_or_model, opts, fixed_point=False, compare_result=True, **kwargs):
+    def _optimized(self, graph_or_model, opts, fixed_point=False, compare_result=True, check=True, **kwargs):
+        if compare_result and not check:
+            self.fail("compare_result cannot be True if check is False")
+
         if isinstance(graph_or_model, ModelProto):
             orig_model = graph_or_model
         else:
             opset_imports = kwargs.pop('opset_imports', None)
             if opset_imports is None:
-                opset_imports = [helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)]
+                opset_imports = [helper.make_opsetid(
+                    "", LATEST_STABLE_OPSET_VERSION)]
 
             orig_model = helper.make_model(
                 graph_or_model, producer_name='onnx-test', opset_imports=opset_imports, **kwargs)
         checker.check_model(orig_model)
         optimized_model = onnxoptimizer.optimize(orig_model, opts, fixed_point)
-        checker.check_model(optimized_model)
+        # NOTE(daquexian): Some passes (like lift_lexical_references) generate illegal model intentionally
+        if check:
+            checker.check_model(optimized_model)
         if compare_result and len(optimized_model.graph.node) > 0:
             if has_ort:
                 assert self._compare(optimized_model, orig_model)
@@ -291,7 +297,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node[3].attribute[0].g.output) == 2
         assert optimized_model.graph.node[3].attribute[0].g.output[1].name == "_B2"
 
-    def test_eliminate_identity_both_graph_input_and_output(self):  # type: () -> None
+    # type: () -> None
+    def test_eliminate_identity_both_graph_input_and_output(self):
         # We should not eliminate an op when its input is also graph input,
         # and its output is also graph output, because we want to always keep
         # the name of graph input and output unchanged.
@@ -308,14 +315,18 @@ class TestOptimizer(unittest.TestCase):
     def test_eliminate_if_with_const_cond(self):  # type: () -> None
         true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
 
-        subgraph_output_info = helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))
+        subgraph_output_info = helper.make_tensor_value_info(
+            "C", TensorProto.FLOAT, (5,))
 
         sin = helper.make_node("Sin", ["A"], ["B"])
-        hard_sigmoid = helper.make_node("HardSigmoid", ["B"], ["C"], alpha=0.4, beta=0.6)
-        true_graph = helper.make_graph([sin, hard_sigmoid], "true_graph", [], [subgraph_output_info])
+        hard_sigmoid = helper.make_node(
+            "HardSigmoid", ["B"], ["C"], alpha=0.4, beta=0.6)
+        true_graph = helper.make_graph(
+            [sin, hard_sigmoid], "true_graph", [], [subgraph_output_info])
 
         identity = helper.make_node("Identity", ["A"], ["C"])
-        false_graph = helper.make_graph([identity], "false_graph", [], [subgraph_output_info])
+        false_graph = helper.make_graph(
+            [identity], "false_graph", [], [subgraph_output_info])
 
         graph = helper.make_graph([
             helper.make_node("Constant", [], ["condition"], value=true),
@@ -324,7 +335,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
             [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))])
-        optimized_model = self._optimized(graph, ["eliminate_if_with_const_cond"])
+        optimized_model = self._optimized(
+            graph, ["eliminate_if_with_const_cond"])
         assert len(optimized_model.graph.node) == 3
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Sin"
@@ -1953,7 +1965,8 @@ class TestOptimizer(unittest.TestCase):
             graph = helper.make_graph(
                 [conv, bn],
                 "test",
-                [helper.make_tensor_value_info("X", tensor_type, (5, 2, 28, 28))],
+                [helper.make_tensor_value_info(
+                    "X", tensor_type, (5, 2, 28, 28))],
                 [helper.make_tensor_value_info(
                     "Z", tensor_type, (5, 3, 24, 24))],
                 initializer=initializers,
@@ -2307,6 +2320,16 @@ class TestOptimizer(unittest.TestCase):
                                 x.dim_value for x in optimized_model.graph.output[0].type.tensor_type.shape.dim)
                             assert optimized_output_shape == output_shape
 
+    def test_split_predict_and_lift_lexical_references_for_caffe2_backend(self):
+        model_str = b'\x08\x06\x12\x07pytorch\x1a\x031.9:\xe5\x02\n\'\x12\x011"\x08Constant*\x18\n\x05value*\x0c\x10\x07J\x08\x05\x00\x00\x00\x00\x00\x00\x00\xa0\x01\x04\n \x12\x012"\x08Constant*\x11\n\x05value*\x05\x10\tJ\x01\x01\xa0\x01\x04\n\xd1\x01\n\x011\n\x012\n\x03x.1\x12\x013"\x04Loop*\xba\x01\n\x04body2\xae\x01\n\x1a\n\x04x.11\n\x03i.1\x12\x017\x1a\x05Add_0"\x03Add\n\x1c\n\x012\x12\x018\x1a\nIdentity_1"\x08Identity\x12\x11torch-jit-export1Z\r\n\x03i.1\x12\x06\n\x04\x08\x07\x12\x00Z\x0e\n\x04cond\x12\x06\n\x04\x08\t\x12\x00Z\x1a\n\x04x.11\x12\x12\n\x10\x08\x07\x12\x0c\n\x02\x08\x01\n\x02\x08\x02\n\x02\x08\x03b\x0b\n\x018\x12\x06\n\x04\x08\t\x12\x00b\x17\n\x017\x12\x12\n\x10\x08\x07\x12\x0c\n\x02\x08\x01\n\x02\x08\x02\n\x02\x08\x03\xa0\x01\x05\x12\x10torch-jit-exportZ\x19\n\x03x.1\x12\x12\n\x10\x08\x07\x12\x0c\n\x02\x08\x01\n\x02\x08\x02\n\x02\x08\x03b\x17\n\x013\x12\x12\n\x10\x08\x07\x12\x0c\n\x02\x08\x01\n\x02\x08\x02\n\x02\x08\x03B\x02\x10\t'
+        model = onnx.load_from_string(model_str)
+        passes = ['fuse_consecutive_transposes',
+                  'eliminate_nop_transpose',
+                  'fuse_transpose_into_gemm',
+                  'lift_lexical_references',
+                  'split_predict']
+        self._optimized(model, passes, fixed_point=True, compare_result=False, check=False)
+
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_fasterrcnn_fpn(self):    # type: () -> None
         model = tv.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
@@ -2314,7 +2337,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     # maskrcnn is only supported in opset 11 and higher
     @unittest.skipUnless(has_tv, "This test needs torchvision")
@@ -2324,7 +2348,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     # keypointrcnn is only supported in opset 11 and higher
     @unittest.skipUnless(has_tv, "This test needs torchvision")
@@ -2334,7 +2359,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f, opset_version=11)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_shufflenet_v2(self):    # type: () -> None
@@ -2343,7 +2369,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_mnasnet(self):    # type: () -> None
@@ -2352,7 +2379,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_deeplabv3(self):    # type: () -> None
@@ -2361,7 +2389,8 @@ class TestOptimizer(unittest.TestCase):
         with io.BytesIO() as f:
             torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
+            self._optimized(
+                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True)
 
 
 if __name__ == '__main__':
