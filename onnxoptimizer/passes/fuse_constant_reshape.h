@@ -23,7 +23,7 @@ struct FuseConstantReshape final : public PredicateBasedPass {
       : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
   std::string getPassName() const override {
-    return "fuse_reshape_constant";
+    return "fuse_constant_reshape";
   }
 
   bool patternMatchPredicate(Node* node) override {
