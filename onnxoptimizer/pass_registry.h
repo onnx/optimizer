@@ -34,6 +34,7 @@
 #include "onnxoptimizer/passes/fuse_matmul_add_bias_into_gemm.h"
 #include "onnxoptimizer/passes/fuse_pad_into_conv.h"
 #include "onnxoptimizer/passes/fuse_transpose_into_gemm.h"
+#include "onnxoptimizer/passes/fuse_constant_reshape.h"
 #include "onnxoptimizer/passes/lift_lexical_references.h"
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/split.h"
@@ -62,6 +63,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopPad>();
     registerPass<EliminateNopTranspose>();
     registerPass<EliminateUnusedInitializer>();
+    registerPass<FuseConstantReshape>();
     registerPass<ExtractConstantToInitializer>();
     registerPass<FuseAddBiasIntoConv>();
     registerPass<FuseBNIntoConv>();
