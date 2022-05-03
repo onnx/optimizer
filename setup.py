@@ -153,6 +153,8 @@ class cmake_build(setuptools.Command):
 
         with cd(CMAKE_BUILD_DIR):
             build_type = 'Release'
+            ext_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+            print(f'ext_suffix: {ext_suffix}')
             # configure
             cmake_args = [
                 CMAKE,
@@ -167,7 +169,7 @@ class cmake_build(setuptools.Command):
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
                 '-DONNX_NAMESPACE={}'.format(ONNX_NAMESPACE),
                 '-DPY_EXT_SUFFIX={}'.format(
-                    sysconfig.get_config_var('EXT_SUFFIX') or ''),
+                    ext_suffix or ''),
             ]
             if COVERAGE:
                 cmake_args.append('-DONNX_COVERAGE=ON')
