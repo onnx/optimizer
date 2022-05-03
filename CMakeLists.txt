@@ -39,7 +39,7 @@ if(BUILD_ONNX_PYTHON)
     endif()
   endif()
 
-  add_subdirectory(${ONNX_ROOT}/third_party/pybind11)
+  add_subdirectory(${ONNX_ROOT}/third_party/pybind11 onnxopt_pybind11)
   pybind11_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc")
   target_include_directories(onnx_opt_cpp2py_export PRIVATE
                              $<BUILD_INTERFACE:${ONNX_ROOT}>
