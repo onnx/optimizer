@@ -1,12 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-
-from distutils.spawn import find_executable
-from distutils import sysconfig, log
+import sysconfig
 import setuptools
 import setuptools.command.build_py
 import setuptools.command.develop
@@ -15,8 +9,10 @@ import setuptools.command.build_ext
 from collections import namedtuple
 from contextlib import contextmanager
 import glob
+import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import platform
@@ -30,8 +26,8 @@ CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build')
 
 WINDOWS = (os.name == 'nt')
 
-CMAKE = find_executable('cmake3') or find_executable('cmake')
-MAKE = find_executable('make')
+CMAKE = shutil.which('cmake3') or shutil.which('cmake')
+MAKE = shutil.which('make')
 
 install_requires = []
 setup_requires = []
@@ -160,7 +156,12 @@ class cmake_build(setuptools.Command):
             # configure
             cmake_args = [
                 CMAKE,
-                '-DPython_INCLUDE_DIR={}'.format(sysconfig.get_python_inc()),
+                # For legacy FindPythonLibs ONNX uses
+                '-DPYTHON_INCLUDE_DIR={}'.format(sysconfig.get_path('include')),
+                '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
+                # For modern FindPython ONNX Optimizer uses
+                '-DPython_INCLUDE_DIR={}'.format(sysconfig.get_path('include')),
+                # For modern FindPython ONNX Optimizer uses
                 '-DPython_EXECUTABLE={}'.format(sys.executable),
                 '-DBUILD_ONNX_PYTHON=ON',
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
@@ -199,7 +200,7 @@ class cmake_build(setuptools.Command):
                 extra_cmake_args = shlex.split(os.environ['CMAKE_ARGS'])
                 # prevent crossfire with downstream scripts
                 del os.environ['CMAKE_ARGS']
-                log.info('Extra cmake args: {}'.format(extra_cmake_args))
+                logging.info('Extra cmake args: {}'.format(extra_cmake_args))
                 cmake_args.extend(extra_cmake_args)
             cmake_args.append(TOP_DIR)
             subprocess.check_call(cmake_args)
