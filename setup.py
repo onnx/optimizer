@@ -155,13 +155,9 @@ class cmake_build(setuptools.Command):
             # configure
             cmake_args = [
                 CMAKE,
-                # For legacy FindPythonLibs ONNX uses
+                # For legacy FindPythonLibs
                 '-DPYTHON_INCLUDE_DIR={}'.format(sysconfig.get_path('include')),
                 '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
-                # For modern FindPython ONNX Optimizer uses
-                '-DPython_INCLUDE_DIR={}'.format(sysconfig.get_path('include')),
-                # For modern FindPython ONNX Optimizer uses
-                '-DPython_EXECUTABLE={}'.format(sys.executable),
                 '-DBUILD_ONNX_PYTHON=ON',
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
                 '-DONNX_NAMESPACE={}'.format(ONNX_NAMESPACE),
