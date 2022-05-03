@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
 project(onnx_optimizer C CXX)
 
@@ -89,8 +89,7 @@ if(BUILD_ONNX_PYTHON)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 
   if(MSVC)
-    message(STATUS "Finding Python ${PY_VERSION}...")
-    find_package(Python ${PY_VERSION} COMPONENTS Interpreter Development REQUIRED)
+    find_package(Python COMPONENTS Interpreter Development REQUIRED)
     target_link_libraries(onnx_opt_cpp2py_export PRIVATE Python::Python)
     target_compile_options(onnx_opt_cpp2py_export
                            PRIVATE /MP
