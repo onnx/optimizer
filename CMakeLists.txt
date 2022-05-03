@@ -39,30 +39,12 @@ if(BUILD_ONNX_PYTHON)
     endif()
   endif()
 
-  add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
-  set_target_properties(onnx_opt_cpp2py_export PROPERTIES PREFIX "")
-  set_target_properties(onnx_opt_cpp2py_export
-                        PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
-  set_target_properties(onnx_opt_cpp2py_export PROPERTIES SUFFIX ${PY_EXT_SUFFIX})
-  set_target_properties(onnx_opt_cpp2py_export
-                        PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+  add_subdirectory(${ONNX_ROOT}/third_party/pybind11)
+  pybind11_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc")
   target_include_directories(onnx_opt_cpp2py_export PRIVATE
                              $<BUILD_INTERFACE:${ONNX_ROOT}>
                              $<INSTALL_INTERFACE:include>
-                             ${PYTHON_INCLUDE_DIR})
-  # pybind11 is a header only lib
-  find_package(pybind11 2.2)
-  if(pybind11_FOUND)
-    target_include_directories(onnx_opt_cpp2py_export PUBLIC
-      ${pybind11_INCLUDE_DIRS})
-  else()
-    if(EXISTS ${ONNX_ROOT}/third_party/pybind11/include/pybind11/pybind11.h)
-      target_include_directories(onnx_opt_cpp2py_export PUBLIC
-        ${ONNX_ROOT}/third_party/pybind11/include)
-    else()
-      message(FATAL_ERROR "cannot find pybind")
-    endif()
-  endif()
+                             )
 
   if(APPLE)
     set_target_properties(onnx_opt_cpp2py_export
@@ -89,9 +71,6 @@ if(BUILD_ONNX_PYTHON)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 
   if(MSVC)
-    find_package(PythonInterp ${PY_VERSION} REQUIRED)
-    find_package(PythonLibs ${PY_VERSION} REQUIRED)
-    target_link_libraries(onnx_opt_cpp2py_export PRIVATE ${PYTHON_LIBRARIES})
     target_compile_options(onnx_opt_cpp2py_export
                            PRIVATE /MP
                                    /WX
