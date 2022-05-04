@@ -56,7 +56,9 @@ jobs:
 
     - name: Install and test sdist
       run: |
-        python3 -m pip install dist/*.tar.gz
+        # It's important to leave the project directory where a 'onnxoptimizer' subdirectory exists
+        cd dist
+        python3 -m pip install *.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
     - uses: actions/upload-artifact@v2
