@@ -9,6 +9,9 @@ endif(NOT MSVC)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(protobuf_BUILD_TESTS "" OFF)
+add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake)
+
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
 add_subdirectory(${ONNX_ROOT})
 
