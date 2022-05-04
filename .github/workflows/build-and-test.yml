@@ -56,6 +56,7 @@ jobs:
 
     - name: Install and test sdist
       run: |
+        sudo apt install libprotobuf-dev protobuf-compiler
         python3 -m pip install dist/*.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
