@@ -42,3 +42,23 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Build sdist
+      run: pipx run build --sdist
+
+    - name: Install and test sdist
+      run: |
+        python3 -m pip install dist/*.tar.gz
+        python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
+
+    - uses: actions/upload-artifact@v2
+      with:
+        path: dist/*.tar.gz
