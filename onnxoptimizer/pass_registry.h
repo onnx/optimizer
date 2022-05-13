@@ -33,6 +33,8 @@
 #include "onnxoptimizer/passes/fuse_consecutive_transposes.h"
 #include "onnxoptimizer/passes/fuse_matmul_add_bias_into_gemm.h"
 #include "onnxoptimizer/passes/fuse_pad_into_conv.h"
+#include "onnxoptimizer/passes/fuse_pad_into_avgpool.h"
+#include "onnxoptimizer/passes/fuse_pad_into_maxpool.h"
 #include "onnxoptimizer/passes/fuse_transpose_into_gemm.h"
 #include "onnxoptimizer/passes/lift_lexical_references.h"
 #include "onnxoptimizer/passes/nop.h"
@@ -72,6 +74,8 @@ struct GlobalPassRegistry {
     registerPass<FuseConsecutiveTransposes>();
     registerPass<FuseMatMulAddBiasIntoGemm>();
     registerPass<FusePadIntoConv>();
+    registerPass<FusePadIntoAvgPool>();
+    registerPass<FusePadIntoMaxPool>();
     registerPass<FuseTransposeIntoGemm>();
     registerPass<LiftLexicalReferences>();
     registerPass<SplitInit>();
