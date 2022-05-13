@@ -33,7 +33,7 @@ struct FusePadIntoMaxPool final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kMaxPool && node->inputs()[0]->node()->kind() == kPad;
+    return node->kind() == Symbol("MaxPool") && node->inputs()[0]->node()->kind() == kPad;
   }
 
   bool runTransform(Node* n, Graph& graph,
