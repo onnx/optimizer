@@ -24,28 +24,28 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct FusePadIntoMaxPool final : public PredicateBasedPass {
-  explicit FusePadIntoMaxPool()
+struct FusePadIntoPool final : public PredicateBasedPass {
+  explicit FusePadIntoPool()
       : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
   std::string getPassName() const override {
-    return "fuse_pad_into_maxpool";
+    return "fuse_pad_into_pool";
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == Symbol("MaxPool") && node->inputs()[0]->node()->kind() == kPad;
+    return (node->kind() == Symbol("AveragePool") || node->kind() == Symbol("MaxPool")) && node->inputs()[0]->node()->kind() == kPad;
   }
 
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     destroy_current = NodeDestroyType::DestroyZero;
 
-    // check if Pad is only used by avgpool
+    // check if Pad is only used by pool
     if (n->inputs()[0]->uses().size() > 1) {
       return false;
     }
 
-    Node* maxpool = n;
+    Node* pool = n;
     Node* pad = n->inputs()[0]->node();
 
     // Process 'pads' data
@@ -160,20 +160,20 @@ struct FusePadIntoMaxPool final : public PredicateBasedPass {
       return false;
     }
 
-    int maxpool_pads_size = pads_size - 4;
-    std::vector<int64_t> max_pads(maxpool_pads_size, 0);
+    int pool_pads_size = pads_size - 4;
+    std::vector<int64_t> pool_pads(pool_pads_size, 0);
     // Fuse into existing padding, if available
-    if (maxpool->hasAttribute(kpads)) {
-      max_pads = maxpool->is(kpads);
+    if (pool->hasAttribute(kpads)) {
+      pool_pads = pool->is(kpads);
     }
 
     for (int i = 2, j = 0; i < pads_size / 2; ++i, ++j) {
-      max_pads[j] += pads[i];
-      max_pads[maxpool_pads_size / 2 + j] += pads[pads_size / 2 + i];
+      pool_pads[j] += pads[i];
+      pool_pads[pool_pads_size / 2 + j] += pads[pads_size / 2 + i];
     }
 
-    maxpool->is_(kpads, std::move(max_pads));
-    maxpool->replaceInput(0, pad->inputs()[0]);
+    pool->is_(kpads, std::move(pool_pads));
+    pool->replaceInput(0, pad->inputs()[0]);
     pad->destroy();
 
     return true;

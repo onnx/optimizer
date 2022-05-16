@@ -1647,6 +1647,784 @@ class TestOptimizer(unittest.TestCase):
 
         assert optimized_model.graph == graph
 
+    def test_fuse_pad_into_avgpool_no_optional_value_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]        
+
+    def test_fuse_pad_into_maxpool_no_optional_value_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]     
+
+    def test_fuse_pad_into_avgpool_no_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
+
+    def test_fuse_pad_into_maxpool_no_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
+
+    def test_fuse_pad_into_avgpool_with_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads", "Constant_value"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
+             helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True),
+             helper.make_tensor("Constant_value", TensorProto.FLOAT,
+                                dims=(),
+                                vals=np.array([0]).astype(np.float32).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
+
+    def test_fuse_pad_into_maxpool_with_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads", "Constant_value"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
+             helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True),
+             helper.make_tensor("Constant_value", TensorProto.FLOAT,
+                                dims=(),
+                                vals=np.array([0]).astype(np.float32).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
+
+    def test_fuse_pad_into_avgpool_with_nonzero_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads", "Constant_value"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
+             helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True),
+             helper.make_tensor("Constant_value", TensorProto.FLOAT,
+                                dims=(),
+                                # non-zero Constant_value -> so no pad
+                                vals=np.array([25]).astype(
+                                    np.float32).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_with_nonzero_optional_value(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads", "Constant_value"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
+             helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True),
+             helper.make_tensor("Constant_value", TensorProto.FLOAT,
+                                dims=(),
+                                # non-zero Constant_value -> so no pad
+                                vals=np.array([25]).astype(
+                                    np.float32).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_avgpool_1d_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 1, 0, 0, 1]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1]
+
+    def test_fuse_pad_into_maxpool_1d_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 1, 0, 0, 1]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1]
+
+    def test_fuse_pad_into_avgpool_1d(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (6,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(6,),
+                                vals=np.array([0, 0, 1, 0, 0, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1]
+
+    def test_fuse_pad_into_maxpool_1d(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (6,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(6,),
+                                vals=np.array([0, 0, 1, 0, 0, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1]
+
+    def test_fuse_pad_into_avgpool_existing_avgpool_pad_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3],
+                                    pads=[1, 1, 0, 0]
+                                    )        
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1, 1, 1]
+
+    def test_fuse_pad_into_maxpool_existing_maxpool_pad_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3],
+                                    pads=[1, 1, 0, 0]
+                                    )        
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1, 1, 1]
+
+    def test_fuse_pad_into_avgpool_existing_avgpool_pad(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3],
+                                    pads=[1, 1, 0, 0]
+                                    )  
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "AveragePool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1, 1, 1]
+
+    def test_fuse_pad_into_maxpool_existing_maxpool_pad(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3],
+                                    pads=[1, 1, 0, 0]
+                                    )  
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(list(optimized_model.graph.node)) == 1
+        assert optimized_model.graph.node[0].op_type == "MaxPool"
+        assert optimized_model.graph.node[0].attribute[0].name == "pads"
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [1, 1, 1, 1]
+
+    def test_fuse_pad_into_avgpool_pad_feature_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 1, 0, 0, 0, 0, 0, 0]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_pad_feature_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 1, 0, 0, 0, 0, 0, 0]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_avgpool_pad_feature_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 1, 0, 0, 0, 0, 0, 0]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_pad_feature_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 1, 0, 0, 0, 0, 0, 0]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_avgpool_negative_pad_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, -1, -1]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_negative_pad_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, -1, -1]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_avgpool_negative_pad_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array(
+                                    [0, 0, 0, 0, 0, 0, -1, -1]).astype(np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_negative_pad_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array(
+                                    [0, 0, 0, 0, 0, 0, -1, -1]).astype(np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph        
+
+    def test_fuse_pad_into_avgpool_reflection_pad_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="reflect",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_reflection_pad_no_fuse_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="reflect",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_avgpool_reflection_pad_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="reflect"
+        )
+        avg_pool = helper.make_node("AveragePool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_reflection_pad_no_fuse(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X", "Pads"],
+            ["P"],
+            mode="reflect"
+        )
+        max_pool = helper.make_node("MaxPool", 
+                                    ["P"], 
+                                    ["Z"],
+                                    kernel_shape=[3, 3]
+                                    )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor("Pads", TensorProto.INT64,
+                                dims=(8,),
+                                vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
+                                    np.int64).tobytes(),
+                                raw=True)])
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
     def test_fuse_consecutive_squeezes(self):  # type: () -> None
         nodes = [helper.make_node("Squeeze", ["X", "X_axes"], ["Y"]),
                  helper.make_node("Squeeze", ["Y", "Y_axes"], ["Z"])]
