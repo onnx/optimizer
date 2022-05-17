@@ -73,7 +73,6 @@ struct FusePadIntoPool final : public PredicateBasedPass {
 
       // parse 'pads' data from the initialized input
       pads = ParseData<int64_t>(&*pads_initializer);
-      graph.eraseInitializer(pads_name);
     }
 
     // Process 'mode'
