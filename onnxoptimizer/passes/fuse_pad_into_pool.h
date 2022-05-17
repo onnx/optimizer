@@ -180,4 +180,4 @@ struct FusePadIntoPool final : public PredicateBasedPass {
 };
 
 }  // namespace optimization
-}  // namespace onnx
+}  // namespace ONNX_NAMESPACE
