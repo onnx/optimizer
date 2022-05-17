@@ -8,13 +8,13 @@
 #pragma once
 
 // Before:
-//   P = Pad(X) - opset 10 and below (or) Pad(X, Pads, [Constant_value]) - opset
+//   P = Pad(X) - opset 10 and below (or) Pad(X, Pads, [constant_value]) - opset
 //   11 and above Z = pool(P, Y)
 // After:
 //   Z = pool(X, Y) with "pads" attribute set
 //
 // the pass handles the case when Pad is zero-padding the input
-// (i.e. mode=constant and Constant_value=0)
+// (i.e. mode=constant and constant_value=0)
 
 #include <numeric>
 
