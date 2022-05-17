@@ -1655,8 +1655,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1671,7 +1671,7 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[0].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]        
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1] 
 
     def test_fuse_pad_into_maxpool_no_optional_value_opset10(self):
         pad = helper.make_node(
@@ -1681,8 +1681,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1697,7 +1697,7 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[0].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]     
+        assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1] 
 
     def test_fuse_pad_into_avgpool_no_optional_value(self):
         pad = helper.make_node(
@@ -1706,8 +1706,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1736,8 +1736,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1766,8 +1766,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1801,8 +1801,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1836,8 +1836,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1870,8 +1870,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1905,8 +1905,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 1, 0, 0, 1]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1931,8 +1931,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 1, 0, 0, 1]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1956,8 +1956,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -1986,8 +1986,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2017,12 +2017,12 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3],
                                     pads=[1, 1, 0, 0]
-                                    )        
+                                    )   
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
@@ -2044,12 +2044,12 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3],
                                     pads=[1, 1, 0, 0]
-                                    )        
+                                    )
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
@@ -2070,12 +2070,12 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3],
                                     pads=[1, 1, 0, 0]
-                                    )  
+                                    )
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
@@ -2101,12 +2101,12 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3],
                                     pads=[1, 1, 0, 0]
-                                    )  
+                                    )
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
@@ -2133,8 +2133,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 1, 0, 0, 0, 0, 0, 0]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2156,8 +2156,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 1, 0, 0, 0, 0, 0, 0]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2178,8 +2178,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2205,8 +2205,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2233,8 +2233,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, -1, -1]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2256,8 +2256,8 @@ class TestOptimizer(unittest.TestCase):
             mode="constant",
             pads=[0, 0, 0, 0, 0, 0, -1, -1]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2278,8 +2278,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2305,8 +2305,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="constant"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2323,7 +2323,7 @@ class TestOptimizer(unittest.TestCase):
                                 raw=True)])
         optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
 
-        assert optimized_model.graph == graph        
+        assert optimized_model.graph == graph     
 
     def test_fuse_pad_into_avgpool_reflection_pad_no_fuse_opset10(self):
         pad = helper.make_node(
@@ -2333,8 +2333,8 @@ class TestOptimizer(unittest.TestCase):
             mode="reflect",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2356,8 +2356,8 @@ class TestOptimizer(unittest.TestCase):
             mode="reflect",
             pads=[0, 0, 0, 0, 0, 0, 1, 1]
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2378,8 +2378,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="reflect"
         )
-        avg_pool = helper.make_node("AveragePool", 
-                                    ["P"], 
+        avg_pool = helper.make_node("AveragePool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
@@ -2405,8 +2405,8 @@ class TestOptimizer(unittest.TestCase):
             ["P"],
             mode="reflect"
         )
-        max_pool = helper.make_node("MaxPool", 
-                                    ["P"], 
+        max_pool = helper.make_node("MaxPool",
+                                    ["P"],
                                     ["Z"],
                                     kernel_shape=[3, 3]
                                     )
