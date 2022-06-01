@@ -3029,6 +3029,34 @@ class TestOptimizer(unittest.TestCase):
                 assert len(optimized_model.graph.node) == 1
                 assert optimized_model.graph.node[0].op_type == "Log"
 
+    def test_eliminate_shape_op(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
+
+        node_def = helper.make_node(
+            'Relu',
+            ['X'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Shape',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],               # outputs
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_shape_op"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Relu"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
