@@ -47,7 +47,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
 
   void replace_inputs(Tensor& W, Tensor& b, Node* conv, Graph& graph) {
-    Value* new_W_value = graph.addInitializerAndInput(W);
+    W.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    Value* new_W_value = graph.addInitializerAndCreateValue(W);
     Value* old_W_value = conv->inputs()[1];
     conv->replaceInput(1, new_W_value);
     if (old_W_value->uses().size() == 0) {
@@ -55,14 +56,15 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     }
 
     if (conv->inputs().size() == 3) {
-      Value* new_b_value = graph.addInitializerAndInput(b);
+      b.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+      Value* new_b_value = graph.addInitializerAndCreateValue(b);
       Value* old_b_value = conv->inputs()[2];
       conv->replaceInput(2, new_b_value);
       if (old_b_value->uses().size() == 0) {
         graph.eraseInitializerAndInput(old_b_value);
       }
     } else {
-      Value* new_b_value = graph.addInitializerAndInput(b);
+      Value* new_b_value = graph.addInitializerAndCreateValue(b);
       conv->addInput(new_b_value);
     }
   }

@@ -51,7 +51,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       t.sizes().push_back(axes.size());
       t.int64s() = axes;
       t.elem_type() = TensorProto_DataType_INT64;
-      Value *tv = graph.addInitializerAndInput(t);
+      Value *tv = graph.addInitializerAndCreateValue(t);
       squeeze->addInput(tv);
     }
     squeeze->insertBefore(target_node);

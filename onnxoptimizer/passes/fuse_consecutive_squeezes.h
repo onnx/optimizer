@@ -122,7 +122,7 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
       t.int64s() = rs;
       t.elem_type() = TensorProto_DataType_INT64;
       auto axes_v = n->inputs()[1];
-      Value *tv = graph.addInitializerAndInput(t);
+      Value *tv = graph.addInitializerAndCreateValue(t);
       n->replaceInput(1, tv);
       if (axes_v->uses().size() == 0) {
         if (axes_v->node()->kind() == kConstant) {

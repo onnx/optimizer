@@ -67,7 +67,7 @@ struct EliminateShapeOp final : public PredicateBasedPass {
                    std::back_inserter(tensor.floats()),
                    [](const auto &dim) { return dim.dim; });
 
-    Value *value = graph.addInitializerAndInput(tensor);
+    Value *value = graph.addInitializerAndCreateValue(tensor);
 
     ONNX_ASSERT(tryReplacingAllUsesWith(node->output(), value));
     destroy_current = NodeDestroyType::DestroyOne;

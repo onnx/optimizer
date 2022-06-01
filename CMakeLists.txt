@@ -9,7 +9,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Poor man's FetchContent
 function(add_subdirectory_if_no_target dir target)
   if (NOT TARGET ${target})
-    message(FATAL_ERROR ${target})
     add_subdirectory(${dir})
   endif()
 endfunction()

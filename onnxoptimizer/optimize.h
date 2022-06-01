@@ -27,11 +27,13 @@ struct Optimizer {
   Optimizer(const std::vector<std::string> &names, const bool fixed_point);
   ~Optimizer();
 
-  ModelProto optimize(const ModelProto &mp_in) {
-    ModelProto mp_compatible = AddInitializerToInput(mp_in);
-    bool has_initializer_not_in_input =
-        (mp_in.graph().input_size() != mp_compatible.graph().input_size());
-    std::shared_ptr<Graph> g(ImportModelProto(mp_compatible));
+  ModelProto optimize(const ModelProto &_mp_in) {
+    ModelProto mp_in = _mp_in;
+    if (mp_in.ir_version() == 3) {
+      // Upgrade ir_version to 4 so that initializer can be not in input
+      mp_in.set_ir_version(4);
+    }
+    std::shared_ptr<Graph> g(ImportModelProto(mp_in));
 
     if (g.get() == nullptr) {
       std::cerr << "Warning: onnx optimizer is unable to parse input model. "
@@ -44,15 +46,6 @@ struct Optimizer {
     ModelProto mp_out = PrepareOutput(mp_in);
     this->pass_manager->run(*g);
     ExportModelProto(&mp_out, g);
-    // `has_initializer_not_in_input` means the original model prefer
-    // initializer to be not in input, so the new initializer introduced by
-    // both `AddInitializerToInput` and optimization passes will be remove from
-    // input
-    if (has_initializer_not_in_input) {
-      mp_out.mutable_graph()->mutable_input()->DeleteSubrange(
-          mp_in.graph().input_size(),
-          mp_out.graph().input_size() - mp_in.graph().input_size());
-    }
     return mp_out;
   }
 
