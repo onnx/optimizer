@@ -64,12 +64,16 @@ struct EliminateShapeOp final : public PredicateBasedPass {
     tensor.sizes().push_back(end - start);
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
     std::transform(input->sizes().begin() + start, input->sizes().begin() + end,
-                   std::back_inserter(tensor.floats()),
+                   std::back_inserter(tensor.int64s()),
                    [](const auto &dim) { return dim.dim; });
 
     Value *value = graph.addInitializerAndCreateValue(tensor);
 
-    ONNX_ASSERT(tryReplacingAllUsesWith(node->output(), value));
+    const bool replacing_success =
+        tryReplacingAllUsesWith(node->output(), value);
+    if (!replacing_success) {
+      return false;
+    }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
