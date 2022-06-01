@@ -2,18 +2,23 @@ cmake_minimum_required(VERSION 3.1)
 
 project(onnx_optimizer C CXX)
 
-# Set C++11 as standard for the whole project
-if(NOT MSVC)
-  set(CMAKE_CXX_STANDARD 11)
-endif(NOT MSVC)
+set(CMAKE_CXX_STANDARD 14)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Poor man's FetchContent
+function(add_subdirectory_if_no_target dir target)
+  if (NOT TARGET ${target})
+    message(FATAL_ERROR ${target})
+    add_subdirectory(${dir})
+  endif()
+endfunction()
+
 option(protobuf_BUILD_TESTS "" OFF)
-add_subdirectory(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake)
+add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
-add_subdirectory(${ONNX_ROOT})
+add_subdirectory_if_no_target(${ONNX_ROOT} onnx)
 
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
 string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)

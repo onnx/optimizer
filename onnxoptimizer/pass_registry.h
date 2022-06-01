@@ -22,6 +22,7 @@
 #include "onnxoptimizer/passes/eliminate_nop_monotone_argmax.h"
 #include "onnxoptimizer/passes/eliminate_nop_pad.h"
 #include "onnxoptimizer/passes/eliminate_nop_transpose.h"
+#include "onnxoptimizer/passes/eliminate_shape_op.h"
 #include "onnxoptimizer/passes/eliminate_unused_initializer.h"
 #include "onnxoptimizer/passes/extract_constant_to_initializer.h"
 #include "onnxoptimizer/passes/fuse_add_bias_into_conv.h"
@@ -62,6 +63,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopMonotoneArgmax>();
     registerPass<EliminateNopPad>();
     registerPass<EliminateNopTranspose>();
+    registerPass<EliminateShapeOp>();
     registerPass<EliminateUnusedInitializer>();
     registerPass<ExtractConstantToInitializer>();
     registerPass<FuseAddBiasIntoConv>();
