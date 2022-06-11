@@ -13,11 +13,16 @@ function(add_subdirectory_if_no_target dir target)
   endif()
 endfunction()
 
+# For integration with onnxruntime_webassembly etc.
+if (NOT DEFINED ONNX_TARGET_NAME)
+  set(ONNX_TARGET_NAME onnx)
+endif()
+
 option(protobuf_BUILD_TESTS "" OFF)
 add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
-add_subdirectory_if_no_target(${ONNX_ROOT} onnx)
+add_subdirectory_if_no_target(${ONNX_ROOT} ${ONNX_TARGET_NAME})
 
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
 string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)
@@ -28,7 +33,7 @@ file(GLOB_RECURSE onnx_opt_srcs "onnxoptimizer/*.cc"
 list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnxoptimizer/cpp2py_export.cc")
 
 add_library(onnx_optimizer ${onnx_opt_srcs})
-target_link_libraries(onnx_optimizer PUBLIC onnx)
+target_link_libraries(onnx_optimizer PUBLIC ${ONNX_TARGET_NAME})
 target_include_directories(onnx_optimizer PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
