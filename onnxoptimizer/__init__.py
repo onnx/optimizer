@@ -26,8 +26,8 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
     """Apply the optimization on the serialized ModelProto.
 
     Arguments:
-        input (ModelProto): model
-        names (list of string): list of optimization names
+        model (ModelProto): model
+        passes (list of string): list of optimization names
 
     Return:
         return (ModelProto) optimized model
