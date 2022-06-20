@@ -32,8 +32,9 @@ struct EliminateNopExpand final : public PredicateBasedPass {
                        const std::vector<Dimension>& dims_b) {
     int ndim_a = dims_a.size();
     int ndim_b = dims_b.size();
-    if (ndim_a > ndim_b)
+    if (ndim_a > ndim_b) {
       return false;
+    }
 
     ndim_a--;
     ndim_b--;
@@ -41,8 +42,9 @@ struct EliminateNopExpand final : public PredicateBasedPass {
     for (; ndim_a >= 0; ndim_a--, ndim_b--) {
       int d_a = dims_a[ndim_a];
       auto const& d_b = dims_b[ndim_b];
-      if (d_a == 1)
+      if (d_a == 1) {
         continue;
+      }
       if (!d_b.is_int || (d_a != d_b.dim)) {
         return false;
       }
