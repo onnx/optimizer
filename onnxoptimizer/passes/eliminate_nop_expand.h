@@ -23,7 +23,7 @@ struct EliminateNopExpand final : public PredicateBasedPass {
   }
 
   bool isConstantTensor(Graph& graph, const std::string& name) {
-    auto& initializer_names = graph.initializer_names();
+    const auto& initializer_names = graph.initializer_names();
     return std::find(initializer_names.cbegin(), initializer_names.cend(),
                      name) != initializer_names.cend();
   }
