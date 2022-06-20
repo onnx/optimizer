@@ -3032,6 +3032,7 @@ class TestOptimizer(unittest.TestCase):
     def test_eliminate_shape_op(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
+        X2 = helper.make_tensor_value_info('X2',TensorProto.FLOAT, [3, 2])
 
         node_def = helper.make_node(
             'Relu',
@@ -3049,13 +3050,44 @@ class TestOptimizer(unittest.TestCase):
             [node_def, node_def2],        # nodes
             'test',      # name
             [X],  # inputs
-            [Y],               # outputs
+            [Y],  # outputs
+            value_info=[X2] 
         )
         optimized_model = self._optimized(
             graph, ["eliminate_shape_op"], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Relu"
+
+    def test_eliminate_nop_expand(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
+        shape = helper.make_tensor('shape',7,[2],np.array([1,1],dtype=np.int64))
+
+        node_def = helper.make_node(
+            'Expand',
+            ['X','shape'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [shape] # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_expand"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
 
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
