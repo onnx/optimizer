@@ -3089,6 +3089,126 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
 
+    def test_eliminate_nop_mul_one(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        one = helper.make_tensor('one', TensorProto.FLOAT, [2], np.array([1, 1], dtype=np.float32))
+
+        node_def = helper.make_node(
+            'Mul',
+            ['X', 'one'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [one],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_mul_one"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_div_one(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        one = helper.make_tensor('one', TensorProto.FLOAT, [2], np.array([1, 1], dtype=np.float32))
+
+        node_def = helper.make_node(
+            'Div',
+            ['X', 'one'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [one],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_div_one"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_add_zero(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        zero = helper.make_tensor('zero', TensorProto.FLOAT, [2], np.array([0, 0], dtype=np.float32))
+
+        node_def = helper.make_node(
+            'Add',
+            ['X', 'zero'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [zero],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_add_zero"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_sub_zero(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        zero = helper.make_tensor('zero', TensorProto.FLOAT, [2], np.array([0, 0], dtype=np.float32))
+
+        node_def = helper.make_node(
+            'Sub',
+            ['X', 'zero'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [zero],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_sub_zero"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
