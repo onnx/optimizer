@@ -79,7 +79,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       if (!initializer.hasName()) {
         continue;
       }
-      // Ignore initializer which is not an input
+      // Ignore initializer which is an input
       if (input_map.find(initializer.name()) != input_map.end()) {
         continue;
       }
