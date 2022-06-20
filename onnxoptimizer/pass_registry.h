@@ -39,6 +39,7 @@
 #include "onnxoptimizer/passes/lift_lexical_references.h"
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/split.h"
+#include "onnxoptimizer/passes/eliminate_nop_expand.h"
 
 #include <unordered_set>
 #include <vector>
@@ -80,6 +81,7 @@ struct GlobalPassRegistry {
     registerPass<LiftLexicalReferences>();
     registerPass<SplitInit>();
     registerPass<SplitPredict>();
+    registerPass<EliminateNopExpand>();
   }
 
   ~GlobalPassRegistry() {
