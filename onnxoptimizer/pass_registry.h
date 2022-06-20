@@ -49,6 +49,7 @@
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/split.h"
 #include "onnxoptimizer/passes/replace_einsum_with_matmul.h"
+#include "onnxoptimizer/passes/eliminate_nop_with_unit.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -91,6 +92,7 @@ struct GlobalPassRegistry {
     registerPass<SplitPredict>();
     registerPass<FuseConcatIntoReshape>();
     registerPass<EliminateNopReshape>();
+    registerPass<EliminateOpWithUnit>();
     registerPass<EliminateDeadEnd>();
     registerPass<EliminateIdentity>();
     registerPass<EliminateShapeOp>();
