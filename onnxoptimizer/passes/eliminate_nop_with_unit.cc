@@ -31,7 +31,7 @@ enum Unit {
   ONE,
 };
 
-template <TensorProto_DataType , Unit >
+template <TensorProto_DataType, Unit>
 struct IdentityUnitTraits;
 
 #define IDENTITY_UNIT_TRAITS(pb_dtype, cpp_dtype, one, zero)                 \
@@ -133,68 +133,127 @@ bool isABroadcastToB(const std::vector<int64_t>& dims_a,
 template <uint32_t>
 struct NodeKindTraits;
 
-#define NODE_KIND_TRAITS_SUPPORT_COMMUTATIVE_LAW(node_kind, unit)   \
-  template <>                                                       \
-  struct NodeKindTraits<node_kind> {                                \
-    static bool patternMatchPredicate(Node* node) {                 \
-      return node->inputs()[0]->node()->kind() == kParam ||         \
-             node->inputs()[1]->node()->kind() == kParam;           \
-    }                                                               \
-    static bool runTransform(Node* node, Graph& graph,              \
-                             NodeDestroyType& destroy_current) {    \
-      auto& a_value = node->inputs()[0];                            \
-      auto& b_value = node->inputs()[1];                            \
-      const auto a_name = a_value->uniqueName();                    \
-      const auto b_name = b_value->uniqueName();                    \
-      const auto a_tensor = graph.getInitializer(a_name);           \
-      const auto b_tensor = graph.getInitializer(b_name);           \
-      bool replacing_success = false;                               \
-      if (isConstantTensor(graph, a_name) &&                        \
-          TensorValueCheck<unit>::all(*a_tensor)) {                 \
-        replacing_success =                                         \
-            isABroadcastToB(a_tensor->sizes(), b_value->sizes()) && \
-            tryReplacingAllUsesWith(node->output(), b_value);       \
-      }                                                             \
-                                                                    \
-      if (!replacing_success && isConstantTensor(graph, b_name) &&  \
-          TensorValueCheck<unit>::all(*b_tensor)) {                 \
-        replacing_success =                                         \
-            isABroadcastToB(b_tensor->sizes(), a_value->sizes()) && \
-            tryReplacingAllUsesWith(node->output(), a_value);       \
-      }                                                             \
-      if (!replacing_success) {                                     \
-        return false;                                               \
-      }                                                             \
-      destroy_current = NodeDestroyType::DestroyOne;                \
-      return true;                                                  \
-    }                                                               \
+#define NODE_KIND_TRAITS_SUPPORT_COMMUTATIVE_LAW(node_kind, unit)             \
+  template <>                                                                 \
+  struct NodeKindTraits<node_kind> {                                          \
+    static bool isPatternConstantOfshape(Value* a_value, Value* b_value) {    \
+      Node* a_node = a_value->node();                                         \
+      if (a_node->kind() != Symbol("ConstantOfShape")) {                      \
+        return false;                                                         \
+      }                                                                       \
+      if (!a_node->hasAttribute(kvalue) &&                                    \
+          !IdentityUnitTraits<TensorProto_DataType_FLOAT, unit>::isAllValue(  \
+              {0.0f})) {                                                      \
+        return false;                                                         \
+      } else {                                                                \
+        Tensor t = a_node->t(kvalue);                                         \
+        if (!TensorValueCheck<unit>::all(t)) {                                \
+          return false;                                                       \
+        }                                                                     \
+      }                                                                       \
+      Node* parent_node = a_node->input()->node();                            \
+      return parent_node->kind() == Symbol("Shape") &&                        \
+             parent_node->input()->node() == b_value->node();                 \
+    }                                                                         \
+    static bool isPatternConstantOfshape(Node* node) {                        \
+      auto& a_value = node->inputs()[0];                                      \
+      auto& b_value = node->inputs()[1];                                      \
+      return isPatternConstantOfshape(a_value, b_value) ||                    \
+             isPatternConstantOfshape(b_value, a_value);                      \
+    }                                                                         \
+    static bool patternMatchPredicate(Node* node) {                           \
+      return node->inputs()[0]->node()->kind() == kParam ||                   \
+             node->inputs()[1]->node()->kind() == kParam ||                   \
+             isPatternConstantOfshape(node);                                  \
+    }                                                                         \
+    static bool runTransform(Node* node, Graph& graph,                        \
+                             NodeDestroyType& destroy_current) {              \
+      auto& a_value = node->inputs()[0];                                      \
+      auto& b_value = node->inputs()[1];                                      \
+      const auto a_name = a_value->uniqueName();                              \
+      const auto b_name = b_value->uniqueName();                              \
+      const auto a_tensor = graph.getInitializer(a_name);                     \
+      const auto b_tensor = graph.getInitializer(b_name);                     \
+      bool replacing_success = false;                                         \
+      if (isConstantTensor(graph, a_name) &&                                  \
+          TensorValueCheck<unit>::all(*a_tensor)) {                           \
+        replacing_success =                                                   \
+            isABroadcastToB(a_tensor->sizes(), b_value->sizes()) &&           \
+            tryReplacingAllUsesWith(node->output(), b_value);                 \
+      }                                                                       \
+      if (!replacing_success && isConstantTensor(graph, b_name) &&            \
+          TensorValueCheck<unit>::all(*b_tensor)) {                           \
+        replacing_success =                                                   \
+            isABroadcastToB(b_tensor->sizes(), a_value->sizes()) &&           \
+            tryReplacingAllUsesWith(node->output(), a_value);                 \
+      }                                                                       \
+      if (!replacing_success && isPatternConstantOfshape(a_value, b_value)) { \
+        replacing_success = tryReplacingAllUsesWith(node->output(), b_value); \
+      }                                                                       \
+      if (!replacing_success && isPatternConstantOfshape(b_value, a_value)) { \
+        replacing_success = tryReplacingAllUsesWith(node->output(), a_value); \
+      }                                                                       \
+      if (!replacing_success) {                                               \
+        return false;                                                         \
+      }                                                                       \
+      destroy_current = NodeDestroyType::DestroyOne;                          \
+      return true;                                                            \
+    }                                                                         \
   };
 
-#define NODE_KIND_TRAITS_NOSUPPORT_COMMUTATIVE_LAW(node_kind, unit) \
-  template <>                                                       \
-  struct NodeKindTraits<node_kind> {                                \
-    static bool patternMatchPredicate(Node* node) {                 \
-      return node->inputs()[1]->node()->kind() == kParam;           \
-    }                                                               \
-    static bool runTransform(Node* node, Graph& graph,              \
-                             NodeDestroyType& destroy_current) {    \
-      auto& a_value = node->inputs()[0];                            \
-      auto& b_value = node->inputs()[1];                            \
-      const auto b_name = b_value->uniqueName();                    \
-      const auto b_tensor = graph.getInitializer(b_name);           \
-      bool replacing_success = false;                               \
-      if (isConstantTensor(graph, b_name) &&                        \
-          TensorValueCheck<unit>::all(*b_tensor)) {                 \
-        replacing_success =                                         \
-            isABroadcastToB(b_tensor->sizes(), a_value->sizes()) && \
-            tryReplacingAllUsesWith(node->output(), a_value);       \
-      }                                                             \
-      if (!replacing_success) {                                     \
-        return false;                                               \
-      }                                                             \
-      destroy_current = NodeDestroyType::DestroyOne;                \
-      return true;                                                  \
-    }                                                               \
+#define NODE_KIND_TRAITS_NOSUPPORT_COMMUTATIVE_LAW(node_kind, unit)           \
+  template <>                                                                 \
+  struct NodeKindTraits<node_kind> {                                          \
+    static bool isPatternConstantOfshape(Value* a_value, Value* b_value) {    \
+      Node* a_node = a_value->node();                                         \
+      if (a_node->kind() != Symbol("ConstantOfShape")) {                      \
+        return false;                                                         \
+      }                                                                       \
+      if (!a_node->hasAttribute(kvalue) &&                                    \
+          !IdentityUnitTraits<TensorProto_DataType_FLOAT, unit>::isAllValue(  \
+              {0.0f})) {                                                      \
+        return false;                                                         \
+      } else {                                                                \
+        Tensor t = a_node->t(kvalue);                                         \
+        if (!TensorValueCheck<unit>::all(t)) {                                \
+          return false;                                                       \
+        }                                                                     \
+      }                                                                       \
+      Node* parent_node = a_node->input()->node();                            \
+      return parent_node->kind() == Symbol("Shape") &&                        \
+             parent_node->input()->node() == b_value->node();                 \
+    }                                                                         \
+    static bool isPatternConstantOfshape(Node* node) {                        \
+      auto& a_value = node->inputs()[0];                                      \
+      auto& b_value = node->inputs()[1];                                      \
+      return isPatternConstantOfshape(b_value, a_value);                      \
+    }                                                                         \
+    static bool patternMatchPredicate(Node* node) {                           \
+      return node->inputs()[1]->node()->kind() == kParam ||                   \
+             isPatternConstantOfshape(node);                                  \
+    }                                                                         \
+    static bool runTransform(Node* node, Graph& graph,                        \
+                             NodeDestroyType& destroy_current) {              \
+      auto& a_value = node->inputs()[0];                                      \
+      auto& b_value = node->inputs()[1];                                      \
+      const auto b_name = b_value->uniqueName();                              \
+      const auto b_tensor = graph.getInitializer(b_name);                     \
+      bool replacing_success = false;                                         \
+      if (isConstantTensor(graph, b_name) &&                                  \
+          TensorValueCheck<unit>::all(*b_tensor)) {                           \
+        replacing_success =                                                   \
+            isABroadcastToB(b_tensor->sizes(), a_value->sizes()) &&           \
+            tryReplacingAllUsesWith(node->output(), a_value);                 \
+      }                                                                       \
+      if (!replacing_success && isPatternConstantOfshape(node)) {             \
+        replacing_success = tryReplacingAllUsesWith(node->output(), a_value); \
+      }                                                                       \
+      if (!replacing_success) {                                               \
+        return false;                                                         \
+      }                                                                       \
+      destroy_current = NodeDestroyType::DestroyOne;                          \
+      return true;                                                            \
+    }                                                                         \
   };
 
 NODE_SUPPORT_COMMUTATIVE_LAW_LIST(NODE_KIND_TRAITS_SUPPORT_COMMUTATIVE_LAW)

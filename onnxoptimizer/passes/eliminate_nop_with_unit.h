@@ -7,9 +7,6 @@
 
 #pragma once
 
-// before: B = add(A, 0) or B = add(0, A)
-// after: B = A
-
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
 
