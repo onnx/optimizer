@@ -43,6 +43,17 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
   PassAnalysisType getPassAnalysisType() const override {
     return PassAnalysisType::CountBased;
   }
+
+  Value *findInitializerValueByName(Node *initializer_node,
+                                    const std::string &name) {
+    for (size_t i = 0; i < initializer_node->outputs().size(); i++) {
+      if (initializer_node->outputs()[i]->uniqueName() == name) {
+        return initializer_node->outputs()[i];
+      }
+    }
+    return nullptr;
+  }
+
   unsigned int EliminateInitializer(Graph &graph) {
     unsigned int initializers_removed = 0;
     const std::vector<Tensor> &initializers = graph.initializers();
@@ -68,8 +79,8 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       if (!initializer.hasName()) {
         continue;
       }
-      // Ignore initializer which is not an input
-      if (input_map.find(initializer.name()) == input_map.end()) {
+      // Ignore initializer which is an input
+      if (input_map.find(initializer.name()) != input_map.end()) {
         continue;
       }
       // Ignore initializer which is output
@@ -86,6 +97,12 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       }
     }
 
+    // workaround to  fetch initializer_node_ pointer in graph
+    Tensor dummy_tensor;
+    dummy_tensor.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    Node *initializer_node =
+        graph.addInitializerAndCreateValue(dummy_tensor)->node();
+
     for (auto pair : init_dict_by_shape) {
       std::set<std::string> visited;
 
@@ -101,7 +118,11 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
           continue;
         }
         Tensor i_tensor = *iter_i_initializer;
-        Value *i_value = input_map.find(i_tensor.name())->second;
+        Value *i_value =
+            findInitializerValueByName(initializer_node, i_tensor.name());
+        if (i_value == nullptr) {
+          continue;
+        }
 
 #define DO_COMPARISON(data_type)                                             \
   const std::vector<data_type> i_data = ParseData<data_type>(&i_tensor);     \
@@ -118,7 +139,12 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       const std::vector<data_type> j_data = ParseData<data_type>(&j_tensor); \
       if (std::equal(i_data.begin(), i_data.end(), j_data.begin())) {        \
         visited.insert(*iter_j);                                             \
-        Value *j_value = input_map.find(j_tensor.name())->second;            \
+        Value *j_value =                                                     \
+            findInitializerValueByName(initializer_node, j_tensor.name());   \
+        if (j_value == nullptr) {                                            \
+          visited.erase(*iter_j);                                            \
+          continue;                                                          \
+        }                                                                    \
         j_value->replaceAllUsesWith(i_value);                                \
         graph.eraseInitializerAndInput(j_value);                             \
         initializers_removed++;                                              \
@@ -142,6 +168,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
 #undef DO_COMPARISON
       }
     }
+    graph.eraseInitializer(dummy_tensor.name());
     return initializers_removed;
   }
   std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) override {

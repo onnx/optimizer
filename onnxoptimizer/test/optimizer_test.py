@@ -3061,7 +3061,7 @@ class TestOptimizer(unittest.TestCase):
 
     def test_eliminate_nop_expand(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
-        Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
         shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([1, 1], dtype=np.int64))
 
         node_def = helper.make_node(
