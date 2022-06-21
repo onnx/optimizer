@@ -40,10 +40,7 @@
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/split.h"
 #include "onnxoptimizer/passes/eliminate_nop_expand.h"
-#include "onnxoptimizer/passes/eliminate_nop_mul_one.h"
-#include "onnxoptimizer/passes/eliminate_nop_div_one.h"
-#include "onnxoptimizer/passes/eliminate_nop_add_zero.h"
-#include "onnxoptimizer/passes/eliminate_nop_sub_zero.h"
+#include "onnxoptimizer/passes/eliminate_nop_with_unit.h"
 
 #include <unordered_set>
 #include <vector>
@@ -86,10 +83,7 @@ struct GlobalPassRegistry {
     registerPass<SplitInit>();
     registerPass<SplitPredict>();
     registerPass<EliminateNopExpand>();
-    registerPass<EliminateNopMulOne>();
-    registerPass<EliminateNopDivOne>();
-    registerPass<EliminateNopAddZero>();
-    registerPass<EliminateNopSubZero>();
+    registerPass<EliminateOpWithUnit>();
   }
 
   ~GlobalPassRegistry() {

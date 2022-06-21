@@ -3114,7 +3114,7 @@ class TestOptimizer(unittest.TestCase):
             [one],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_mul_one"], False)
+            graph, ["eliminate_nop_with_unit"], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
@@ -3144,7 +3144,7 @@ class TestOptimizer(unittest.TestCase):
             [one],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_div_one"], False)
+            graph, ["eliminate_nop_with_unit"], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
@@ -3174,7 +3174,7 @@ class TestOptimizer(unittest.TestCase):
             [zero],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_add_zero"], False)
+            graph, ["eliminate_nop_with_unit"], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
@@ -3204,7 +3204,37 @@ class TestOptimizer(unittest.TestCase):
             [zero],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_sub_zero"], False)
+            graph, ["eliminate_nop_with_unit"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_pow_one(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        one = helper.make_tensor('one', TensorProto.FLOAT, [1], np.array([1], dtype=np.float32))
+
+        node_def = helper.make_node(
+            'Pow',
+            ['X', 'one'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [one],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_with_unit"], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
