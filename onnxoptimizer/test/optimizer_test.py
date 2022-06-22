@@ -3089,6 +3089,36 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
 
+    def test_rename_input_output(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([1, 1], dtype=np.int64))
+
+        node_def = helper.make_node(
+            'Expand',
+            ['X', 'shape'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [shape],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["rename_input_output"], False)
+
+        assert optimized_model.graph.input[0].name == "input_0"
+        assert optimized_model.graph.output[0].name == "output_0"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):

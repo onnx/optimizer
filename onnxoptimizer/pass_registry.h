@@ -40,6 +40,7 @@
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/split.h"
 #include "onnxoptimizer/passes/eliminate_nop_expand.h"
+#include "onnxoptimizer/passes/rename_input_output.h"
 
 #include <unordered_set>
 #include <vector>
@@ -82,6 +83,7 @@ struct GlobalPassRegistry {
     registerPass<SplitInit>();
     registerPass<SplitPredict>();
     registerPass<EliminateNopExpand>();
+    registerPass<RenameInputOutput>();
   }
 
   ~GlobalPassRegistry() {
