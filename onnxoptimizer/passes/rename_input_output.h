@@ -74,7 +74,7 @@ struct RenameInputOutput final : public FullGraphBasedPass {
       if (initializer_names.count(value->uniqueName()) > 0) {
         continue;
       }
-      std::string current_name =
+      const std::string current_name =
           rename_patterns[0] + std::to_string(i) + rename_patterns[1];
 
       value->setUniqueName(current_name);
