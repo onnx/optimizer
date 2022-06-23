@@ -70,7 +70,7 @@ struct RenameInputOutput final : public FullGraphBasedPass {
 
     for (int i = 0; i < graph.inputs().size(); ++i) {
       auto& value = graph.inputs()[i];
-      // ignore when input aslo in initializer
+      // ignore when input also in initializer
       if (initializer_names.count(value->uniqueName()) > 0) {
         continue;
       }
