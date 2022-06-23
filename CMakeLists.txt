@@ -21,8 +21,11 @@ if (NOT DEFINED ONNX_TARGET_NAME)
   set(ONNX_TARGET_NAME onnx)
 endif()
 
-option(protobuf_BUILD_TESTS "" OFF)
-add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
+if(NOT ${USE_SYSTEM_PROTOBUF})
+  option(protobuf_BUILD_TESTS "" OFF)
+  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
+endif()
+
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
 add_subdirectory_if_no_target(${ONNX_ROOT} ${ONNX_TARGET_NAME})
