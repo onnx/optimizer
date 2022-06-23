@@ -38,15 +38,15 @@ struct RenameInputOutput final : public FullGraphBasedPass {
         [](const std::string& s, const std::string& pattern,
            const std::string& default_s) -> std::vector<std::string> {
       std::vector<std::string> res(2);
-      std::string tmp = s;
-      auto n = tmp.find(pattern);
+      const std::string* tmp = &s;
+      auto n = tmp->find(pattern);
       if (n == std::string::npos) {
-        tmp = default_s;
-        n = tmp.find(pattern);
+        tmp = &default_s;
+        n = tmp->find(pattern);
       }
 
-      res[0] = tmp.substr(0, n);
-      res[1] = tmp.substr(n + pattern.size());
+      res[0] = tmp->substr(0, n);
+      res[1] = tmp->substr(n + pattern.size());
       return res;
     };
     const std::string pattern{"%d"};
@@ -57,8 +57,7 @@ struct RenameInputOutput final : public FullGraphBasedPass {
     for (int i = 0; i < 2; ++i) {
       auto env_str = fetch_env(envs[i]);
       auto split_str = split_pattern(env_str, pattern, default_str[i]);
-      std::copy(split_str.begin(), split_str.end(),
-                std::back_insert_iterator<std::vector<std::string>>(result));
+      std::copy(split_str.begin(), split_str.end(), std::back_inserter(result));
     }
     return result;
   }
@@ -71,7 +70,7 @@ struct RenameInputOutput final : public FullGraphBasedPass {
 
     for (int i = 0; i < graph.inputs().size(); ++i) {
       auto& value = graph.inputs()[i];
-      // ingore when input aslo in initializer
+      // ignore when input aslo in initializer
       if (initializer_names.count(value->uniqueName()) > 0) {
         continue;
       }
@@ -83,7 +82,7 @@ struct RenameInputOutput final : public FullGraphBasedPass {
 
     for (int i = 0; i < graph.outputs().size(); ++i) {
       auto& value = graph.outputs()[i];
-      std::string current_name =
+      const std::string current_name =
           rename_patterns[2] + std::to_string(i) + rename_patterns[3];
       value->setUniqueName(current_name);
     }
