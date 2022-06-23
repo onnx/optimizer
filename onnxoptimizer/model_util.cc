@@ -129,7 +129,7 @@ std::vector<TensorProto*> getAllTensors(ModelProto* m) {
   auto tensors = getInitializerTensors(m);
   auto attr_tensors = getAttributeTensors(m);
   std::copy(attr_tensors.begin(), attr_tensors.end(),
-            std::back_insert_iterator<decltype(tensors)>(tensors));
+            std::back_inserter(tensors));
   return tensors;
 }
 
@@ -239,8 +239,7 @@ void loadModel(ModelProto* m, const std::string& model_path,
                bool load_external_data) {
   LoadProtoFromPath<ModelProto>(model_path, *m);
   if (load_external_data) {
-    std::filesystem::path parent_path =
-        std::filesystem::path(model_path).parent_path();
+    const auto parent_path = std::filesystem::path(model_path).parent_path();
     loadExternalDataForModel(m, parent_path);
   }
 }
@@ -251,8 +250,7 @@ void saveModel(ModelProto* m, const std::string& model_path,
   if (save_external_data) {
     convertModelToExternalData(m, data_file_name);
   }
-  std::filesystem::path parent_path =
-      std::filesystem::path(model_path).parent_path();
+  const auto parent_path = std::filesystem::path(model_path).parent_path();
   writeExternalDataTensors(m, parent_path);
 
   std::string serialize;
