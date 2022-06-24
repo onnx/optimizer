@@ -6,7 +6,10 @@
 // Adventurous users should note that the APIs will probably change.
 
 #include "eliminate_nop_with_unit.h"
+
 #include "onnx/defs/tensor_util.h"
+
+#include <optional>
 
 using namespace ONNX_NAMESPACE;
 using namespace optimization;
@@ -58,6 +61,60 @@ PROTO_DTYPE_TO_CPP_DTYPE_LIST(IDENTITY_UNIT_TRAITS)
 
 #undef IDENTITY_UNIT_TRAITS
 #undef PROTO_DTYPE_TO_CPP_DTYPE_LIST
+
+template <class T>
+std::optional<T> IdentityElement(uint32_t kind) {
+  switch (kind) {
+    case kAdd:
+      return static_cast<T>(0);
+    case kMul:
+      return static_cast<T>(1);
+  }
+  return std::nullopt;
+};
+
+template <class T>
+std::optional<T> LeftIdentityElement(uint32_t kind) {
+  return std::nullopt;
+};
+
+template <class T>
+std::optional<T> RightIdentityElement(uint32_t kind) {
+  switch (kind) {
+    case kPow:
+      return static_cast<T>(1);
+  }
+  return std::nullopt;
+};
+
+template <uint32_t kind>
+struct CppType;
+
+template <>
+struct CppType<onnx::TensorProto_DataType_FLOAT> {
+  using type = float;
+};
+
+template <>
+struct CppType<onnx::TensorProto_DataType_DOUBLE> {
+  using type = double;
+};
+
+bool IsIdentityTensor(const Tensor& tensor, uint32_t op_kind) {
+#define XXX(dtype)                                             \
+  if (tensor.elem_type() == onnx::dtype) {                     \
+    using cpp_type = typename CppType<dtype>::type;            \
+    std::vector<cpp_type> data = ParseData<cpp_type>(&tensor); \
+    auto ie = IdentityElement<cpp_type>(op_kind);              \
+    return std::all_of(data.cbegin(), data.cend(),             \
+                       [ie](cpp_type v) { return v == ie; });  \
+  }
+
+  XXX(TensorProto_DataType_FLOAT)
+  XXX(TensorProto_DataType_DOUBLE)
+
+  return false;
+}
 
 template <Unit unit>
 struct TensorValueCheck {
@@ -130,76 +187,73 @@ bool isABroadcastToB(const std::vector<int64_t>& dims_a,
   _(kSub, ZERO)                                 \
   _(kPow, ONE)
 
-template <uint32_t>
-struct NodeKindTraits;
 
-#define NODE_KIND_TRAITS_SUPPORT_COMMUTATIVE_LAW(node_kind, unit)             \
-  template <>                                                                 \
-  struct NodeKindTraits<node_kind> {                                          \
-    static bool isPatternConstantOfshape(Value* a_value, Value* b_value) {    \
-      Node* a_node = a_value->node();                                         \
-      if (a_node->kind() != Symbol("ConstantOfShape")) {                      \
-        return false;                                                         \
-      }                                                                       \
-      if (!a_node->hasAttribute(kvalue) &&                                    \
-          !IdentityUnitTraits<TensorProto_DataType_FLOAT, unit>::isAllValue(  \
-              {0.0f})) {                                                      \
-        return false;                                                         \
-      } else {                                                                \
-        Tensor t = a_node->t(kvalue);                                         \
-        if (!TensorValueCheck<unit>::all(t)) {                                \
-          return false;                                                       \
-        }                                                                     \
-      }                                                                       \
-      Node* parent_node = a_node->input()->node();                            \
-      return parent_node->kind() == Symbol("Shape") &&                        \
-             parent_node->input()->node() == b_value->node();                 \
-    }                                                                         \
-    static bool isPatternConstantOfshape(Node* node) {                        \
-      auto& a_value = node->inputs()[0];                                      \
-      auto& b_value = node->inputs()[1];                                      \
-      return isPatternConstantOfshape(a_value, b_value) ||                    \
-             isPatternConstantOfshape(b_value, a_value);                      \
-    }                                                                         \
-    static bool patternMatchPredicate(Node* node) {                           \
-      return node->inputs()[0]->node()->kind() == kParam ||                   \
-             node->inputs()[1]->node()->kind() == kParam ||                   \
-             isPatternConstantOfshape(node);                                  \
-    }                                                                         \
-    static bool runTransform(Node* node, Graph& graph,                        \
-                             NodeDestroyType& destroy_current) {              \
-      auto& a_value = node->inputs()[0];                                      \
-      auto& b_value = node->inputs()[1];                                      \
-      const auto a_name = a_value->uniqueName();                              \
-      const auto b_name = b_value->uniqueName();                              \
-      const auto a_tensor = graph.getInitializer(a_name);                     \
-      const auto b_tensor = graph.getInitializer(b_name);                     \
-      bool replacing_success = false;                                         \
-      if (isConstantTensor(graph, a_name) &&                                  \
-          TensorValueCheck<unit>::all(*a_tensor)) {                           \
-        replacing_success =                                                   \
-            isABroadcastToB(a_tensor->sizes(), b_value->sizes()) &&           \
-            tryReplacingAllUsesWith(node->output(), b_value);                 \
-      }                                                                       \
-      if (!replacing_success && isConstantTensor(graph, b_name) &&            \
-          TensorValueCheck<unit>::all(*b_tensor)) {                           \
-        replacing_success =                                                   \
-            isABroadcastToB(b_tensor->sizes(), a_value->sizes()) &&           \
-            tryReplacingAllUsesWith(node->output(), a_value);                 \
-      }                                                                       \
-      if (!replacing_success && isPatternConstantOfshape(a_value, b_value)) { \
-        replacing_success = tryReplacingAllUsesWith(node->output(), b_value); \
-      }                                                                       \
-      if (!replacing_success && isPatternConstantOfshape(b_value, a_value)) { \
-        replacing_success = tryReplacingAllUsesWith(node->output(), a_value); \
-      }                                                                       \
-      if (!replacing_success) {                                               \
-        return false;                                                         \
-      }                                                                       \
-      destroy_current = NodeDestroyType::DestroyOne;                          \
-      return true;                                                            \
-    }                                                                         \
-  };
+
+struct NodeKindTraits {
+  static bool isPatternConstantOfshape(Value* a_value, Value* b_value) {
+    Node* a_node = a_value->node();
+    if (a_node->kind() != Symbol("ConstantOfShape")) {
+      return false;
+    }
+    if (!a_node->hasAttribute(kvalue) &&
+        !IdentityUnitTraits<TensorProto_DataType_FLOAT, unit>::isAllValue(
+            {0.0f})) {
+      return false;
+    } else {
+      Tensor t = a_node->t(kvalue);
+      if (!TensorValueCheck<unit>::all(t)) {
+        return false;
+      }
+    }
+    Node* parent_node = a_node->input()->node();
+    return parent_node->kind() == Symbol("Shape") &&
+           parent_node->input()->node() == b_value->node();
+  }
+  static bool isPatternConstantOfshape(Node* node) {
+    auto& a_value = node->inputs()[0];
+    auto& b_value = node->inputs()[1];
+    return isPatternConstantOfshape(a_value, b_value) ||
+           isPatternConstantOfshape(b_value, a_value);
+  }
+  static bool patternMatchPredicate(Node* node) {
+    return node->inputs()[0]->node()->kind() == kParam ||
+           node->inputs()[1]->node()->kind() == kParam ||
+           isPatternConstantOfshape(node);
+  }
+  static bool runTransform(Node* node, Graph& graph,
+                           NodeDestroyType& destroy_current) {
+    auto& a_value = node->inputs()[0];
+    auto& b_value = node->inputs()[1];
+    const auto a_name = a_value->uniqueName();
+    const auto b_name = b_value->uniqueName();
+    const auto a_tensor = graph.getInitializer(a_name);
+    const auto b_tensor = graph.getInitializer(b_name);
+    bool replacing_success = false;
+    if (isConstantTensor(graph, a_name) &&
+        IsIdentityTensor(*a_tensor, node->kind())) {
+      replacing_success =
+          isABroadcastToB(a_tensor->sizes(), b_value->sizes()) &&
+          tryReplacingAllUsesWith(node->output(), b_value);
+    }
+    if (!replacing_success && isConstantTensor(graph, b_name) &&
+        IsIdentityTensor(*b_tensor, node->kind())) {
+      replacing_success =
+          isABroadcastToB(b_tensor->sizes(), a_value->sizes()) &&
+          tryReplacingAllUsesWith(node->output(), a_value);
+    }
+    if (!replacing_success && isPatternConstantOfshape(a_value, b_value)) {
+      replacing_success = tryReplacingAllUsesWith(node->output(), b_value);
+    }
+    if (!replacing_success && isPatternConstantOfshape(b_value, a_value)) {
+      replacing_success = tryReplacingAllUsesWith(node->output(), a_value);
+    }
+    if (!replacing_success) {
+      return false;
+    }
+    destroy_current = NodeDestroyType::DestroyOne;
+    return true;
+  }
+};
 
 #define NODE_KIND_TRAITS_NOSUPPORT_COMMUTATIVE_LAW(node_kind, unit)           \
   template <>                                                                 \
