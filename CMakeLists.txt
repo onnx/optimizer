@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.1)
 
 # For std::filesystem
 set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
