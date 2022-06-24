@@ -3089,6 +3089,69 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
 
+    def test_rename_input_output(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+        shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([1, 1], dtype=np.int64))
+
+        node_def = helper.make_node(
+            'Expand',
+            ['X', 'shape'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [shape],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["rename_input_output"], compare_result=False)
+
+        assert optimized_model.graph.input[0].name == "input_0"
+        assert optimized_model.graph.output[0].name == "output_0"
+
+    def test_rename_input_output_with_env_variable(self):  # type: () -> None
+        os.environ["OPTIMIZER_RENAME_INPUT_PATTERN"] = "INPUT__%d_"
+        os.environ["OPTIMIZER_RENAME_OUTPUT_PATTERN"] = "OUTPUT__%d_"
+
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        X1 = helper.make_tensor_value_info('X1', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+
+        node_def = helper.make_node(
+            'Add',
+            ['X', 'X1'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X, X1],  # inputs
+            [Y],  # outputs
+        )
+        optimized_model = self._optimized(
+            graph, ["rename_input_output"], compare_result=False)
+
+        assert optimized_model.graph.input[0].name == "INPUT__0_"
+        assert optimized_model.graph.input[1].name == "INPUT__1_"
+        assert optimized_model.graph.output[0].name == "OUTPUT__0_"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
