@@ -3114,7 +3114,7 @@ class TestOptimizer(unittest.TestCase):
             [shape],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["rename_input_output"], False)
+            graph, ["rename_input_output"], compare_result=False)
 
         assert optimized_model.graph.input[0].name == "input_0"
         assert optimized_model.graph.output[0].name == "output_0"
@@ -3146,7 +3146,7 @@ class TestOptimizer(unittest.TestCase):
             [Y],  # outputs
         )
         optimized_model = self._optimized(
-            graph, ["rename_input_output"], False)
+            graph, ["rename_input_output"], compare_result=False)
 
         assert optimized_model.graph.input[0].name == "INPUT__0_"
         assert optimized_model.graph.input[1].name == "INPUT__1_"
