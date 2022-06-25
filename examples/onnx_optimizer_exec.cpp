@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   if (argc == 4) {
     model_data_path = std::filesystem::relative(
         std::string(argv[3]),
-        std::filesystem::path(model_out_path).parent_path());
+        std::filesystem::path(model_out_path).parent_path()).string();
   }
 
   try {
