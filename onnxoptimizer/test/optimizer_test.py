@@ -3152,6 +3152,39 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.input[1].name == "INPUT__1_"
         assert optimized_model.graph.output[0].name == "OUTPUT__0_"
 
+    def test_set_unique_name_for_node(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        X1 = helper.make_tensor_value_info('X1', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
+
+        node_def = helper.make_node(
+            'Add',
+            ['X', 'X1'],
+            ['X2'],
+        )
+
+        node_def2 = helper.make_node(
+            'Identity',
+            ['X2'],
+            ['Y'],
+        )
+
+        graph = helper.make_graph(
+            [node_def, node_def2],        # nodes
+            'test',      # name
+            [X, X1],  # inputs
+            [Y],  # outputs
+        )
+
+        assert not graph.node[0].HasField("name")
+        assert not graph.node[1].HasField("name")
+
+        optimized_model = self._optimized(
+            graph, ["set_unique_name_for_node"], compare_result=False)
+
+        assert optimized_model.graph.node[0].HasField("name")
+        assert optimized_model.graph.node[1].HasField("name")
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
