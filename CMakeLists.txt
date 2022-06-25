@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.1)
 
 # For std::filesystem
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+# Must be a cache variable and be set before project()
+# Reference: https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html
+# Maybe it can be a normal variable if policy CMP0126 is set to NEW?
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Minimum OS X deployment version")
 
 project(onnx_optimizer C CXX)
 
