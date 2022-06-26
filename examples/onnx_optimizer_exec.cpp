@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <fstream>
 
-void PrintUsage() {
+void printUsage() {
   std::string usage =
       R"(Usage: onnx_optimizer_exec [model.onnx] [model_out.onnx]  [optional: model_data_out.data])";
   std::cout << usage << std::endl;
@@ -18,8 +18,8 @@ void PrintUsage() {
 
 int main(int argc, char** argv) {
   if (argc != 3 && argc != 4) {
-    PrintUsage();
-    return 0;
+    printUsage();
+    return -1;
   }
   std::string model_in_path(argv[1]);
   std::string model_out_path(argv[2]);
