@@ -3180,7 +3180,7 @@ class TestOptimizer(unittest.TestCase):
         assert not graph.node[1].HasField("name")
 
         optimized_model = self._optimized(
-            graph, ["set_unique_name_for_node"], compare_result=False)
+            graph, ["set_unique_name_for_nodes"], compare_result=False)
 
         assert optimized_model.graph.node[0].HasField("name")
         assert optimized_model.graph.node[1].HasField("name")

@@ -18,7 +18,7 @@ struct SetUniqueNameForNode final : public PredicateBasedPass {
                            PassOptimizationType::None) {}
 
   std::string getPassName() const override {
-    return "set_unique_name_for_node";
+    return "set_unique_name_for_nodes";
   }
 
   bool patternMatchPredicate(Node* node) override {
