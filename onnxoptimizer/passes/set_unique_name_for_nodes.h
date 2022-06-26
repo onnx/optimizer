@@ -12,8 +12,8 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct SetUniqueNameForNode final : public PredicateBasedPass {
-  explicit SetUniqueNameForNode()
+struct SetUniqueNameForNodes final : public PredicateBasedPass {
+  explicit SetUniqueNameForNodes()
       : PredicateBasedPass(PassType::Other, PassEfficiency::Complete,
                            PassOptimizationType::None) {}
 
