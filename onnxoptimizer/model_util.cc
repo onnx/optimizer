@@ -42,7 +42,7 @@ struct ExternalDataInfo {
     }
   }
 
-  void SetExternalData(TensorProto* tensor) {
+  void setExternalData(TensorProto* tensor) {
     if (!tensor->has_raw_data()) {
       return;
     }
@@ -64,7 +64,7 @@ struct ExternalDataInfo {
   }
 };
 
-std::string GenUUID() {
+std::string genUUID() {
   static std::random_device rd;
   static std::mt19937 gen(rd());
   static std::uniform_int_distribution<> dis(0, 15);
@@ -196,7 +196,7 @@ void saveExternalData(TensorProto* tensor,
   const auto& raw_data = tensor->raw_data();
   data_file.write(raw_data.c_str(), raw_data.size());
   info.length = data_file.tellp() - info.offset;
-  info.SetExternalData(tensor);
+  info.setExternalData(tensor);
   data_file.close();
 }
 
@@ -210,14 +210,14 @@ void convertModelToExternalData(ModelProto* m, const std::string& location = {},
     tensors = getInitializerTensors(m);
   }
 
-  auto file_name = GenUUID();
+  auto file_name = genUUID();
   if (!location.empty()) {
     file_name = location;
   }
   for (auto& tensor : tensors) {
     if (tensor->has_raw_data() && tensor->raw_data().size() >= size_threshold) {
       ExternalDataInfo info(file_name);
-      info.SetExternalData(tensor);
+      info.setExternalData(tensor);
     }
   }
 }
