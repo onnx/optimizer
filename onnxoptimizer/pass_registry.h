@@ -41,6 +41,7 @@
 #include "onnxoptimizer/passes/split.h"
 #include "onnxoptimizer/passes/eliminate_nop_expand.h"
 #include "onnxoptimizer/passes/rename_input_output.h"
+#include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 
 #include <unordered_set>
 #include <vector>
@@ -84,6 +85,7 @@ struct GlobalPassRegistry {
     registerPass<SplitPredict>();
     registerPass<EliminateNopExpand>();
     registerPass<RenameInputOutput>();
+    registerPass<SetUniqueNameForNodes>();
   }
 
   ~GlobalPassRegistry() {
