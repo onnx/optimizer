@@ -3186,40 +3186,40 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].HasField("name")
         assert optimized_model.graph.node[1].HasField("name")
 
-    def test_larger_model(self):  # type: () -> None
-        os.environ["OPTIMIZER_RENAME_INPUT_PATTERN"] = "input_%d"
-        os.environ["OPTIMIZER_RENAME_OUTPUT_PATTERN"] = "output_%d"
-        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1024, 1024, 1024])
-        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [1024, 1024, 1024])
-        one = helper.make_tensor('one', TensorProto.FLOAT, [1024, 1024, 1024],
-            np.ones((1024, 1024, 1024), dtype=np.float32).tobytes(), raw=True)
+    # def test_larger_model(self):  # type: () -> None
+    #     os.environ["OPTIMIZER_RENAME_INPUT_PATTERN"] = "input_%d"
+    #     os.environ["OPTIMIZER_RENAME_OUTPUT_PATTERN"] = "output_%d"
+    #     X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1024, 1024, 1024])
+    #     Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [1024, 1024, 1024])
+    #     one = helper.make_tensor('one', TensorProto.FLOAT, [1024, 1024, 1024],
+    #         np.ones((1024, 1024, 1024), dtype=np.float32).tobytes(), raw=True)
 
-        node_def = helper.make_node(
-            'Mul',
-            ['X', 'one'],
-            ['X2'],
-        )
+    #     node_def = helper.make_node(
+    #         'Mul',
+    #         ['X', 'one'],
+    #         ['X2'],
+    #     )
 
-        node_def2 = helper.make_node(
-            'Identity',
-            ['X2'],
-            ['Y'],
-        )
+    #     node_def2 = helper.make_node(
+    #         'Identity',
+    #         ['X2'],
+    #         ['Y'],
+    #     )
 
-        graph = helper.make_graph(
-            [node_def, node_def2],        # nodes
-            'test',      # name
-            [X],  # inputs
-            [Y],  # outputs
-            [one],
-        )
+    #     graph = helper.make_graph(
+    #         [node_def, node_def2],        # nodes
+    #         'test',      # name
+    #         [X],  # inputs
+    #         [Y],  # outputs
+    #         [one],
+    #     )
 
-        model = helper.make_model(graph)
-        optimized_model = self._optimized(model, ["rename_input_output"], compare_result=False, check=False)
+    #     model = helper.make_model(graph)
+    #     optimized_model = self._optimized(model, ["rename_input_output"], compare_result=False, check=False)
 
-        assert isinstance(optimized_model, ModelProto)
-        assert optimized_model.graph.input[0].name == "input_0"
-        assert optimized_model.graph.output[0].name == "output_0"
+    #     assert isinstance(optimized_model, ModelProto)
+    #     assert optimized_model.graph.input[0].name == "input_0"
+    #     assert optimized_model.graph.output[0].name == "output_0"
 
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
