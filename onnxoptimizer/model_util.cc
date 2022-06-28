@@ -106,19 +106,14 @@ std::vector<TensorProto*> getInitializerTensors(ModelProto* m) {
 }
 
 std::vector<TensorProto*> getAttributeTensors(ModelProto* m) {
-  int node_size = m->graph().node_size();
   std::vector<TensorProto*> tensors;
-  for (int i = 0; i < node_size; ++i) {
-    auto* node = m->mutable_graph()->mutable_node(i);
-    int attr_size = node->attribute_size();
-    for (int j = 0; j < attr_size; ++j) {
-      auto* attr = node->mutable_attribute(j);
-      if (attr->has_t()) {
-        tensors.push_back(attr->mutable_t());
+  for(auto& node : *m->mutable_graph()->mutable_node()){
+    for(auto& attr : *node.mutable_attribute()){
+      if(attr.has_t()){
+        tensors.push_back(attr.mutable_t());
       }
-      int tensor_size = attr->tensors_size();
-      for (int k = 0; k < tensor_size; ++k) {
-        tensors.push_back(attr->mutable_tensors(k));
+      for(auto& tensor: *attr.mutable_tensors()){
+        tensors.push_back(&tensor);
       }
     }
   }
