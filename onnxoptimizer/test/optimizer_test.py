@@ -3249,9 +3249,9 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Reshape"
 
     def test_eliminate_nop_gather_shape(self):  # type: () -> None
-        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, ['n', 2])
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
-        X2 = helper.make_tensor_value_info('X2', TensorProto.FLOAT, ['n', 2])
+        X2 = helper.make_tensor_value_info('X2', TensorProto.FLOAT, [3, 2])
         indices = helper.make_tensor('indices', TensorProto.INT64, [1], np.array([1], dtype=np.int64))
 
         node_def = helper.make_node('Relu', ['X'], ['X2'],)
