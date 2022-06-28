@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.1)
 
 # For std::filesystem
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+# Must be a cache variable and be set before project()
+# Reference: https://cmake.org/cmake/help/latest/variable/CMAKE_OSX_DEPLOYMENT_TARGET.html
+# Maybe it can be a normal variable if policy CMP0126 is set to NEW?
+set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Minimum OS X deployment version")
 
 project(onnx_optimizer C CXX)
 
@@ -22,7 +25,11 @@ if (NOT DEFINED ONNX_TARGET_NAME)
 endif()
 
 option(protobuf_BUILD_TESTS "" OFF)
-add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
+option(ONNX_OPT_USE_SYSTEM_PROTOBUF "" OFF)
+if(NOT ONNX_OPT_USE_SYSTEM_PROTOBUF)
+  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
+endif()
+
 
 set(ONNX_ROOT ${PROJECT_SOURCE_DIR}/third_party/onnx)
 add_subdirectory_if_no_target(${ONNX_ROOT} ${ONNX_TARGET_NAME})
