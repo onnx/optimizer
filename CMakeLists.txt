@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.22)
 
 # For std::filesystem
 # Must be a cache variable and be set before project()
@@ -12,21 +12,17 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Poor man's FetchContent
-function(add_subdirectory_if_no_target dir target)
-  if (NOT TARGET ${target})
-    add_subdirectory(${dir})
-  endif()
-endfunction()
+include(cmake/utils.cmake)
 
 # For integration with onnxruntime_webassembly etc.
 if (NOT DEFINED ONNX_TARGET_NAME)
   set(ONNX_TARGET_NAME onnx)
 endif()
 
-option(protobuf_BUILD_TESTS "" OFF)
 option(ONNX_OPT_USE_SYSTEM_PROTOBUF "" OFF)
 if(NOT ONNX_OPT_USE_SYSTEM_PROTOBUF)
+  option(protobuf_BUILD_TESTS "" OFF)
+  option(protobuf_MSVC_STATIC_RUNTIME "" ${ONNX_USE_MSVC_STATIC_RUNTIME})
   add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
 endif()
 
@@ -42,14 +38,14 @@ file(GLOB_RECURSE onnx_opt_srcs "onnxoptimizer/*.cc"
     )
 list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnxoptimizer/cpp2py_export.cc")
 
-add_library(onnx_optimizer ${onnx_opt_srcs})
+onnxopt_add_library(onnx_optimizer ${onnx_opt_srcs})
 target_link_libraries(onnx_optimizer PUBLIC ${ONNX_TARGET_NAME})
 target_include_directories(onnx_optimizer PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
     )
 
-add_executable(onnx_optimizer_exec examples/onnx_optimizer_exec.cpp)
+onnxopt_add_executable(onnx_optimizer_exec examples/onnx_optimizer_exec.cpp)
 target_link_libraries(onnx_optimizer_exec onnx_optimizer)
 
 if(BUILD_ONNX_PYTHON)
@@ -61,7 +57,7 @@ if(BUILD_ONNX_PYTHON)
     endif()
   endif()
 
-  add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
+  onnxopt_add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
   set_target_properties(onnx_opt_cpp2py_export PROPERTIES PREFIX "")
   set_target_properties(onnx_opt_cpp2py_export
                         PROPERTIES COMPILE_FLAGS "-fvisibility=hidden")
@@ -140,7 +136,6 @@ if(BUILD_ONNX_PYTHON)
                                              # clients of class 'type2'
                             )
     endif()
-    add_msvc_runtime_flag(onnx_opt_cpp2py_export)
   endif()
 endif()
 
