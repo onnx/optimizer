@@ -41,8 +41,8 @@ extras_require = {}
 # Global variables for controlling the build variant
 ################################################################################
 
-# Default value is set to TRUE\1 to keep the settings same as the current ones.
-# However going forward the recomemded way to is to set this to False\0
+# Default value is set to TRUE/1 to keep the settings same as the current ones.
+# However going forward the recomemded way to is to set this to False/0
 USE_MSVC_STATIC_RUNTIME = bool(os.getenv('USE_MSVC_STATIC_RUNTIME', '1') == '1')
 ONNX_ML = not bool(os.getenv('ONNX_ML') == '0')
 ONNX_VERIFY_PROTO3 = bool(os.getenv('ONNX_VERIFY_PROTO3') == '1')
