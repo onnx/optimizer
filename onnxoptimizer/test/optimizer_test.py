@@ -3221,7 +3221,7 @@ class TestOptimizer(unittest.TestCase):
     #     assert optimized_model.graph.input[0].name == "input_0"
     #     assert optimized_model.graph.output[0].name == "output_0"
 
-    def test_fuse_concat_shape_for_reshape(self):  # type: () -> None
+    def test_fuse_concat_and_reshape(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
         shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([4, 5], dtype=np.int64))
