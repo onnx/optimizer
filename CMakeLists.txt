@@ -56,8 +56,7 @@ if(BUILD_ONNX_PYTHON)
       set(PY_EXT_SUFFIX ".so")
     endif()
   endif()
-  find_package(Python ${PY_VERSION} COMPONENTS Interpreter Development REQUIRED)
-  message(STATUS "onnxopt: ${PYTHON_LIBRARIES}")
+  find_package(Python COMPONENTS Interpreter REQUIRED)
 
   onnxopt_add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
   set_target_properties(onnx_opt_cpp2py_export PROPERTIES PREFIX "")
@@ -69,7 +68,7 @@ if(BUILD_ONNX_PYTHON)
   target_include_directories(onnx_opt_cpp2py_export PRIVATE
                              $<BUILD_INTERFACE:${ONNX_ROOT}>
                              $<INSTALL_INTERFACE:include>
-                             ${PYTHON_INCLUDE_DIR})
+                             ${Python_INCLUDE_DIR})
   # pybind11 is a header only lib
   find_package(pybind11 2.2)
   if(pybind11_FOUND)
@@ -109,7 +108,8 @@ if(BUILD_ONNX_PYTHON)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 
   if(MSVC)
-    target_link_libraries(onnx_opt_cpp2py_export PRIVATE ${PYTHON_LIBRARIES})
+    find_package(Python COMPONENTS Interpreter Development REQUIRED)
+    target_link_libraries(onnx_opt_cpp2py_export PRIVATE ${Python_LIBRARIES})
     target_compile_options(onnx_opt_cpp2py_export
                            PRIVATE /MP
                                    /WX

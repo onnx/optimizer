@@ -20,7 +20,7 @@ jobs:
       # Only build on Python 3 and skip 32-bit builds
       CIBW_BUILD: cp3?-*
       # Skip python 3.5 and 3.6
-      CIBW_SKIP: "cp36-* *-win32 *-manylinux_i686"
+      CIBW_SKIP: "cp36-* cp37-* *-win32 *-manylinux_i686"
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
