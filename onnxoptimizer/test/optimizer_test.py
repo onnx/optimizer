@@ -3227,24 +3227,23 @@ class TestOptimizer(unittest.TestCase):
         shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([4, 5], dtype=np.int64))
         indices = helper.make_tensor('indices', TensorProto.INT64, [1], np.array([0], dtype=np.int64))
         axes = helper.make_tensor('axes', TensorProto.INT64, [1], np.array([0], dtype=np.int64))
-        X3 = helper.make_tensor_value_info('X3', TensorProto.INT64, [1])
+        X2 = helper.make_tensor_value_info('X2', TensorProto.INT64, [1])
 
         node_def = helper.make_node('Shape', ['X'], ['X1'],)
         node_def1 = helper.make_node('Gather', ['X1', 'indices'], ['X2'], axis=0,)
-        node_def2 = helper.make_node('Unsqueeze', ['X2', 'axes'], ['X3'])
-        node_def3 = helper.make_node('Concat', ['X3', 'shape'], ['X4'], axis=0,)
-        node_def4 = helper.make_node('Reshape', ['X', 'X4'], ['Y'],)
+        node_def2 = helper.make_node('Concat', ['X2', 'shape'], ['X3'], axis=0,)
+        node_def3 = helper.make_node('Reshape', ['X', 'X3'], ['Y'],)
 
         graph = helper.make_graph(
-            [node_def, node_def1, node_def2, node_def3, node_def4],        # nodes
+            [node_def, node_def1, node_def2, node_def3],        # nodes
             'test',      # name
             [X],  # inputs
             [Y],  # outputs
             [shape, indices, axes],   # initialzer
-            value_info=[X3],
+            value_info=[X2],
         )
         optimized_model = self._optimized(
-            graph, ["fuse_concat_shape_for_reshape", 'eliminate_deadend'], False)
+            graph, ["fuse_concat_and_reshape", 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Reshape"

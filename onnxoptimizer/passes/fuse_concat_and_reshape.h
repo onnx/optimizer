@@ -13,13 +13,13 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct FuseConcatShapeForReshape final : public PredicateBasedPass {
-  explicit FuseConcatShapeForReshape()
+struct FuseConcatAndReshape final : public PredicateBasedPass {
+  explicit FuseConcatAndReshape()
       : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
-    return "fuse_concat_shape_for_reshape";
+    return "fuse_concat_and_reshape";
   }
 
   bool patternMatchPredicate(Node *node) override {
@@ -50,14 +50,17 @@ struct FuseConcatShapeForReshape final : public PredicateBasedPass {
         shapes.push_back(-1);
         continue;
       }
+      if (tensor->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
+        return false;
+      }
       const auto data = ParseData<int64_t>(tensor);
       std::copy(data.cbegin(), data.cend(), std::back_inserter(shapes));
     }
-    int unkown_dim_count = 0;
+    int unknown_dim_count = 0;
     for (auto dim : shapes) {
-      unkown_dim_count += int64_t(dim == -1);
+      unknown_dim_count += int64_t(dim == -1);
     }
-    if (unkown_dim_count > 1) {
+    if (unknown_dim_count > 1) {
       return false;
     }
 

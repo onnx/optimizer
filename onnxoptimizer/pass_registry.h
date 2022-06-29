@@ -42,7 +42,7 @@
 #include "onnxoptimizer/passes/eliminate_nop_expand.h"
 #include "onnxoptimizer/passes/rename_input_output.h"
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
-#include "onnxoptimizer/passes/fuse_concat_shape_for_reshape.h"
+#include "onnxoptimizer/passes/fuse_concat_and_reshape.h"
 
 #include <unordered_set>
 #include <vector>
@@ -87,7 +87,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopExpand>();
     registerPass<RenameInputOutput>();
     registerPass<SetUniqueNameForNodes>();
-    registerPass<FuseConcatShapeForReshape>();
+    registerPass<FuseConcatAndReshape>();
   }
 
   ~GlobalPassRegistry() {
