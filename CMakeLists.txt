@@ -56,6 +56,8 @@ if(BUILD_ONNX_PYTHON)
       set(PY_EXT_SUFFIX ".so")
     endif()
   endif()
+  find_package(Python ${PY_VERSION} COMPONENTS Interpreter Development REQUIRED)
+  message(STATUS "onnxopt: ${PYTHON_LIBRARIES}")
 
   onnxopt_add_library(onnx_opt_cpp2py_export MODULE "onnxoptimizer/cpp2py_export.cc")
   set_target_properties(onnx_opt_cpp2py_export PROPERTIES PREFIX "")
@@ -107,8 +109,6 @@ if(BUILD_ONNX_PYTHON)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 
   if(MSVC)
-    find_package(PythonInterp ${PY_VERSION} REQUIRED)
-    find_package(PythonLibs ${PY_VERSION} REQUIRED)
     target_link_libraries(onnx_opt_cpp2py_export PRIVATE ${PYTHON_LIBRARIES})
     target_compile_options(onnx_opt_cpp2py_export
                            PRIVATE /MP
