@@ -28,17 +28,17 @@ struct EliminateNopReshape final : public PredicateBasedPass {
 
   bool runTransform(Node *node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
-    const auto &data_dims = node->inputs()[0]->sizes();
-    auto *shape = node->inputs()[1];
+    const auto &data_input_dims = node->inputs()[0]->sizes();
+    const auto *shape_input = node->inputs()[1];
     const auto &initializer_names = graph.initializer_names();
 
     const Tensor *shape_tensor = nullptr;
-    if (shape->node()->kind() == kConstant) {
-      shape_tensor = &shape->node()->t(kvalue);
-    } else if (shape->node()->kind() == kParam &&
+    if (shape_input->node()->kind() == kConstant) {
+      shape_tensor = &shape_input->node()->t(kvalue);
+    } else if (shape_input->node()->kind() == kParam &&
                std::find(initializer_names.cbegin(), initializer_names.cend(),
-                         shape->uniqueName()) != initializer_names.cend()) {
-      shape_tensor = &*graph.getInitializer(shape->uniqueName());
+                         shape_input->uniqueName()) != initializer_names.cend()) {
+      shape_tensor = &*graph.getInitializer(shape_input->uniqueName());
     } else {
       return false;
     }
@@ -46,20 +46,20 @@ struct EliminateNopReshape final : public PredicateBasedPass {
     if (shape_tensor->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
       return false;
     }
-    const auto shape_data = ParseData<int64_t>(shape_tensor);
+    const auto shape_input_data = ParseData<int64_t>(shape_tensor);
 
-    if (shape_data.size() != data_dims.size()) {
+    if (shape_input_data.size() != data_input_dims.size()) {
       return false;
     }
 
     int unknown_dim_count = 0;
-    for (int i = 0; i < shape_data.size(); ++i) {
-      const auto d = shape_data[i];
+    for (int i = 0; i < shape_input_data.size(); ++i) {
+      const auto d = shape_input_data[i];
       if (d == 0) {
         continue;
       }
-      if (data_dims[i].is_int) {
-        if (data_dims[i].dim != d) {
+      if (data_input_dims[i].is_int) {
+        if (data_input_dims[i].dim != d) {
           return false;
         }
         continue;
