@@ -46,7 +46,7 @@ struct EliminateNopGatherShape final : public PredicateBasedPass {
     } else {
       return false;
     }
-
+    assert(indices_tensor->sizes().size() <= 1);
     int indices_val;
     if (indices_tensor->elem_type() ==
         ONNX_NAMESPACE::TensorProto_DataType_INT32) {
