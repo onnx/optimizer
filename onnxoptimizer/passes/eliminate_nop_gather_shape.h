@@ -34,7 +34,7 @@ struct EliminateNopGatherShape final : public PredicateBasedPass {
     auto *indices = node->inputs()[1];
     const auto &initializer_names = graph.initializer_names();
     Node *shape = x->node();
-    const auto& dims = shape->input()->sizes();
+    const auto &dims = shape->input()->sizes();
 
     const Tensor *indices_tensor = nullptr;
     if (indices->node()->kind() == kConstant) {
@@ -80,7 +80,9 @@ struct EliminateNopGatherShape final : public PredicateBasedPass {
     }
 
     Tensor tensor;
-    tensor.sizes().push_back(1);
+    if (indices_tensor->sizes().size() == 1) {
+      tensor.sizes().push_back(1);
+    }
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
     tensor.int64s().push_back(dims[indices_val].dim);
     Value *value = graph.addInitializerAndCreateValue(tensor);
