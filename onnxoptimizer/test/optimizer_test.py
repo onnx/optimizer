@@ -3248,6 +3248,30 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Reshape"
 
+    def test_eliminate_nop_gather_shape(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
+        X2 = helper.make_tensor_value_info('X2', TensorProto.FLOAT, [3, 2])
+        indices = helper.make_tensor('indices', TensorProto.INT64, [1], np.array([1], dtype=np.int64))
+
+        node_def = helper.make_node('Relu', ['X'], ['X2'],)
+        node_def2 = helper.make_node('Shape', ['X2'], ['X3'],)
+        node_def3 = helper.make_node('Gather', ['X3', 'indices'], ['X4'],)
+        node_def4 = helper.make_node('Identity', ['X4'], ['Y'],)
+
+        graph = helper.make_graph(
+            [node_def, node_def2, node_def3, node_def4],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [indices],  # initializer
+            value_info=[X2],
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_gather_shape"], False)
+
+        assert len(optimized_model.graph.node) == 3
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
