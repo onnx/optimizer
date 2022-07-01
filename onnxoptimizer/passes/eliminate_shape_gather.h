@@ -13,13 +13,13 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct EliminateNopGatherShape final : public PredicateBasedPass {
-  explicit EliminateNopGatherShape()
-      : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
+struct EliminateShapeGather final : public PredicateBasedPass {
+  explicit EliminateShapeGather()
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
-    return "eliminate_nop_gather_shape";
+    return "eliminate_shape_gather";
   }
 
   bool patternMatchPredicate(Node *node) override {
@@ -43,7 +43,7 @@ struct EliminateNopGatherShape final : public PredicateBasedPass {
     } else {
       return false;
     }
-    assert(indices_tensor->sizes().size() <= 1);
+    ONNX_ASSERT(indices_tensor->sizes().size() <= 1);
     int indices_val;
     if (indices_tensor->elem_type() ==
         ONNX_NAMESPACE::TensorProto_DataType_INT32) {
@@ -70,7 +70,7 @@ struct EliminateNopGatherShape final : public PredicateBasedPass {
     indices_val = add_y_if_negative(indices_val, end - start);
     indices_val += start;
 
-    assert(indices_val < dims);
+    ONNX_ASSERT(indices_val < dims.size());
 
     if (!dims[indices_val].is_int) {
       return false;
