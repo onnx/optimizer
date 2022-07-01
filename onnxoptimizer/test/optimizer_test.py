@@ -3272,6 +3272,27 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 3
 
+    def test_eliminate_nop_reshape(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
+        shape = helper.make_tensor('shape', TensorProto.INT64, [3], np.array([0, 4, 5], dtype=np.int64))
+
+        node_def = helper.make_node('Reshape', ['X', 'shape'], ['X1'],)
+        node_def1 = helper.make_node('Identity', ['X1'], ['Y'],)
+
+        graph = helper.make_graph(
+            [node_def, node_def1],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [shape],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_nop_reshape"], False)
+        print(optimized_model)
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
