@@ -3248,7 +3248,7 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Reshape"
 
-    def test_eliminate_nop_gather_shape(self):  # type: () -> None
+    def test_eliminate_shape_gather(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
         X2 = helper.make_tensor_value_info('X2', TensorProto.FLOAT, [3, 2])
@@ -3268,7 +3268,7 @@ class TestOptimizer(unittest.TestCase):
             value_info=[X2],
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_gather_shape"], False)
+            graph, ["eliminate_shape_gather"], False)
 
         assert len(optimized_model.graph.node) == 3
 

@@ -23,6 +23,7 @@
 #include "onnxoptimizer/passes/eliminate_nop_pad.h"
 #include "onnxoptimizer/passes/eliminate_nop_transpose.h"
 #include "onnxoptimizer/passes/eliminate_shape_op.h"
+#include "onnxoptimizer/passes/eliminate_shape_gather.h"
 #include "onnxoptimizer/passes/eliminate_unused_initializer.h"
 #include "onnxoptimizer/passes/extract_constant_to_initializer.h"
 #include "onnxoptimizer/passes/fuse_add_bias_into_conv.h"
@@ -43,7 +44,6 @@
 #include "onnxoptimizer/passes/rename_input_output.h"
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/fuse_concat_and_reshape.h"
-#include "onnxoptimizer/passes/eliminate_nop_gather_shape.h"
 #include "onnxoptimizer/passes/eliminate_nop_reshape.h"
 
 #include <unordered_set>
@@ -90,7 +90,7 @@ struct GlobalPassRegistry {
     registerPass<RenameInputOutput>();
     registerPass<SetUniqueNameForNodes>();
     registerPass<FuseConcatAndReshape>();
-    registerPass<EliminateNopGatherShape>();
+    registerPass<EliminateShapeGather>();
     registerPass<EliminateNopReshape>();
   }
 
