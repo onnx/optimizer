@@ -22,12 +22,6 @@ struct EliminateNopExpand final : public PredicateBasedPass {
     return "eliminate_nop_expand";
   }
 
-  bool isConstantTensor(Graph& graph, const std::string& name) {
-    const auto& initializer_names = graph.initializer_names();
-    return std::find(initializer_names.cbegin(), initializer_names.cend(),
-                     name) != initializer_names.cend();
-  }
-
   bool isABroadcastToB(const std::vector<int64_t>& dims_a,
                        const std::vector<Dimension>& dims_b) {
     int ndim_a = dims_a.size();
@@ -59,10 +53,11 @@ struct EliminateNopExpand final : public PredicateBasedPass {
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     auto& input_value = node->inputs()[0];
-    const auto shape_tensor_name = node->inputs()[1]->uniqueName();
+    const auto* shape_value = node->input(1);
+    const auto shape_tensor_name = shape_value->uniqueName();
     const auto shape_tensor = graph.getInitializer(shape_tensor_name);
 
-    if (!isConstantTensor(graph, shape_tensor_name) ||
+    if (!graph.is_constant_initializer(shape_value) ||
         !isABroadcastToB(ParseData<int64_t>(&*shape_tensor),
                          input_value->sizes()) ||
         !tryReplacingAllUsesWith(node->output(), input_value)) {

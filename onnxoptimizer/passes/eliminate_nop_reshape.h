@@ -30,14 +30,11 @@ struct EliminateNopReshape final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     const auto &data_input_dims = node->inputs()[0]->sizes();
     const auto *shape_input = node->inputs()[1];
-    const auto &initializer_names = graph.initializer_names();
 
     const Tensor *shape_tensor = nullptr;
     if (shape_input->node()->kind() == kConstant) {
       shape_tensor = &shape_input->node()->t(kvalue);
-    } else if (shape_input->node()->kind() == kParam &&
-               std::find(initializer_names.cbegin(), initializer_names.cend(),
-                         shape_input->uniqueName()) != initializer_names.cend()) {
+    } else if (graph.is_constant_initializer(shape_input)) {
       shape_tensor = &*graph.getInitializer(shape_input->uniqueName());
     } else {
       return false;

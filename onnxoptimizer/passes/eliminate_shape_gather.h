@@ -32,16 +32,13 @@ struct EliminateShapeGather final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     auto *x = node->inputs()[0];
     auto *indices = node->inputs()[1];
-    const auto &initializer_names = graph.initializer_names();
     Node *shape = x->node();
     const auto &dims = shape->input()->sizes();
 
     const Tensor *indices_tensor = nullptr;
     if (indices->node()->kind() == kConstant) {
       indices_tensor = &indices->node()->t(kvalue);
-    } else if (indices->node()->kind() == kParam &&
-               std::find(initializer_names.cbegin(), initializer_names.cend(),
-                         indices->uniqueName()) != initializer_names.cend()) {
+    } else if (graph.is_constant_initializer(indices)) {
       indices_tensor = &*graph.getInitializer(indices->uniqueName());
     } else {
       return false;
