@@ -31,7 +31,6 @@ struct FuseConcatAndReshape final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     auto *shape_value = node->inputs()[1];
     auto *concat = shape_value->node();
-    const auto &initializer_names = graph.initializer_names();
 
     std::vector<int64_t> shapes;
     for (const auto *v : concat->inputs()) {
@@ -39,9 +38,7 @@ struct FuseConcatAndReshape final : public PredicateBasedPass {
       const Tensor *tensor = nullptr;
       if (kind == kConstant) {
         tensor = &v->node()->t(kvalue);
-      } else if (kind == kParam &&
-                 std::find(initializer_names.cbegin(), initializer_names.cend(),
-                           v->uniqueName()) != initializer_names.cend()) {
+      } else if (graph.is_constant_initializer(v)) {
         tensor = &*graph.getInitializer(v->uniqueName());
       } else {
         if (v->sizes().size() != 1) {
