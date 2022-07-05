@@ -3383,7 +3383,7 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
 
-    def test_eliminate_slice_shape(self):  # type: () -> None
+    def test_eliminate_shape_slice(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
         start = helper.make_tensor('start', TensorProto.INT64, [1], np.array([-1], dtype=np.int64))
@@ -3402,7 +3402,7 @@ class TestOptimizer(unittest.TestCase):
             [start, end],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_slice_shape", "eliminate_deadend"], False)
+            graph, ["eliminate_shape_slice", "eliminate_deadend"], False)
 
         assert len(optimized_model.graph.node) == 2
 

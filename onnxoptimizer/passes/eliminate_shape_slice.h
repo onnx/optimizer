@@ -13,13 +13,13 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct EliminateSliceShape final : public PredicateBasedPass {
-  explicit EliminateSliceShape()
+struct EliminateShapeSlice final : public PredicateBasedPass {
+  explicit EliminateShapeSlice()
       : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
-    return "eliminate_slice_shape";
+    return "eliminate_shape_slice";
   }
 
   bool patternMatchPredicate(Node *node) override {
@@ -60,9 +60,7 @@ struct EliminateSliceShape final : public PredicateBasedPass {
       const Tensor *tensor = nullptr;
       if (kind == kConstant) {
         tensor = &v->node()->t(kvalue);
-      } else if (kind == kParam &&
-                 std::find(initializer_names.cbegin(), initializer_names.cend(),
-                           v->uniqueName()) != initializer_names.cend()) {
+      } else if (graph.is_constant_initializer(v)) {
         tensor = &*graph.getInitializer(v->uniqueName());
       } else {
         return false;
