@@ -24,7 +24,8 @@ struct FuseConcatAndReshape final : public PredicateBasedPass {
 
   bool patternMatchPredicate(Node *node) override {
     return node->kind() == kReshape &&
-           node->inputs()[1]->node()->kind() == kConcat;
+           node->inputs()[1]->node()->kind() == kConcat &&
+           node->input(1)->node()->i(kaxis) == 0;
   }
 
   bool runTransform(Node *node, Graph &graph,
@@ -41,7 +42,13 @@ struct FuseConcatAndReshape final : public PredicateBasedPass {
       } else if (graph.is_constant_initializer(v)) {
         tensor = &*graph.getInitializer(v->uniqueName());
       } else {
-        if (v->sizes().size() != 1) {
+        // If the value of v is unknown, and v has only one element, we can represent
+        // it with -1 in Reshape op.
+        // TODO:
+        //  support the case that v is a shape and only one of the dims is unknown.
+        //  Example:
+        //  Concat [?, 2, 3] and [4] into [-1, 2, 3, 4]
+        if (v->sizes().size() != 1 || !v->sizes()[0].is_int || v->sizes()[0].dim != 1) {
           return false;
         }
         shapes.push_back(-1);
