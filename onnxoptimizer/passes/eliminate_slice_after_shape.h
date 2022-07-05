@@ -13,13 +13,13 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-struct EliminateShapeSlice final : public PredicateBasedPass {
-  explicit EliminateShapeSlice()
+struct EliminateSliceAfterShape final : public PredicateBasedPass {
+  explicit EliminateSliceAfterShape()
       : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
-    return "eliminate_shape_slice";
+    return "eliminate_slice_after_shape";
   }
 
   bool patternMatchPredicate(Node *node) override {

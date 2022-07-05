@@ -3402,7 +3402,7 @@ class TestOptimizer(unittest.TestCase):
             [start, end],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_shape_slice", "eliminate_deadend"], False)
+            graph, ["eliminate_slice_after_shape", "eliminate_deadend"], False)
 
         assert len(optimized_model.graph.node) == 2
 

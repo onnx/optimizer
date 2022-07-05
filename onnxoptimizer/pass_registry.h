@@ -45,7 +45,7 @@
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/fuse_concat_and_reshape.h"
 #include "onnxoptimizer/passes/eliminate_nop_reshape.h"
-#include "onnxoptimizer/passes/eliminate_shape_slice.h"
+#include "onnxoptimizer/passes/eliminate_slice_after_shape.h"
 
 #include <unordered_set>
 #include <vector>
@@ -93,7 +93,7 @@ struct GlobalPassRegistry {
     registerPass<FuseConcatAndReshape>();
     registerPass<EliminateShapeGather>();
     registerPass<EliminateNopReshape>();
-    registerPass<EliminateShapeSlice>();
+    registerPass<EliminateSliceAfterShape>();
   }
 
   ~GlobalPassRegistry() {
