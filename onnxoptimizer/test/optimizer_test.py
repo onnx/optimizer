@@ -176,7 +176,8 @@ class TestOptimizer(unittest.TestCase):
             checker.check_model(optimized_model)
         if compare_result and len(optimized_model.graph.node) > 0:
             if has_ort:
-                assert self._compare(optimized_model, orig_model, input_shapes=input_shapes_for_comparing)
+                assert self._compare(
+                    optimized_model, orig_model, input_shapes=input_shapes_for_comparing)
             else:
                 print("Skip onnxruntime test because it is not installed.")
         return optimized_model
@@ -1665,15 +1666,19 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 2, 2))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[2].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_maxpool_no_optional_value_opset10(self):
         pad = helper.make_node(
@@ -1691,15 +1696,19 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 2, 2))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[1].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_avgpool_no_optional_value(self):
         pad = helper.make_node(
@@ -1719,7 +1728,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1730,7 +1740,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[2].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_maxpool_no_optional_value(self):
         pad = helper.make_node(
@@ -1749,7 +1760,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1760,7 +1772,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[1].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_avgpool_with_optional_value(self):
         pad = helper.make_node(
@@ -1781,7 +1794,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
              helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1797,7 +1811,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[2].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_maxpool_with_optional_value(self):
         pad = helper.make_node(
@@ -1817,7 +1832,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
              helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1832,7 +1848,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [0, 0, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[1].ints) == [
+            0, 0, 1, 1]
 
     def test_fuse_pad_into_avgpool_with_nonzero_optional_value(self):
         pad = helper.make_node(
@@ -1852,7 +1869,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
              helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1886,7 +1904,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
              helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ())],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -1921,7 +1940,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1))],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
@@ -1947,7 +1967,8 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1))],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
@@ -2033,15 +2054,19 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[2].ints) == [
+            1, 1, 1, 1]
 
     def test_fuse_pad_into_maxpool_existing_maxpool_pad_opset10(self):
         pad = helper.make_node(
@@ -2060,15 +2085,19 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [1, 1, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[1].ints) == [
+            1, 1, 1, 1]
 
     def test_fuse_pad_into_avgpool_existing_avgpool_pad(self):
         pad = helper.make_node(
@@ -2089,7 +2118,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -2100,7 +2130,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "AveragePool"
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[2].ints) == [
+            1, 1, 1, 1]
 
     def test_fuse_pad_into_maxpool_existing_maxpool_pad(self):
         pad = helper.make_node(
@@ -2120,7 +2151,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -2131,7 +2163,8 @@ class TestOptimizer(unittest.TestCase):
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "MaxPool"
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [1, 1, 1, 1]
+        assert list(optimized_model.graph.node[0].attribute[1].ints) == [
+            1, 1, 1, 1]
 
     def test_fuse_pad_into_avgpool_pad_feature_no_fuse_opset10(self):
         pad = helper.make_node(
@@ -2149,10 +2182,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 4, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 4, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2172,10 +2208,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 4, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 4, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2196,7 +2235,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 4, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 1, 0, 0, 0, 0, 0, 0]).astype(
@@ -2223,7 +2263,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 4, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 1, 0, 0, 0, 0, 0, 0]).astype(
@@ -2249,10 +2290,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2272,10 +2316,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2296,7 +2343,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array(
@@ -2323,7 +2371,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array(
@@ -2349,10 +2398,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, avg_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2372,10 +2424,13 @@ class TestOptimizer(unittest.TestCase):
         graph = helper.make_graph(
             [pad, max_pool],
             "test",
-            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))]
+            [helper.make_tensor_value_info(
+                "X", TensorProto.FLOAT, (1, 5, 3, 3))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))]
         )
-        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
+        optimized_model = self._optimized(
+            graph, ["fuse_pad_into_pool"], False, opset_imports=[helper.make_opsetid("", 10)])
 
         assert optimized_model.graph == graph
 
@@ -2396,7 +2451,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -2423,7 +2479,8 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
              helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,))],
-            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info(
+                "Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [helper.make_tensor("Pads", TensorProto.INT64,
                                 dims=(8,),
                                 vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(
@@ -3063,7 +3120,8 @@ class TestOptimizer(unittest.TestCase):
     def test_eliminate_nop_expand(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
-        shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([1, 1], dtype=np.int64))
+        shape = helper.make_tensor('shape', TensorProto.INT64, [
+                                   2], np.array([1, 1], dtype=np.int64))
 
         node_def = helper.make_node(
             'Expand',
@@ -3093,7 +3151,8 @@ class TestOptimizer(unittest.TestCase):
     def test_rename_input_output(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 2])
-        shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([1, 1], dtype=np.int64))
+        shape = helper.make_tensor('shape', TensorProto.INT64, [
+                                   2], np.array([1, 1], dtype=np.int64))
 
         node_def = helper.make_node(
             'Expand',
@@ -3224,13 +3283,17 @@ class TestOptimizer(unittest.TestCase):
     def test_fuse_concat_and_reshape1(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
-        shape = helper.make_tensor('shape', TensorProto.INT64, [2], np.array([4, 5], dtype=np.int64))
-        indices = helper.make_tensor('indices', TensorProto.INT64, [1], np.array([0], dtype=np.int64))
-        axes = helper.make_tensor('axes', TensorProto.INT64, [1], np.array([0], dtype=np.int64))
+        shape = helper.make_tensor('shape', TensorProto.INT64, [
+                                   2], np.array([4, 5], dtype=np.int64))
+        indices = helper.make_tensor('indices', TensorProto.INT64, [
+                                     1], np.array([0], dtype=np.int64))
+        axes = helper.make_tensor('axes', TensorProto.INT64, [
+                                  1], np.array([0], dtype=np.int64))
         X2 = helper.make_tensor_value_info('X2', TensorProto.INT64, [1])
 
         node_def = helper.make_node('Shape', ['X'], ['X1'],)
-        node_def1 = helper.make_node('Gather', ['X1', 'indices'], ['X2'], axis=0,)
+        node_def1 = helper.make_node(
+            'Gather', ['X1', 'indices'], ['X2'], axis=0,)
         node_def2 = helper.make_node('Concat', ['X2', 'shape'], ['X3'], axis=0,)
         node_def3 = helper.make_node('Reshape', ['X', 'X3'], ['Y'],)
 
@@ -3252,8 +3315,10 @@ class TestOptimizer(unittest.TestCase):
         # This case is not supported by fuse_concat_and_reshape for now.
         # Just test that no invalid model is genereated.
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, ['N', 4, 5])
-        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, ['N', 4, 5, 1])
-        shape = helper.make_tensor('shape', TensorProto.INT64, [1], np.array([1], dtype=np.int64))
+        Y = helper.make_tensor_value_info(
+            'Y', TensorProto.FLOAT, ['N', 4, 5, 1])
+        shape = helper.make_tensor('shape', TensorProto.INT64, [
+                                   1], np.array([1], dtype=np.int64))
 
         node_def = helper.make_node('Shape', ['X'], ['X1'],)
         node_def2 = helper.make_node('Concat', ['X1', 'shape'], ['X2'], axis=0,)
@@ -3267,7 +3332,7 @@ class TestOptimizer(unittest.TestCase):
             [shape],   # initialzer
         )
         optimized_model = self._optimized(
-                graph, ["fuse_concat_and_reshape", 'eliminate_deadend'], False, input_shapes_for_comparing={'X': [2,4,5]})
+            graph, ["fuse_concat_and_reshape", 'eliminate_deadend'], False, input_shapes_for_comparing={'X': [2, 4, 5]})
 
         assert len(optimized_model.graph.node) == 3
 
@@ -3275,7 +3340,8 @@ class TestOptimizer(unittest.TestCase):
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info('Y', TensorProto.INT64, [2])
         X2 = helper.make_tensor_value_info('X2', TensorProto.FLOAT, [3, 2])
-        indices = helper.make_tensor('indices', TensorProto.INT64, [1], np.array([1], dtype=np.int64))
+        indices = helper.make_tensor('indices', TensorProto.INT64, [
+                                     1], np.array([1], dtype=np.int64))
 
         node_def = helper.make_node('Relu', ['X'], ['X2'],)
         node_def2 = helper.make_node('Shape', ['X2'], ['X3'],)
@@ -3298,7 +3364,8 @@ class TestOptimizer(unittest.TestCase):
     def test_eliminate_nop_reshape(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
-        shape = helper.make_tensor('shape', TensorProto.INT64, [3], np.array([0, 4, 5], dtype=np.int64))
+        shape = helper.make_tensor('shape', TensorProto.INT64, [
+                                   3], np.array([0, 4, 5], dtype=np.int64))
 
         node_def = helper.make_node('Reshape', ['X', 'shape'], ['X1'],)
         node_def1 = helper.make_node('Identity', ['X1'], ['Y'],)
@@ -3400,7 +3467,8 @@ class TestOptimizer(unittest.TestCase):
                   'fuse_transpose_into_gemm',
                   'lift_lexical_references',
                   'split_predict']
-        self._optimized(model, passes, fixed_point=True, compare_result=False, check=False)
+        self._optimized(model, passes, fixed_point=True,
+                        compare_result=False, check=False)
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_fasterrcnn_fpn(self):    # type: () -> None
