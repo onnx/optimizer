@@ -15,7 +15,7 @@ namespace optimization {
 
 struct EliminateSliceAfterShape final : public PredicateBasedPass {
   explicit EliminateSliceAfterShape()
-      : PredicateBasedPass(PassType::Nop, PassEfficiency::Complete,
+      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
