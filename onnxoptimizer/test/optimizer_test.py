@@ -3379,9 +3379,32 @@ class TestOptimizer(unittest.TestCase):
         )
         optimized_model = self._optimized(
             graph, ["eliminate_nop_reshape"], False)
-        print(optimized_model)
+
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_shape_slice(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
+        start = helper.make_tensor('start', TensorProto.INT64, [1], np.array([-1], dtype=np.int64))
+        end = helper.make_tensor('end', TensorProto.INT64, [1], np.array([999], dtype=np.int64))
+
+        node_def = helper.make_node('Shape', ['X'], ['X1'],)
+        node_def1 = helper.make_node('Slice', ['X1', 'start', 'end'], ['X2'],)
+        node_def2 = helper.make_node('Cast', ['X2'], ['X3'], to=TensorProto.FLOAT)
+        node_def3 = helper.make_node('Mul', ['X', 'X3'], ['Y'])
+
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [start, end],   # initialzer
+        )
+        optimized_model = self._optimized(
+            graph, ["eliminate_slice_after_shape", "eliminate_deadend"], False)
+
+        assert len(optimized_model.graph.node) == 2
 
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
