@@ -53,8 +53,8 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
         result_of_shape_op.push_back(dims_of_shape_node_input[i]);
       }
     }
-    auto fetch_first_value_of_tensor = [&graph](const Value *v,
-                                                int64_t &i_d) -> bool {
+    auto fetch_sole_value_of_tensor = [&graph](const Value *v,
+                                               int64_t &i_d) -> bool {
       const auto &initializer_names = graph.initializer_names();
       const uint32_t kind = v->node()->kind();
       const Tensor *tensor = nullptr;
@@ -66,10 +66,14 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
         return false;
       }
       if (tensor->elem_type() == ONNX_NAMESPACE::TensorProto_DataType_INT32) {
-        i_d = ParseData<int32_t>(tensor)[0];
+        const auto data = ParseData<int32_t>(tensor);
+        ONNX_ASSERT(data.size() == 1);
+        i_d = data[0];
       } else if (tensor->elem_type() ==
                  ONNX_NAMESPACE::TensorProto_DataType_INT64) {
-        i_d = ParseData<int64_t>(tensor)[0];
+        const auto data = ParseData<int64_t>(tensor);
+        ONNX_ASSERT(data.size() == 1);
+        i_d = data[0];
       } else {
         return false;
       }
@@ -77,10 +81,10 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
     };
     int64_t slice_start = 0, slice_end = result_of_shape_op.size(),
             slice_step = 1;
-    if (!fetch_first_value_of_tensor(node->inputs()[1], slice_start) ||
-        !fetch_first_value_of_tensor(node->inputs()[2], slice_end) ||
+    if (!fetch_sole_value_of_tensor(node->inputs()[1], slice_start) ||
+        !fetch_sole_value_of_tensor(node->inputs()[2], slice_end) ||
         (node->inputs().size() == 5 &&
-         !fetch_first_value_of_tensor(node->inputs()[4], slice_step)) ||
+         !fetch_sole_value_of_tensor(node->inputs()[4], slice_step)) ||
         slice_step == 0) {
       return false;
     }
