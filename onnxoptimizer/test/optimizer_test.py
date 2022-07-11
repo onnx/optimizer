@@ -3280,7 +3280,7 @@ class TestOptimizer(unittest.TestCase):
     #     assert optimized_model.graph.input[0].name == "input_0"
     #     assert optimized_model.graph.output[0].name == "output_0"
 
-    def test_fuse_concat_and_reshape1(self):  # type: () -> None
+    def test_fuse_concat_into_reshape1(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5])
         shape = helper.make_tensor('shape', TensorProto.INT64, [
@@ -3306,7 +3306,7 @@ class TestOptimizer(unittest.TestCase):
             value_info=[X2],
         )
         optimized_model = self._optimized(
-            graph, ["fuse_concat_and_reshape", 'eliminate_deadend'], False)
+            graph, ["fuse_concat_into_reshape", 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Reshape"
@@ -3332,9 +3332,42 @@ class TestOptimizer(unittest.TestCase):
             [shape],   # initialzer
         )
         optimized_model = self._optimized(
-            graph, ["fuse_concat_and_reshape", 'eliminate_deadend'], False, input_shapes_for_comparing={'X': [2, 4, 5]})
+            graph, ["fuse_concat_into_reshape", 'eliminate_deadend'], False, input_shapes_for_comparing={'X': [2, 4, 5]})
 
         assert len(optimized_model.graph.node) == 3
+
+    def test_fuse_concat_into_reshape3(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, ['N', 4, 5])
+        Y = helper.make_tensor_value_info(
+            'Y', TensorProto.FLOAT, ['N', 4, 5, 1])
+        shape = helper.make_tensor('shape', TensorProto.INT32, [
+                                   3], np.array([4, 5, 1], dtype=np.int64))
+        indices = helper.make_tensor('indices', TensorProto.INT64, [
+                                     1], np.array([0], dtype=np.int64))
+        axes = helper.make_tensor('axes', TensorProto.INT64, [
+                                  1], np.array([0], dtype=np.int64))
+        X3 = helper.make_tensor_value_info('X3', TensorProto.INT32, [1])
+
+        node_def = helper.make_node('Shape', ['X'], ['X1'],)
+        node_def1 = helper.make_node(
+            'Gather', ['X1', 'indices'], ['X2'], axis=0,)
+        node_def2 = helper.make_node("Cast", ['X2'], ['X3'], to=TensorProto.INT32)
+        node_def3 = helper.make_node('Concat', ['X3', 'shape'], ['X4'], axis=0,)
+        node_def4 = helper.make_node("Cast", ['X4'], ['X5'], to=TensorProto.INT64)
+        node_def5 = helper.make_node('Reshape', ['X', 'X5'], ['Y'],)
+
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3, node_def4, node_def5],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [shape, indices, axes],   # initialzer
+            value_info=[X3],
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_concat_into_reshape", 'eliminate_deadend'], False, input_shapes_for_comparing={'X': [2, 4, 5]})
+
+        assert len(optimized_model.graph.node) == 1
 
     def test_eliminate_shape_gather(self):  # type: () -> None
         X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 2])
