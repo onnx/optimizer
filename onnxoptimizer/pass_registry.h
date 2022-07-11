@@ -48,6 +48,7 @@
 #include "onnxoptimizer/passes/rename_input_output.h"
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/split.h"
+#include "onnxoptimizer/passes/replace_einsum_with_matmul.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -84,6 +85,7 @@ struct GlobalPassRegistry {
     registerPass<FusePadIntoConv>();
     registerPass<FusePadIntoPool>();
     registerPass<FuseTransposeIntoGemm>();
+    registerPass<ReplaceEinsumWithMatmul>();
     registerPass<LiftLexicalReferences>();
     registerPass<SplitInit>();
     registerPass<SplitPredict>();

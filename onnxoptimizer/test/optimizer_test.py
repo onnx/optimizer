@@ -3406,6 +3406,42 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 2
 
+    def test_fuse_einsum_into_matmul_1(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5, 6])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 5, 5])
+
+        node_def = helper.make_node('Einsum', ['X', 'X'], ['Y'], equation='bhid,bhjd->bhij')
+
+        graph = helper.make_graph(
+            [node_def],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+        )
+        optimized_model = self._optimized(
+            graph, ["replace_einsum_with_matmul"], False)
+
+        assert len(optimized_model.graph.node) == 2
+
+    def test_fuse_einsum_into_matmul_2(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [3, 4, 5, 6])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 4, 6, 5])
+        Z = helper.make_tensor_value_info('Z', TensorProto.FLOAT, [3, 4, 5, 5])
+
+        node_def = helper.make_node('Einsum', ['X', 'Y'], ['Y1'], equation='bhij,bhjd->bhid')
+        node_def1 = helper.make_node('Identity', ['Y1'], ['Z'])
+        graph = helper.make_graph(
+            [node_def, node_def1],        # nodes
+            'test',      # name
+            [X, Y],  # inputs
+            [Z],  # outputs
+        )
+        optimized_model = self._optimized(
+            graph, ["replace_einsum_with_matmul"], False)
+
+        assert len(optimized_model.graph.node) == 2
+        assert optimized_model.graph.node[0].op_type == 'MatMul'
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(input_shape, reduction_axes, unsqueeze_axes, keepdim):
