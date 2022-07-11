@@ -10,24 +10,16 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-const std::vector<std::string> GlobalPassRegistry::GetAvailablePasses() {
-  std::vector<std::string> names;
-  for (const auto& pass : this->passes) {
-    names.push_back(pass.first);
-  }
-  return names;
-}
-
 const std::vector<std::string> GlobalPassRegistry::GetFuseAndEliminationPass() {
   std::vector<std::string> names;
-  for (const auto& pass : this->passes) {
-    const auto pass_type = pass.second->getPassType();
+  for (const auto& name : this->pass_names) {
+    const auto pass_type = this->passes.at(name)->getPassType();
     if (pass_type == PassType::Fuse || pass_type == PassType::Nop) {
-      names.push_back(pass.first);
+      names.push_back(name);
     }
   }
   return names;
 }
 
-} // namespace optimization
-} // namespace ONNX_NAMESPACE
+}  // namespace optimization
+}  // namespace ONNX_NAMESPACE
