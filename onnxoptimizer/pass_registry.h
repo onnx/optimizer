@@ -33,7 +33,7 @@
 #include "onnxoptimizer/passes/extract_constant_to_initializer.h"
 #include "onnxoptimizer/passes/fuse_add_bias_into_conv.h"
 #include "onnxoptimizer/passes/fuse_bn_into_conv.h"
-#include "onnxoptimizer/passes/fuse_concat_and_reshape.h"
+#include "onnxoptimizer/passes/fuse_concat_into_reshape.h"
 #include "onnxoptimizer/passes/fuse_consecutive_concats.h"
 #include "onnxoptimizer/passes/fuse_consecutive_log_softmax.h"
 #include "onnxoptimizer/passes/fuse_consecutive_reduce_unsqueeze.h"
@@ -89,7 +89,7 @@ struct GlobalPassRegistry {
     registerPass<LiftLexicalReferences>();
     registerPass<SplitInit>();
     registerPass<SplitPredict>();
-    registerPass<FuseConcatAndReshape>();
+    registerPass<FuseConcatIntoReshape>();
     registerPass<EliminateNopReshape>();
     registerPass<EliminateDeadEnd>();
     registerPass<EliminateIdentity>();
