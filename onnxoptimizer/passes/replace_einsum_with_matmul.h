@@ -26,7 +26,7 @@ namespace optimization {
 
 struct ReplaceEinsumWithMatmul final : public PredicateBasedPass {
   explicit ReplaceEinsumWithMatmul()
-      : PredicateBasedPass(PassType::Fuse, PassEfficiency::Complete,
+      : PredicateBasedPass(PassType::Replace, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
   std::string getPassName() const override {
     return "replace_einsum_with_matmul";
