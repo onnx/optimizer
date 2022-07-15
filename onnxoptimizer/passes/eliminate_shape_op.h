@@ -9,16 +9,10 @@
 
 #include "onnx/common/tensor.h"
 #include "onnxoptimizer/pass.h"
+#include "pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
-
-inline int AddYIfNegative(int x, int y) {
-  if (x < 0) {
-    return x + y;
-  }
-  return x;
-};
 
 struct EliminateShapeOp final : public PredicateBasedPass {
   explicit EliminateShapeOp()
@@ -30,20 +24,16 @@ struct EliminateShapeOp final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    if (node->kind() != Symbol("Shape")) {
+    if (!CheckKind(node, "Shape")) {
       return false;
     }
     const Value *input = node->input();
     if (!input->has_sizes()) {
       return false;
     }
-    const int start = AddYIfNegative(
-        node->hasAttribute(Symbol("start")) ? node->i(Symbol("start")) : 0,
-        input->sizes().size());
-    const int end = AddYIfNegative(node->hasAttribute(Symbol("end"))
-                                       ? node->i(Symbol("end"))
-                                       : input->sizes().size(),
-                                   input->sizes().size());
+
+    const auto [start, end] = FetchStartAndEndAttrOfShape(node);
+
     return std::all_of(input->sizes().cbegin() + start,
                        input->sizes().cbegin() + end,
                        [](const auto &dim) { return dim.is_int; });
@@ -51,15 +41,9 @@ struct EliminateShapeOp final : public PredicateBasedPass {
 
   bool runTransform(Node *node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
-    // TODO: add implicit conversion from const char* to Symbol
     const Value *input = node->input();
-    const int start = AddYIfNegative(
-        node->hasAttribute(Symbol("start")) ? node->i(Symbol("start")) : 0,
-        input->sizes().size());
-    const int end = AddYIfNegative(node->hasAttribute(Symbol("end"))
-                                       ? node->i(Symbol("end"))
-                                       : input->sizes().size(),
-                                   input->sizes().size());
+    const auto [start, end] = FetchStartAndEndAttrOfShape(node);
+
     Tensor tensor;
     tensor.sizes().push_back(end - start);
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
