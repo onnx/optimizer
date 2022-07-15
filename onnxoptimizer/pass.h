@@ -29,8 +29,10 @@ enum PassType {
   Separate = 2,
   // Immutable pass, also sometimes referred to as an analysis pass.
   Immutable = 3,
+  // Class of optimizations that replaces nodes with other.
+  Replace = 4,
   // Other type of pass.
-  Other = 4
+  Other = 5
 };
 
 // Enum that represents the return type of the analysis.
