@@ -9,6 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -23,8 +24,7 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    return node->kind() == kSlice &&
-           node->inputs()[0]->node()->kind() == Symbol("Shape") &&
+    return node->kind() == kSlice && CheckKind(node->inputs()[0], "Shape") &&
            node->inputs()[0]->node()->input()->has_sizes();
   }
 
@@ -34,63 +34,28 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
     const auto &dims_of_shape_node_input = shape_node->input()->sizes();
     std::vector<Dimension> result_of_shape_op;
 
-    auto add_y_if_negative = [](int64_t x, int64_t y) -> int64_t {
-      return x < 0 ? x + y : x;
-    };
     {
-      const int64_t shape_start =
-          add_y_if_negative(shape_node->hasAttribute(Symbol("start"))
-                                ? shape_node->i(Symbol("start"))
-                                : 0,
-                            dims_of_shape_node_input.size());
-      const int64_t shape_end =
-          add_y_if_negative(shape_node->hasAttribute(Symbol("end"))
-                                ? shape_node->i(Symbol("end"))
-                                : dims_of_shape_node_input.size(),
-                            dims_of_shape_node_input.size());
+      const auto [shape_start, shape_end] =
+          FetchStartAndEndAttrOfShape(shape_node);
 
       for (int i = shape_start; i < shape_end; ++i) {
         result_of_shape_op.push_back(dims_of_shape_node_input[i]);
       }
     }
-    auto fetch_sole_value_of_tensor = [&graph](const Value *v,
-                                               int64_t &i_d) -> bool {
-      const auto &initializer_names = graph.initializer_names();
-      const uint32_t kind = v->node()->kind();
-      const Tensor *tensor = nullptr;
-      if (kind == kConstant) {
-        tensor = &v->node()->t(kvalue);
-      } else if (graph.is_constant_initializer(v)) {
-        tensor = &*graph.getInitializer(v->uniqueName());
-      } else {
-        return false;
-      }
-      if (tensor->elem_type() == ONNX_NAMESPACE::TensorProto_DataType_INT32) {
-        const auto data = ParseData<int32_t>(tensor);
-        ONNX_ASSERT(data.size() == 1);
-        i_d = data[0];
-      } else if (tensor->elem_type() ==
-                 ONNX_NAMESPACE::TensorProto_DataType_INT64) {
-        const auto data = ParseData<int64_t>(tensor);
-        ONNX_ASSERT(data.size() == 1);
-        i_d = data[0];
-      } else {
-        return false;
-      }
-      return true;
-    };
+
     int64_t slice_start = 0, slice_end = result_of_shape_op.size(),
             slice_step = 1;
-    if (!fetch_sole_value_of_tensor(node->inputs()[1], slice_start) ||
-        !fetch_sole_value_of_tensor(node->inputs()[2], slice_end) ||
+    if (!FetchSoleIntValueOfTensor(node->inputs()[1], slice_start) ||
+        !FetchSoleIntValueOfTensor(node->inputs()[2], slice_end) ||
         (node->inputs().size() == 5 &&
-         !fetch_sole_value_of_tensor(node->inputs()[4], slice_step)) ||
+         !FetchSoleIntValueOfTensor(node->inputs()[4], slice_step)) ||
         slice_step == 0) {
       return false;
     }
 
-    slice_start = add_y_if_negative(slice_start, result_of_shape_op.size());
-    slice_end = add_y_if_negative(slice_end, result_of_shape_op.size());
+    slice_start =
+        AddYIfNegative<int64_t>(slice_start, result_of_shape_op.size());
+    slice_end = AddYIfNegative<int64_t>(slice_end, result_of_shape_op.size());
 
     std::vector<int64_t> result_of_slice_op;
     if (slice_step > 0) {

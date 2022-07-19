@@ -9,6 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -23,7 +24,8 @@ struct EliminateNopReshape final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    return node->kind() == kReshape && !node->inputs()[0]->sizes().empty();
+    return node->kind() == kReshape && !node->inputs()[0]->sizes().empty() &&
+           IsConstantTensor(node, 1);
   }
 
   bool runTransform(Node *node, Graph &graph,
@@ -31,16 +33,13 @@ struct EliminateNopReshape final : public PredicateBasedPass {
     const auto &data_input_dims = node->inputs()[0]->sizes();
     const auto *shape_input = node->inputs()[1];
 
-    const Tensor *shape_tensor = nullptr;
-    if (shape_input->node()->kind() == kConstant) {
-      shape_tensor = &shape_input->node()->t(kvalue);
-    } else if (graph.is_constant_initializer(shape_input)) {
-      shape_tensor = &*graph.getInitializer(shape_input->uniqueName());
-    } else {
+    const Tensor *shape_tensor = FetchConstantTensor(shape_input);
+    if (!shape_tensor) {
       return false;
     }
 
-    if (shape_tensor->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
+    if (shape_tensor->elem_type() !=
+        ONNX_NAMESPACE::TensorProto_DataType_INT64) {
       return false;
     }
     const auto shape_input_data = ParseData<int64_t>(shape_tensor);

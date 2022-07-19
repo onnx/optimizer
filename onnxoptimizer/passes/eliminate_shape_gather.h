@@ -9,6 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -23,8 +24,8 @@ struct EliminateShapeGather final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    return node->kind() == Symbol("Gather") &&
-           node->inputs()[0]->node()->kind() == Symbol("Shape") &&
+    return CheckKind(node, "Gather") && IsConstantTensor(node, 1) &&
+           CheckKind(node->inputs()[0], "Shape") &&
            node->inputs()[0]->node()->input()->has_sizes();
   }
 
@@ -35,39 +36,14 @@ struct EliminateShapeGather final : public PredicateBasedPass {
     Node *shape = x->node();
     const auto &dims = shape->input()->sizes();
 
-    const Tensor *indices_tensor = nullptr;
-    if (indices->node()->kind() == kConstant) {
-      indices_tensor = &indices->node()->t(kvalue);
-    } else if (graph.is_constant_initializer(indices)) {
-      indices_tensor = &*graph.getInitializer(indices->uniqueName());
-    } else {
-      return false;
-    }
-    ONNX_ASSERT(indices_tensor->sizes().size() <= 1);
-    int indices_val;
-    if (indices_tensor->elem_type() ==
-        ONNX_NAMESPACE::TensorProto_DataType_INT32) {
-      indices_val = ParseData<int32_t>(indices_tensor)[0];
-    } else if (indices_tensor->elem_type() ==
-               ONNX_NAMESPACE::TensorProto_DataType_INT64) {
-      indices_val = ParseData<int64_t>(indices_tensor)[0];
-    } else {
+    int64_t indices_val;
+    if (!FetchSoleIntValueOfTensor(indices, indices_val)) {
       return false;
     }
 
-    auto add_y_if_negative = [](int x, int y) -> int {
-      return x < 0 ? x + y : x;
-    };
+    const auto [start, end] = FetchStartAndEndAttrOfShape(shape);
 
-    const int start = add_y_if_negative(
-        shape->hasAttribute(Symbol("start")) ? shape->i(Symbol("start")) : 0,
-        dims.size());
-    const int end = add_y_if_negative(shape->hasAttribute(Symbol("end"))
-                                          ? shape->i(Symbol("end"))
-                                          : dims.size(),
-                                      dims.size());
-
-    indices_val = add_y_if_negative(indices_val, end - start);
+    indices_val = AddYIfNegative(indices_val, end - start);
     indices_val += start;
 
     ONNX_ASSERT(indices_val < dims.size());
@@ -77,7 +53,7 @@ struct EliminateShapeGather final : public PredicateBasedPass {
     }
 
     Tensor tensor;
-    if (indices_tensor->sizes().size() == 1) {
+    if (indices->sizes().size() == 1) {
       tensor.sizes().push_back(1);
     }
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;

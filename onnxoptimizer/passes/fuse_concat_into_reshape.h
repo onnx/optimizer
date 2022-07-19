@@ -32,17 +32,15 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
   }
 
   inline bool matchConcatReshape(Node *node) {
-    return node->kind() == kReshape &&
-           node->inputs()[1]->node()->kind() == kConcat &&
+    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kConcat) &&
            node->input(1)->node()->i(kaxis) == 0;
   }
 
   inline bool matchConcatCastReshape(Node *node) {
-    return node->kind() == kReshape &&
-           node->inputs()[1]->node()->kind() == kCast &&
+    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kCast) &&
            node->inputs()[1]->node()->i(kto) ==
                ONNX_NAMESPACE::TensorProto_DataType_INT64 &&
-           node->inputs()[1]->node()->input()->node()->kind() == kConcat &&
+           CheckKind(node->inputs()[1]->node()->input(), kConcat) &&
            node->inputs()[1]->node()->input()->node()->i(kaxis) == 0;
   }
 
@@ -64,13 +62,9 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
 
     std::vector<int64_t> shapes;
     for (const auto *v : concat->inputs()) {
-      const uint32_t kind = v->node()->kind();
-      const Tensor *tensor = nullptr;
-      if (kind == kConstant) {
-        tensor = &v->node()->t(kvalue);
-      } else if (graph.is_constant_initializer(v)) {
-        tensor = &*graph.getInitializer(v->uniqueName());
-      } else {
+      const Tensor *tensor = FetchConstantTensor(v);
+
+      if (tensor == nullptr) {
         // If the value of v is unknown, and v has only one element, we can
         // represent it with -1 in Reshape op.
         // TODO:

@@ -33,7 +33,7 @@ struct ReplaceEinsumWithMatmul final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == Symbol("Einsum") && node->inputs().size() == 2 &&
+    return CheckKind(node, "Einsum") && node->inputs().size() == 2 &&
            std::all_of(node->inputs().begin(), node->inputs().end(),
                        [](const Value* v) {
                          switch (v->elemType()) {

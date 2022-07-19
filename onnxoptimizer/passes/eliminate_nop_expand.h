@@ -9,6 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -47,18 +48,16 @@ struct EliminateNopExpand final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kExpand && node->inputs()[1]->node()->kind() == kParam;
+    return node->kind() == kExpand && IsConstantTensor(node, 1);
   }
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     auto& input_value = node->inputs()[0];
-    const auto* shape_value = node->input(1);
-    const auto shape_tensor_name = shape_value->uniqueName();
-    const auto shape_tensor = graph.getInitializer(shape_tensor_name);
+    const auto* shape_tensor = FetchConstantTensor(node->input(1));
 
-    if (!graph.is_constant_initializer(shape_value) ||
-        !isABroadcastToB(ParseData<int64_t>(&*shape_tensor),
+    if (!shape_tensor ||
+        !isABroadcastToB(ParseData<int64_t>(shape_tensor),
                          input_value->sizes()) ||
         !tryReplacingAllUsesWith(node->output(), input_value)) {
       return false;
