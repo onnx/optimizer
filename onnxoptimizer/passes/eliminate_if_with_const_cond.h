@@ -50,6 +50,9 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
   bool runTransform(Node *if_node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
     const auto cond_value = if_node->input();
+    if (!graph.is_constant_initializer(cond_value)) {
+      return false;
+    }
     Tensor cond_tensor;
     if (cond_value->node()->kind() == kConstant) {
       cond_tensor = cond_value->node()->t(kvalue);
@@ -73,18 +76,29 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
           parent_graph.create(node->kind(), node->outputs().size());
       new_node->insertBefore(if_node);
       new_node->copyAttributes(*node);
-      for (const auto *input : node->inputs()) {
+      for (auto *input : node->inputs()) {
         const auto &unique_name = input->uniqueName();
         if (value_dict.find(unique_name) == value_dict.end()) {
-          ONNX_ASSERT(input->node()->kind() == kCaptured);
-          auto it = unique_name_to_value_in_parent.find(unique_name);
-          if (it == unique_name_to_value_in_parent.end()) {
-            // a value from the parent graph of parent_graph
-            auto *captured_node = parent_graph.create(kCaptured, 1);
-            captured_node->output()->setUniqueName(unique_name);
-            new_node->addInput(captured_node->output());
+          if (input->node()->kind() == kCaptured) {
+            auto it = unique_name_to_value_in_parent.find(unique_name);
+            if (it == unique_name_to_value_in_parent.end()) {
+              // a value from the parent graph of parent_graph
+              auto *captured_node = parent_graph.create(kCaptured, 1);
+              captured_node->output()->setUniqueName(unique_name);
+              new_node->addInput(captured_node->output());
+            } else {
+              new_node->addInput(it->second);
+            }
+          } else if (input->node()->kind() == kParam) {
+            ONNX_ASSERT(subgraph->is_constant_initializer(input));
+            const Tensor& initializer_subgraph = *subgraph->getInitializer(input->uniqueName());
+            // copy a new tensor
+            Tensor initializer_parent_graph = initializer_subgraph;
+            new_node->addInput(parent_graph.addInitializerAndCreateValue(initializer_parent_graph));
           } else {
-            new_node->addInput(it->second);
+            ONNX_ASSERTM(
+                false,
+                "input node not in value_dict can only be captured or param");
           }
         } else {
           new_node->addInput(value_dict[unique_name]);
