@@ -7,13 +7,10 @@
 
 This enables users to optimize their models.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 
 import onnx
 import onnxoptimizer.onnx_opt_cpp2py_export as C
+from .version import version as __version__  # noqa
 from onnx import ModelProto
 from typing import Text, Sequence, Optional
 
