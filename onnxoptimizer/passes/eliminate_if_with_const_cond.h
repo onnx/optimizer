@@ -73,7 +73,7 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
           parent_graph.create(node->kind(), node->outputs().size());
       new_node->insertBefore(if_node);
       new_node->copyAttributes(*node);
-      for (auto *input : node->inputs()) {
+      for (const auto *input : node->inputs()) {
         const auto &unique_name = input->uniqueName();
         if (value_dict.find(unique_name) == value_dict.end()) {
           if (input->node()->kind() == kCaptured) {
