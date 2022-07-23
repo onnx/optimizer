@@ -35,7 +35,7 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
     if (node->kind() == kIf) {
       const auto cond_value = node->input();
       if ((cond_value->node()->kind() == kConstant ||
-           cond_value->node()->kind() == kParam)) {
+           cond_value->owningGraph()->is_constant_initializer(cond_value))) {
         return true;
       }
     }
@@ -50,9 +50,6 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
   bool runTransform(Node *if_node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
     const auto cond_value = if_node->input();
-    if (!graph.is_constant_initializer(cond_value)) {
-      return false;
-    }
     Tensor cond_tensor;
     if (cond_value->node()->kind() == kConstant) {
       cond_tensor = cond_value->node()->t(kvalue);
@@ -91,10 +88,12 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
             }
           } else if (input->node()->kind() == kParam) {
             ONNX_ASSERT(subgraph->is_constant_initializer(input));
-            const Tensor& initializer_subgraph = *subgraph->getInitializer(input->uniqueName());
+            const Tensor &initializer_subgraph =
+                *subgraph->getInitializer(input->uniqueName());
             // copy a new tensor
             Tensor initializer_parent_graph = initializer_subgraph;
-            new_node->addInput(parent_graph.addInitializerAndCreateValue(initializer_parent_graph));
+            new_node->addInput(parent_graph.addInitializerAndCreateValue(
+                initializer_parent_graph));
           } else {
             ONNX_ASSERTM(
                 false,
