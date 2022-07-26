@@ -48,6 +48,8 @@ bool FetchSoleValueOfTensor(const Value* t, T& val);
 // easier. E.g: get axis from axes tensor
 bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val);
 
+bool FetchSoleIntValueOfAttr(const Node* node, Symbol attr_name, int64_t& val);
+
 inline bool CheckKind(const Value* v, const Symbol& symbol) {
   return v->node()->kind() == symbol;
 }

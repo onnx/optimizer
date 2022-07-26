@@ -5,8 +5,9 @@
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
-#include "onnx/defs/tensor_util.h"
 #include "pass_util.h"
+
+#include "onnx/defs/tensor_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -41,6 +42,22 @@ bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val) {
   }
   return r1 || r2;
 }
+
+bool FetchSoleIntValueOfAttr(const Node* node, Symbol attr_name, int64_t& val) {
+  if (node->kindOf(attr_name) == AttributeKind::is) {
+    const auto attrs = node->is(attr_name);
+    if (attrs.size() != 1) {
+      return false;
+    }
+    val = attrs[0];
+    return true;
+  } else if (node->kindOf(attr_name) == AttributeKind::i) {
+    val = node->i(attr_name);
+    return true;
+  } else {
+    return false;
+  }
+};
 
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
