@@ -45,12 +45,20 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
 
     int64_t slice_start = 0, slice_end = result_of_shape_op.size(),
             slice_step = 1;
-    if (!FetchSoleIntValueOfTensor(node->inputs()[1], slice_start) ||
-        !FetchSoleIntValueOfTensor(node->inputs()[2], slice_end) ||
-        (node->inputs().size() == 5 &&
-         !FetchSoleIntValueOfTensor(node->inputs()[4], slice_step)) ||
-        slice_step == 0) {
-      return false;
+    const int opset_version = getOpsetVersion(graph);
+    if (opset_version < 10) {
+      if (!FetchSoleIntValueOfAttr(node, kstarts, slice_start) ||
+          !FetchSoleIntValueOfAttr(node, kends, slice_end)) {
+        return false;
+      }
+    } else {
+      if (!FetchSoleIntValueOfTensor(node->inputs()[1], slice_start) ||
+          !FetchSoleIntValueOfTensor(node->inputs()[2], slice_end) ||
+          (node->inputs().size() == 5 &&
+           !FetchSoleIntValueOfTensor(node->inputs()[4], slice_step)) ||
+          slice_step == 0) {
+        return false;
+      }
     }
 
     slice_start =
