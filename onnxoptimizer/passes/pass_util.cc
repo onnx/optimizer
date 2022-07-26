@@ -29,11 +29,11 @@ namespace optimization {
   }
 
 FetchSoleValueOfTensor_Template(INT32, int32_t)
-    FetchSoleValueOfTensor_Template(INT64, int64_t)
-        FetchSoleValueOfTensor_Template(FLOAT, float)
-            FetchSoleValueOfTensor_Template(DOUBLE, double)
+FetchSoleValueOfTensor_Template(INT64, int64_t)
+FetchSoleValueOfTensor_Template(FLOAT, float)
+FetchSoleValueOfTensor_Template(DOUBLE, double)
 
-                bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val) {
+bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val) {
   int32_t i32_val;
   const bool r1 = FetchSoleValueOfTensor<int64_t>(t, val);
   const bool r2 = FetchSoleValueOfTensor<int32_t>(t, i32_val);
