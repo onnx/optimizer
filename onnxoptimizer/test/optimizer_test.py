@@ -3859,6 +3859,67 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 2
         assert optimized_model.graph.node[0].op_type == "MatMul"
 
+    def test_eliminate_nop_concat(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5, 6])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4, 6, 5])
+
+        node_def = helper.make_node(
+            "Concat", ["X"], ["Y1"], axis=0
+        )
+        node_def1 = helper.make_node("Identity", ["Y1"], ["Y"])
+        graph = helper.make_graph(
+            [node_def, node_def1],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y],  # outputs
+        )
+        optimized_model = self._optimized(graph, ["eliminate_nop_concat"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_split1(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5, 6])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4, 6, 5])
+
+        node_def = helper.make_node(
+            "Split", ["X"], ["Y1"], axis=0, split=[3]
+        )
+        node_def1 = helper.make_node("Identity", ["Y1"], ["Y"])
+        graph = helper.make_graph(
+            [node_def, node_def1],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y],  # outputs
+        )
+        opset_imports = [helper.make_opsetid("", 11)]
+        optimized_model = self._optimized(graph, ["eliminate_nop_split"], False, opset_imports=opset_imports)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_split2(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5, 6])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [2, 4, 6, 5])
+        Z = helper.make_tensor_value_info("Z", TensorProto.FLOAT, [1, 4, 6, 5])
+
+        node_def = helper.make_node(
+            "Split", ["X"], ["Y1", "Y2"], axis=0, split=[2, 1]
+        )
+        node_def1 = helper.make_node("Identity", ["Y1"], ["Y"])
+        node_def2 = helper.make_node("Identity", ["Y2"], ["Z"])
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y, Z],  # outputs
+        )
+        opset_imports = [helper.make_opsetid("", 11)]
+        optimized_model = self._optimized(graph, ["eliminate_nop_split"], False, opset_imports=opset_imports)
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Split"
+
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]
         def _calculate_post_transform_shape(
