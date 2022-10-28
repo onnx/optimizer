@@ -48,7 +48,7 @@ struct EliminateShapeGather final : public PredicateBasedPass {
 
     ONNX_ASSERT(indices_val < dims.size());
 
-    if (!dims[indices_val].is_int) {
+    if (!dims[indices_val].is_int || dims[indices_val].dim == -1) {
       return false;
     }
 
