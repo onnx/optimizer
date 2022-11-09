@@ -14,7 +14,7 @@ namespace ONNX_NAMESPACE {
 namespace optimization {
 
 // before
-// Z  = Reshape(X, Concat(...)) or Z = Reshape(X, Cast(Concat(...), to=INT64 ))
+// Z = Reshape(X, Concat(...)) or Z = Reshape(X, Cast(Concat(...), to=INT64 ))
 // after
 // Z = Reshape(X, Y) , Y is a constant tensor
 
@@ -52,7 +52,6 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     const bool has_cast = matchConcatCastReshape(node);
 
-    Value *shape_value = node->inputs()[1];
     Node *concat = nullptr;
     if (has_cast) {
       concat = node->inputs()[1]->node()->input()->node();
@@ -118,10 +117,7 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
     t.int64s().swap(shapes);
     Value *value = graph.addInitializerAndCreateValue(t);
 
-    const bool replacing_success = tryReplacingAllUsesWith(shape_value, value);
-    if (!replacing_success) {
-      return false;
-    }
+    node->replaceInput(1, value);
     destroy_current = NodeDestroyType::DestroyZero;
     return true;
   }
