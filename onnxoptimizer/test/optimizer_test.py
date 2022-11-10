@@ -3749,6 +3749,42 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 1
 
+    def test_fuse_concat_into_reshape_multiple_consumers(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5])
+        Y1 = helper.make_tensor_value_info("Y1", TensorProto.FLOAT, [3, 4, 5])
+        Y2 = helper.make_tensor_value_info("Y2", TensorProto.INT64, [1])
+        shape = helper.make_tensor(
+            "shape", TensorProto.INT64, [2], np.array([4, 5], dtype=np.int64)
+        )
+        indices = helper.make_tensor(
+            "indices", TensorProto.INT64, [1], np.array([0], dtype=np.int64)
+        )
+        axes = helper.make_tensor(
+            "axes", TensorProto.INT64, [1], np.array([0], dtype=np.int64)
+        )
+        X2 = helper.make_tensor_value_info("X2", TensorProto.INT64, [1])
+
+        node_def = helper.make_node("Shape", ["X"], ["X1"],)
+        node_def1 = helper.make_node("Gather", ["X1", "indices"], ["X2"], axis=0,)
+        node_def2 = helper.make_node("Concat", ["X2", "shape"], ["X3"], axis=0,)
+        node_def3 = helper.make_node("Reshape", ["X", "X3"], ["Y1"],)
+        node_def4 = helper.make_node("Shape", ["X3"], ["Y2"],)
+
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3, node_def4],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y1, Y2],  # outputs
+            [shape, indices, axes],  # initialzer
+            value_info=[X2],
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_concat_into_reshape", "eliminate_deadend"], False
+        )
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[3].input[1] != "X3"
+
     def test_eliminate_shape_gather(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [2])
