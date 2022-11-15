@@ -23,9 +23,10 @@ struct EliminateNopSplit final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return CheckKind(node, "Split") && node->input()->has_sizes() &&
-           node->hasAttribute(kaxis) && node->hasAttribute(ksplit) &&
-           node->outputs().size() == 1;
+    // TODO: support Split-18 where `split` is an input instead of an attribute
+    return CheckKind(node, "Split") && node->inputs().size() == 1 &&
+           node->input()->has_sizes() && node->hasAttribute(kaxis) &&
+           node->hasAttribute(ksplit) && node->outputs().size() == 1;
   }
 
   bool runTransform(Node* node, Graph& graph,
