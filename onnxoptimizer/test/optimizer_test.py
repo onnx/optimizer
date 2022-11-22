@@ -1424,6 +1424,208 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Conv"
         assert optimized_model.graph.node[1].op_type == "Add"
 
+    def test_fuse_add_bias_into_conv_transpose_with_scalar_bias(self):  # type: () -> None
+        nodes = [
+            helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2)),
+            helper.make_node("Add", ["Z", "A"], ["B"]),
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, ()),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        # Unsqueeze, Conv
+        assert len(optimized_model.graph.node) == 4
+        assert optimized_model.graph.node[0].op_type == "Unsqueeze"
+        assert optimized_model.graph.node[1].op_type == "Constant"
+        assert optimized_model.graph.node[2].op_type == "Tile"
+        assert optimized_model.graph.node[3].op_type == "ConvTranspose"
+
+    def test_fuse_add_bias_into_conv_transpose_use_weight_shape(self):  # type: () -> None
+        nodes = [
+            helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2)),
+            helper.make_node("Add", ["Z", "A"], ["B"]),
+        ]
+        # FIXME(daquexian): It looks like subgraph cannot get value info from parent subgraph
+        # nodes.extend(self._make_fake_loop_op(
+        #     [helper.make_node("Conv", ["_X", "Y"], ["_Z"]),
+        #      helper.make_node("Add", ["_Z", "A"], ["_B2"])],
+        #     [(TensorProto.FLOAT, (1, 5, 3, 3), "X")],
+        #     [(TensorProto.FLOAT, (1, 16, 1, 1), "B2")]))
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        # # Squeeze, Conv, Constant (trip count), Constant (condition), Loop
+        # assert len(list(optimized_model.graph.node)) == 5
+        assert len(list(optimized_model.graph.node)) == 2
+        assert optimized_model.graph.node[0].op_type == "Squeeze"
+        assert optimized_model.graph.node[1].op_type == "ConvTranspose"
+        assert optimized_model.graph.output[0].name == "B"
+        # # Squeeze, Conv
+        # assert len(optimized_model.graph.node[4].attribute[0].g.node) == 2
+        # assert optimized_model.graph.node[4].attribute[0].g.node[0].op_type == 'Squeeze'
+        # assert optimized_model.graph.node[4].attribute[0].g.node[1].op_type == 'Conv'
+        # # Output 1 since 0 is 'cond'
+        # assert optimized_model.graph.node[4].attribute[0].g.output[1].name == 'B2'
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_transpose_use_weight_shape_with_tile(self):
+        conv = helper.make_node("ConvTranspose", ["X", "Y"], ["Z"],  strides=(2, 2))
+        add = helper.make_node("Add", ["Z", "A"], ["B"])
+        graph = helper.make_graph(
+            [conv, add],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (1,)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(list(optimized_model.graph.node)) == 3
+        assert len(optimized_model.graph.value_info) == 1
+        assert (
+            optimized_model.graph.value_info[0].type.tensor_type.elem_type
+            == TensorProto.INT64
+        )
+        assert len(optimized_model.graph.value_info[0].type.tensor_type.shape.dim) == 1
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Tile"
+        assert optimized_model.graph.node[2].op_type == "ConvTranspose"
+        assert optimized_model.graph.output[0].name == "B"
+
+    def test_fuse_add_bias_into_conv_transpose_use_conv_shape(self):  # type: () -> None
+        sub = helper.make_node("Sub", ["M", "N"], ["Y"])
+        conv = helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2))
+        add = helper.make_node("Add", ["Z", "A"], ["B"])
+        graph = helper.make_graph(
+            [sub, conv, add],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("M", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("N", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 16, 1, 1)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+            value_info=[
+                helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 320, 320))
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Sub"
+        assert optimized_model.graph.node[1].op_type == "Squeeze"
+        assert optimized_model.graph.node[2].op_type == "ConvTranspose"
+        assert optimized_model.graph.output[0].name == "B"
+        assert (
+            optimized_model.graph.output[0].type.tensor_type.elem_type
+            == TensorProto.FLOAT
+        )
+        assert len(optimized_model.graph.output[0].type.tensor_type.shape.dim) == 4
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_transpose_use_move_constant(self):
+        conv = helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2))
+        constant = helper.make_node(
+            "Constant",
+            [],
+            ["A"],
+            value=helper.make_tensor(
+                name="bias",
+                data_type=TensorProto.FLOAT,
+                dims=(16, 1, 1),
+                vals=np.random.randn(16).astype(np.float32).tolist(),
+            ),
+        )
+        add = helper.make_node("Add", ["Z", "A"], ["B"])
+        graph = helper.make_graph(
+            [conv, constant, add],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+            value_info=[
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1)),
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Squeeze"
+        assert optimized_model.graph.node[2].op_type == "ConvTranspose"
+        assert optimized_model.graph.output[0].name == "B"
+        assert (
+            optimized_model.graph.output[0].type.tensor_type.elem_type
+            == TensorProto.FLOAT
+        )
+        assert len(optimized_model.graph.output[0].type.tensor_type.shape.dim) == 4
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_transpose_squeeze_1d_bias_no_fuse(self):
+        conv = helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2))
+        add = helper.make_node("Add", ["Z", "A"], ["B"])
+        graph = helper.make_graph(
+            [conv, add],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (320,)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+            value_info=[
+                helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 320, 320)),
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(list(optimized_model.graph.node)) == 2
+        assert optimized_model.graph.node[0].op_type == "ConvTranspose"
+        assert optimized_model.graph.node[1].op_type == "Add"
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_transpose_squeeze_4d_bias_no_fuse(self):
+        conv = helper.make_node("ConvTranspose", ["X", "Y"], ["Z"], strides=(2, 2))
+        add = helper.make_node("Add", ["Z", "A"], ["B"])
+        graph = helper.make_graph(
+            [conv, add],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 3, 160, 160)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (3, 16, 2, 2)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (1, 16, 320, 320)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (1, 16, 320, 320))],
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(list(optimized_model.graph.node)) == 2
+        assert optimized_model.graph.node[0].op_type == "ConvTranspose"
+        assert optimized_model.graph.node[1].op_type == "Add"
+
     def test_fuse_matmul_add_bias_into_gemm(self):  # type: () -> None
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
