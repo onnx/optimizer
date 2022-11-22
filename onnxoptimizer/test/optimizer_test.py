@@ -3063,6 +3063,46 @@ class TestOptimizer(unittest.TestCase):
             )
             optimized_model = self._optimized(graph, ["fuse_bn_into_conv"]) # noqa
 
+    def test_fuse_bn_into_conv_transpose_simple(self):  # type: () -> None
+        for (tensor_type, np_type) in [(TensorProto.FLOAT, np.float32)]:
+            conv = helper.make_node("ConvTranspose", ["X", "W", "B"], ["Y"], strides=(2, 2))
+            bn = helper.make_node(
+                "BatchNormalization", ["Y", "scale", "b", "mean", "var"], ["Z"]
+            )
+
+            W = np.random.randn(64, 64, 2, 2).astype(np_type) + 2
+            B = np.random.randn(64,).astype(np_type) + 2
+            scale = np.random.randn(64,).astype(np_type) + 2
+            b = np.random.randn(64,).astype(np_type) + 2
+            mean = np.random.randn(64,).astype(np_type) + 2
+            var = np.abs(np.random.randn(64,).astype(np_type)) + 2
+
+            initializers = [
+                helper.make_tensor(
+                    name, tensor_type, npa.shape, npa.tobytes(), raw=True
+                )
+                for name, npa in [
+                    ("W", W),
+                    ("B", B),
+                    ("scale", scale),
+                    ("b", b),
+                    ("mean", mean),
+                    ("var", var),
+                ]
+            ]
+            graph = helper.make_graph(
+                [conv, bn],
+                "test",
+                [helper.make_tensor_value_info("X", tensor_type, (1, 64, 160, 160))],
+                [helper.make_tensor_value_info("Z", tensor_type, (1, 64, 320, 320))],
+                initializer=initializers,
+                value_info=[
+                    helper.make_tensor_value_info("Y", tensor_type, (1, 64, 320, 320))
+                ],
+            )
+
+            optimized_model = self._optimized(graph, ["fuse_bn_into_conv"])
+
     def _internal_test_deadend_elimination(self, fixed):  # type: (bool) -> None
         softmax = helper.make_node("Softmax", ["X"], ["Y"], axis=2)
         log = helper.make_node("Log", ["Y"], ["Z"])
