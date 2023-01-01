@@ -171,6 +171,11 @@ struct FusePadIntoPool final : public PredicateBasedPass {
       pool_pads[pool_pads_size / 2 + j] += pads[pads_size / 2 + i];
     }
 
+    if (pool->kind() == Symbol("AveragePool")) {
+      int64_t count_include_pad = 1;
+      pool->i_(kcount_include_pad, count_include_pad);
+    }
+
     pool->is_(kpads, std::move(pool_pads));
     pool->replaceInput(0, pad->inputs()[0]);
     pad->destroy();
