@@ -107,7 +107,7 @@ class TestOptimizer(unittest.TestCase):
                 np.int32,
                 np.int64,
                 str,
-                np.bool,
+                bool,
                 np.float16,
                 np.double,
                 np.uint32,
