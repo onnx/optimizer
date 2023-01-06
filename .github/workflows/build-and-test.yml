@@ -11,9 +11,11 @@ jobs:
       CIBW_TEST_REQUIRES_LINUX: pytest==5.4.3 nbval flake8 mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest==5.4.3 nbval
       CIBW_TEST_REQUIRES_WINDOWS: pytest==5.4.3 nbval
-      CIBW_BEFORE_TEST_LINUX: pip install torch==1.7.1+cpu torchvision==0.8.2+cpu torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html
+      CIBW_BEFORE_TEST_LINUX: pip install torch==1.13.1+cpu torchvision==0.14.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
+      # Python3.11 doesn't have torchvision prebuilt wheel
+      CIBW_TEST_SKIP: "cp311-* *_arm64 *_universal2:arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       # Only build on Python 3 and skip 32-bit builds
