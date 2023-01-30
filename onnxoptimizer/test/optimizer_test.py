@@ -4201,6 +4201,40 @@ class TestOptimizer(unittest.TestCase):
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
             )
 
+    def test_adjust_add(self):  # type: () -> None
+        shapes = [3, 4, 5, 6]
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, shapes)
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, shapes)
+
+        I0 = helper.make_tensor(
+            "I0", TensorProto.FLOAT, shapes, np.zeros(shapes, dtype=np.float32)
+        )
+
+        I1 = helper.make_tensor(
+            "I1", TensorProto.FLOAT, shapes, np.zeros(shapes, dtype=np.float32)
+        )
+
+        node_def = helper.make_node("Add", ["I0", "X"], ["Y1"])
+        node_def1 = helper.make_node("Add", ["I1", "Y1"], ["Y2"])
+        node_def2 = helper.make_node("Add", ["Y1", "Y2"], ["Y"])
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y],  # outputs
+            [I0, I1],  # initializer
+        )
+        optimized_model = self._optimized(graph, ["adjust_add", "eliminate_deadend"], False)
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Add"
+        assert optimized_model.graph.node[1].op_type == "Add"
+        assert optimized_model.graph.node[0].input[0] == "X"
+        assert optimized_model.graph.node[0].input[1] == "I0"
+        assert optimized_model.graph.node[1].input[0] == "Y1"
+        assert optimized_model.graph.node[1].input[1] == "I1"
+        assert optimized_model.graph.node[2].input[0] == "Y1"
+        assert optimized_model.graph.node[2].input[1] == "Y2"
+
 
 if __name__ == "__main__":
     unittest.main()
