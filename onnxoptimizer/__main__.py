@@ -13,20 +13,32 @@ import onnx.checker
 import argparse
 import sys
 import onnxoptimizer
+import pathlib
 
-usage = 'python -m onnxoptimizer -i input_model.onnx -o output_model.onnx '
+usage = 'python -m onnxoptimizer input_model.onnx output_model.onnx '
+
+
+def format_argv(argv):
+    argv_ = argv[1:]
+    if len(argv_) == 1:
+        return argv_
+    elif len(argv_) >= 2:
+        return argv_[2:]
+    else:
+        print('please check arguments!')
+        sys.exit(1)
+
 
 parser = argparse.ArgumentParser(
     prog='onnxoptimizer',
     usage=usage,
-    description='Onnxoptimizer command-line api')
-parser.add_argument('--print_all_passes', action='store_true', default=False, help='Print all available passes')
-parser.add_argument('--print_fuse_elimination_passes', action='store_true', default=False, help='Print all fuse and elimination passes')
-parser.add_argument('-i', '--input', type=str, help='input onnx model that will be optimized')
-parser.add_argument('-o', '--output', type=str, help='output filepath that stores optimized onnx model')
+    description='onnxoptimizer command-line api')
+parser.add_argument('--print_all_passes', action='store_true', default=False, help='print all available passes')
+parser.add_argument('--print_fuse_elimination_passes', action='store_true', default=False, help='print all fuse and elimination passes')
 parser.add_argument('-p', '--passes', nargs='*', default=None, help='list of optimization passes name, if no set, fuse_and_elimination_passes will be used')
 parser.add_argument('--fixed_point', action='store_true', default=False, help='fixed point')
-args = parser.parse_args()
+argv = sys.argv.copy()
+args = parser.parse_args(format_argv(sys.argv))
 
 all_available_passes = onnxoptimizer.get_available_passes()
 fuse_and_elimination_passes = onnxoptimizer.get_fuse_and_elimination_passes()
@@ -43,11 +55,16 @@ passes = []
 if args.passes is None:
     passes = fuse_and_elimination_passes
 
-input_file = args.input
-output_file = args.output
+if len(argv[1:]) < 2:
+    print('usage:{}'.format(usage))
+    print('please check arguments!')
+    sys.exit(1)
 
-if input_file is None or output_file is None:
-    print('usage:{}\n'.format(usage))
+input_file = argv[1]
+output_file = argv[2]
+
+if not pathlib.Path(input_file).exists():
+    print("input file: {0} no exist!".format(input_file))
     sys.exit(1)
 
 model = onnx.load(input_file)

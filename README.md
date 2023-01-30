@@ -43,28 +43,24 @@ Note that you need to install protobuf before building from source.
 Now you can use command-line api in terminal instead of  python script.
 
 ```
-python -m onnxoptimizer -i <input-modle-file> -o <output-model-file>
+python -m onnxoptimizer input_model.onnx output_model.onnx
 ```
 
 Arguments list is following:
 ```
-# python3 -m onnxoptimizer -h
-usage: python -m onnxoptimizer -i input_model.onnx -o output_model.onnx
+# python3 -m onnxoptimizer -h                                 
+usage: python -m onnxoptimizer input_model.onnx output_model.onnx 
 
-Onnxoptimizer command-line api
+onnxoptimizer command-line api
 
 optional arguments:
   -h, --help            show this help message and exit
-  --print_all_passes    Print all available passes
+  --print_all_passes    print all available passes
   --print_fuse_elimination_passes
-                        Print all fuse and elimination passes
-  -i INPUT, --input INPUT
-                        input onnx model that will be optimized
-  -o OUTPUT, --output OUTPUT
-                        output filepath that stores optimized onnx model
-  -p [PASSES [PASSES ...]], --passes [PASSES [PASSES ...]]
+                        print all fuse and elimination passes
+  -p [PASSES ...], --passes [PASSES ...]
                         list of optimization passes name, if no set, fuse_and_elimination_passes will be used
-  --fixed_point         fixed point, default: False
+  --fixed_point         fixed point
 ```
 ## Roadmap
 
