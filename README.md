@@ -38,9 +38,36 @@ pip3 install -e .
 
 Note that you need to install protobuf before building from source.
 
+
+## Command-line API
+Now you can use command-line api in terminal instead of  python script.
+
+```
+python -m onnxoptimizer -i <input-modle-file> -o <output-model-file>
+```
+
+Arguments list is following:
+```
+# python3 -m onnxoptimizer -h
+usage: python -m onnxoptimizer -i input_model.onnx -o output_model.onnx
+
+Onnxoptimizer command-line api
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --print_all_passes    Print all available passes
+  --print_fuse_elimination_passes
+                        Print all fuse and elimination passes
+  -i INPUT, --input INPUT
+                        input onnx model that will be optimized
+  -o OUTPUT, --output OUTPUT
+                        output filepath that stores optimized onnx model
+  -p [PASSES [PASSES ...]], --passes [PASSES [PASSES ...]]
+                        list of optimization passes name, if no set, fuse_and_elimination_passes will be used
+  --fixed_point         fixed point, default: False
+```
 ## Roadmap
 
-* Command-line API (e.g. `python3 -m onnxoptimizer model.onnx output.onnx`)
 * More built-in pass
 * Separate graph rewriting and constant folding (or a pure graph rewriting mode, see [issue #9](https://github.com/onnx/optimizer/issues/9) for the details)
 
