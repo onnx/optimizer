@@ -13,7 +13,7 @@ import onnxoptimizer.onnx_opt_cpp2py_export as C
 from .version import version as __version__  # noqa
 from onnx import ModelProto
 from typing import Text, Sequence, Optional
-
+from onnxoptimizer.onnxoptimizer_main import main
 import tempfile
 import os
 
@@ -71,4 +71,4 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
             os.remove(data_file_dest.name)
 
 
-__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes']
+__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes', 'main']
