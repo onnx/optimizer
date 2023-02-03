@@ -33,8 +33,10 @@ add_subdirectory_if_no_target(${ONNX_ROOT} ${ONNX_TARGET_NAME})
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
 string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)
 
-file(GLOB_RECURSE onnx_opt_srcs "onnxoptimizer/*.cc"
+file(GLOB onnx_opt_srcs "onnxoptimizer/*.cc"
     "onnxoptimizer/*.h"
+    "onnxoptimizer/passes/*.cc"
+    "onnxoptimizer/passes/*.h"
     )
 list(REMOVE_ITEM onnx_opt_srcs "${PROJECT_SOURCE_DIR}/onnxoptimizer/cpp2py_export.cc")
 
@@ -47,6 +49,18 @@ target_include_directories(onnx_optimizer PUBLIC
 
 onnxopt_add_executable(onnx_optimizer_exec examples/onnx_optimizer_exec.cpp)
 target_link_libraries(onnx_optimizer_exec onnx_optimizer)
+
+
+file(GLOB onnx_opt_c_api_srcs "onnxoptimizer/c_api/*.cc"
+  "onnxoptimizer/c_api/*.h"
+    )
+
+onnxopt_add_library(onnx_optimizer_c_api ${onnx_opt_c_api_srcs})
+target_link_libraries(onnx_optimizer_c_api PRIVATE onnx_optimizer)
+target_include_directories(onnx_optimizer_c_api PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+    )
 
 if(BUILD_ONNX_PYTHON)
   if("${PY_EXT_SUFFIX}" STREQUAL "")
@@ -161,6 +175,6 @@ install(FILES
   COMPONENT dev)
 install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
 install(TARGETS
-  onnx_optimizer
+  onnx_optimizer onnx_optimizer_c_api
   EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
