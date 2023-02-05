@@ -51,11 +51,13 @@ struct EliminateNopReshape final : public PredicateBasedPass {
     int unknown_dim_count = 0;
     for (int i = 0; i < shape_input_data.size(); ++i) {
       const auto d = shape_input_data[i];
-      if (d == 0) {
+      // the dim can be copied from the input only when allowzero == 0
+      if (d == 0 && !(node->hasAttribute(Symbol("allowzero")) &&
+                     node->i(Symbol("allowzero")) == 1)) {
         continue;
       }
       if (data_input_dims[i].is_int) {
-        if (data_input_dims[i].dim != d) {
+        if (data_input_dims[i].dim != d && d != -1) {
           return false;
         }
         continue;

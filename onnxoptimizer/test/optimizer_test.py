@@ -25,6 +25,7 @@ from onnx import (
     GraphProto,
     NodeProto,
     shape_inference,
+    parser,
 )
 from onnx import numpy_helper
 from onnx.numpy_helper import to_array
@@ -3447,14 +3448,13 @@ class TestOptimizer(unittest.TestCase):
 
     def test_eliminate_nop_dropout_opset11(self):  # type: () -> None
         for ratio in [0.0, 0.5]:
-            node = helper.make_node("Dropout", ["X"], ["Y"], ratio=ratio)
-            node1 = helper.make_node("Log", ["Y"], ["Z"])
-            graph = helper.make_graph(
-                [node, node1],
-                "test",
-                [helper.make_tensor_value_info("X", TensorProto.FLOAT, (5, 7))],
-                [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (5, 7))],
-            )
+            graph = parser.parse_graph(f"""
+               agraph (float[5, 7] X) => (float[5, 7] Z)
+               {{
+                  Y = Dropout<ratio={ratio}> (X)
+                  Z = Log(Y)
+               }}
+            """)
             optimized_model = self._optimized(
                 graph,
                 ["eliminate_nop_dropout"],
@@ -3733,7 +3733,7 @@ class TestOptimizer(unittest.TestCase):
         node_def5 = helper.make_node("Reshape", ["X", "X5"], ["Y"],)
 
         graph = helper.make_graph(
-            [node_def, node_def1, node_def2, node_def3, node_def4, node_def5],  # nodes
+            [node_def, node_def1, node_def2, node_def3, node_def4, node_def5],
             "test",  # name
             [X],  # inputs
             [Y],  # outputs
@@ -3831,6 +3831,33 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_reshape_with_neg_1(self):  # type: () -> None
+        graph = parser.parse_graph("""
+           agraph (float[5, 7] X) => (float[5, 7] Z)
+           {
+              Shape = Constant<value=int64[2]{5, -1}> ()
+              Y = Reshape (X, Shape)
+              Z = Identity(Y)
+           }
+        """)
+        optimized_model = self._optimized(graph, ["eliminate_nop_reshape", "eliminate_deadend"], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+
+    def test_eliminate_nop_reshape_with_allowzero(self):  # type: () -> None
+        graph = parser.parse_graph("""
+           agraph (float[N, 0] X) => (float[0, M] Z)
+           {
+              Shape = Constant<value=int64[2]{0, 5}> ()
+              Y = Reshape (X, Shape)
+              Z = Identity(Y)
+           }
+        """)
+        optimized_model = self._optimized(graph, ["eliminate_nop_reshape", "eliminate_deadend"], False, compare_result=False)
+
+        assert len(optimized_model.graph.node) == 3
 
     def test_eliminate_shape_slice(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5])
