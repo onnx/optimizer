@@ -79,33 +79,37 @@ struct FuseConsecutiveReduceUnsqueeze final : public PredicateBasedPass {
   }
   bool runTransform(Node *node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
-    Node *prev_node = node->inputs()[0]->node();
+    Node *reduction_op = node->inputs()[0]->node();
+    // This pass will modify reduction_op, so it must have only one user.
+    if (reduction_op->output()->uses().size() != 1) {
+      return false;
+    }
     std::vector<int64_t> axes;
     bool success = getAxes(node, graph, axes);
     if (!success) {
       return false;
     }
     std::vector<int64_t> prev_axes;
-    success = getAxes(prev_node, graph, prev_axes);
+    success = getAxes(reduction_op, graph, prev_axes);
     if (!success) {
       return false;
     }
     if (axes != prev_axes) {
       return false;
     }
-    Node *reduction_op = node->inputs()[0]->node();
-    // set keepdims flag to be true
-    reduction_op->i_(kkeepdims, 1);
-    // remove unnecessary unsqueeze
-    reduction_op->output()->setSizes(node->output()->sizes());
-    reduction_op->output()->setElemType(node->output()->elemType());
     const bool replacing_success =
         tryReplacingAllUsesWith(node->output(), node->inputs()[0]);
-    if (!replacing_success) {
+    if (replacing_success) {
+      // set keepdims flag to be true
+      reduction_op->i_(kkeepdims, 1);
+      // remove unnecessary unsqueeze
+      reduction_op->output()->setSizes(node->output()->sizes());
+      reduction_op->output()->setElemType(node->output()->elemType());
+      destroy_current = NodeDestroyType::DestroyOne;
+      return true;
+    } else {
       return false;
     }
-    destroy_current = NodeDestroyType::DestroyOne;
-    return true;
   }
 };
 
