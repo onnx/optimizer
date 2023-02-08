@@ -10,6 +10,9 @@
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/pass_util.h"
+#include "onnxoptimizer/passes/string_utils.h"
+#include "onnxoptimizer/passes/logging.h"
+
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -28,6 +31,7 @@ struct EliminateNopPad final : public PredicateBasedPass {
     if (!GetValueFromAttrOrInput(node, kpads, 1, pads) || pads.empty()) {
       return false;
     }
+    VLOG(1) << pads;
     for (const auto& p : pads) {
       if (p != 0) {
         return false;
