@@ -65,13 +65,13 @@ decltype(auto) Str(const Args&... args) {
   return StrWrapper<typename StrTypeTrait<Args>::type...>::Call(args...);
 }
 
-template <typename T>
+template <typename T, char delimiter = ','>
 std::ostream& operator<<(std::ostream& os, const std::vector<T>& datas) {
   os << "[";
   bool first = true;
   for (const auto& d : datas) {
     if (!first) {
-      os << ",";
+      os << delimiter;
     } else {
       first = false;
     }

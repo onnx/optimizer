@@ -31,7 +31,7 @@ struct EliminateNopPad final : public PredicateBasedPass {
     if (!GetValueFromAttrOrInput(node, kpads, 1, pads) || pads.empty()) {
       return false;
     }
-    VLOG(1) << pads;
+    VLOG(1) << Str("pads",pads);
     for (const auto& p : pads) {
       if (p != 0) {
         return false;
