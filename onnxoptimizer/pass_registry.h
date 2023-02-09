@@ -51,6 +51,7 @@
 #include "onnxoptimizer/passes/replace_einsum_with_matmul.h"
 #include "onnxoptimizer/passes/eliminate_nop_concat.h"
 #include "onnxoptimizer/passes/eliminate_nop_split.h"
+#include "onnxoptimizer/passes/adjust_add.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -62,6 +63,7 @@ struct GlobalPassRegistry {
 
   GlobalPassRegistry() {
     // Register the optimization passes to the optimizer.
+    registerPass<AdjustAdd>();
     registerPass<RenameInputOutput>();
     registerPass<SetUniqueNameForNodes>();
     registerPass<NopEmptyPass>();
