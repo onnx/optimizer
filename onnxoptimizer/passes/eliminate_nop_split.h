@@ -23,20 +23,19 @@ struct EliminateNopSplit final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    // TODO: support Split-18 where `split` is an input instead of an attribute
-    return CheckKind(node, "Split") && node->inputs().size() == 1 &&
-           node->input()->has_sizes() && node->hasAttribute(kaxis) &&
-           node->hasAttribute(ksplit) && node->outputs().size() == 1;
+    return CheckKind(node, "Split") && node->inputs()[0]->has_sizes() &&
+           node->outputs().size() == 1;
   }
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     auto* input = node->input();
     const auto& sizes = input->sizes();
-    int64_t axis =
-        AddYIfNegative(node->i(kaxis), static_cast<int64_t>(sizes.size()));
-    const auto split = node->is(ksplit);
-    if (!sizes[axis].is_int || sizes[axis].dim != split[0]) {
+    int64_t axis = GetValueFromAttrWithDefault(node, kaxis, int64_t{0});
+    axis = AddYIfNegative(axis, static_cast<int64_t>(sizes.size()));
+    std::vector<int64_t> split;
+    if (GetValueFromAttrOrInput(node, ksplit, 1, split) && !split.empty() &&
+        (!sizes[axis].is_int || sizes[axis].dim != split[0])) {
       return false;
     }
 

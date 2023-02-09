@@ -811,7 +811,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (4,)),
             ],
             [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (2, 4))],
             [
@@ -1591,7 +1590,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1622,8 +1620,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1662,8 +1658,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1723,7 +1717,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 30)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (6,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 32)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1))],
@@ -1779,7 +1772,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 4, 4)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1832,7 +1824,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1882,7 +1873,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 4, 4)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -1935,7 +1925,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
                 helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
@@ -2011,7 +2000,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2039,7 +2027,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2071,8 +2058,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2110,8 +2095,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2148,8 +2131,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2184,8 +2165,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
-                helper.make_tensor_value_info("Constant_value", TensorProto.FLOAT, ()),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2267,7 +2246,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (6,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
             [
@@ -2295,7 +2273,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (6,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
             [
@@ -2385,7 +2362,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2415,7 +2391,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2483,7 +2458,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
             [
@@ -2508,7 +2482,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 4, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 4, 1, 1))],
             [
@@ -2573,7 +2546,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2600,7 +2572,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2667,7 +2638,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2692,7 +2662,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
-                helper.make_tensor_value_info("Pads", TensorProto.INT64, (8,)),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
             [
@@ -2740,8 +2709,6 @@ class TestOptimizer(unittest.TestCase):
                 helper.make_tensor_value_info(
                     "X", TensorProto.FLOAT, (1, 1, 2, 3, 1, 1, 1, 1, 8, 9)
                 ),
-                helper.make_tensor_value_info("X_axes", TensorProto.INT64, [3]),
-                helper.make_tensor_value_info("Y_axes", TensorProto.INT64, [2]),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (2, 3, 1, 8, 9))],
             initializer=initializers,
@@ -2777,9 +2744,6 @@ class TestOptimizer(unittest.TestCase):
                 helper.make_tensor_value_info(
                     "X", TensorProto.FLOAT, (1, 1, 2, 3, 1, 1, 1, 1, 8, 9)
                 ),
-                helper.make_tensor_value_info("X_axes", TensorProto.INT64, [3]),
-                helper.make_tensor_value_info("Y_axes", TensorProto.INT64, [2]),
-                helper.make_tensor_value_info("Z_axes", TensorProto.INT64, [1]),
             ],
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3, 8, 9))],
             initializer=initializers,
@@ -2818,12 +2782,6 @@ class TestOptimizer(unittest.TestCase):
             "test",
             [
                 helper.make_tensor_value_info("X", TensorProto.FLOAT, x_shape),
-                helper.make_tensor_value_info(
-                    "X_axes", TensorProto.INT64, s1_axes.shape
-                ),
-                helper.make_tensor_value_info(
-                    "Y_axes", TensorProto.INT64, s2_axes.shape
-                ),
             ],
             [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (3, 4, 6, 9))],
             initializer=initializers,
@@ -2857,8 +2815,6 @@ class TestOptimizer(unittest.TestCase):
                     "X", TensorProto.FLOAT, (1, 1, 2, 3, 1, 1, 1, 1, 8, 9)
                 ),
                 helper.make_tensor_value_info("A", TensorProto.FLOAT, (1,)),
-                helper.make_tensor_value_info("X_axes", TensorProto.INT64, [3]),
-                helper.make_tensor_value_info("Y_axes", TensorProto.INT64, [2]),
             ],
             [
                 helper.make_tensor_value_info("Z", TensorProto.FLOAT, (2, 3, 1, 8, 9)),
@@ -4027,9 +3983,6 @@ class TestOptimizer(unittest.TestCase):
                             helper.make_tensor_value_info(
                                 "X", TensorProto.FLOAT, input_shape
                             ),
-                            helper.make_tensor_value_info(
-                                "Y_axes", TensorProto.INT64, axes2_arr.shape
-                            ),
                         ]
                         graph_initializer = [
                             helper.make_tensor(
@@ -4044,11 +3997,6 @@ class TestOptimizer(unittest.TestCase):
                             axes1_arr = np.array(axes1, dtype=np.int64)
                             node = helper.make_node(
                                 reduction, ["X", "X_axes"], ["Y"], keepdims=keepdim
-                            )
-                            graph_input.append(
-                                helper.make_tensor_value_info(
-                                    "X_axes", TensorProto.INT64, axes1_arr.shape
-                                )
                             )
                             graph_initializer.append(
                                 helper.make_tensor(

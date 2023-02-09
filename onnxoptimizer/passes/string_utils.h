@@ -14,6 +14,31 @@
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
+template <typename T, char delimiter = ','>
+std::ostream& operator<<(std::ostream& os, const std::vector<T>& datas) {
+  os << "[";
+  bool first = true;
+  for (const auto& d : datas) {
+    if (!first) {
+      os << delimiter;
+    } else {
+      first = false;
+    }
+    os << d;
+  }
+  os << "]";
+  return os;
+}
+
+inline std::string StripFilename(const std::string& filepath) {
+  size_t pos = filepath.find_last_of('/');
+  return (pos == std::string::npos) ? filepath : filepath.substr(pos + 1);
+}
+
+inline std::string StripFilename(const char* filepath) {
+  return StripFilename(std::string(filepath));
+}
+
 namespace {
 template <typename T>
 struct StrTypeTrait {
@@ -63,31 +88,6 @@ struct StrWrapper<const char*> {
 template <typename... Args>
 decltype(auto) Str(const Args&... args) {
   return StrWrapper<typename StrTypeTrait<Args>::type...>::Call(args...);
-}
-
-template <typename T, char delimiter = ','>
-std::ostream& operator<<(std::ostream& os, const std::vector<T>& datas) {
-  os << "[";
-  bool first = true;
-  for (const auto& d : datas) {
-    if (!first) {
-      os << delimiter;
-    } else {
-      first = false;
-    }
-    os << d;
-  }
-  os << "]";
-  return os;
-}
-
-inline std::string StripFilename(const std::string& filepath) {
-  size_t pos = filepath.find_last_of('/');
-  return (pos == std::string::npos) ? filepath : filepath.substr(pos + 1);
-}
-
-inline std::string StripFilename(const char* filepath){
-  return StripFilename(std::string(filepath));
 }
 
 }  // namespace optimization

@@ -7,6 +7,10 @@
 
 #pragma once
 
+#include <algorithm>
+#include <type_traits>
+
+#include "onnx/onnx_pb.h"
 #include "onnxoptimizer/pass.h"
 
 namespace ONNX_NAMESPACE {
@@ -37,7 +41,74 @@ struct ToSymbol<const char*> {
   }
 };
 
+template <typename>
+struct SupportedTypeOfAttr : public std::false_type {};
+
+#define Create_SupportedTypeOfAttr(type, kind_)              \
+  template <>                                                \
+  struct SupportedTypeOfAttr<type> : public std::true_type { \
+    static constexpr AttributeKind kind = kind_;             \
+  };
+
+Create_SupportedTypeOfAttr(double, AttributeKind::f);
+Create_SupportedTypeOfAttr(float, AttributeKind::f);
+Create_SupportedTypeOfAttr(std::string, AttributeKind::s);
+Create_SupportedTypeOfAttr(int32_t, AttributeKind::i);
+Create_SupportedTypeOfAttr(int64_t, AttributeKind::i);
+Create_SupportedTypeOfAttr(std::vector<double>, AttributeKind::fs);
+Create_SupportedTypeOfAttr(std::vector<float>, AttributeKind::fs);
+Create_SupportedTypeOfAttr(std::vector<std::string>, AttributeKind::ss);
+Create_SupportedTypeOfAttr(std::vector<int32_t>, AttributeKind::is);
+Create_SupportedTypeOfAttr(std::vector<int64_t>, AttributeKind::is);
+#undef Create_SupportedTypeOfAttr
+
+template <typename>
+struct SupportedTypeOfTensor : public std::false_type {};
+
+#define Create_SupportedTypeOfTensor(cpp_type_, store_type_, elem_type_) \
+  template <>                                                            \
+  struct SupportedTypeOfTensor<cpp_type_> : public std::true_type {      \
+    using cpp_type = cpp_type_;                                          \
+    using store_type = store_type_;                                      \
+    static constexpr int elem_type = elem_type_;                         \
+  }
+
+Create_SupportedTypeOfTensor(std::vector<int32_t>, std::vector<int32_t>,
+                             TensorProto_DataType_INT32);
+Create_SupportedTypeOfTensor(std::vector<int64_t>, std::vector<int64_t>,
+                             TensorProto_DataType_INT64);
+Create_SupportedTypeOfTensor(std::vector<uint64_t>, std::vector<uint64_t>,
+                             TensorProto_DataType_UINT64);
+Create_SupportedTypeOfTensor(std::vector<float>, std::vector<float>,
+                             TensorProto_DataType_FLOAT);
+Create_SupportedTypeOfTensor(std::vector<double>, std::vector<double>,
+                             TensorProto_DataType_DOUBLE);
+Create_SupportedTypeOfTensor(std::vector<uint32_t>, std::vector<uint64_t>,
+                             TensorProto_DataType_UINT32);
+Create_SupportedTypeOfTensor(std::vector<int8_t>, std::vector<int32_t>,
+                             TensorProto_DataType_INT8);
+Create_SupportedTypeOfTensor(std::vector<uint8_t>, std::vector<int32_t>,
+                             TensorProto_DataType_UINT8);
+Create_SupportedTypeOfTensor(std::vector<int16_t>, std::vector<int32_t>,
+                             TensorProto_DataType_INT16);
+Create_SupportedTypeOfTensor(std::vector<uint16_t>, std::vector<int32_t>,
+                             TensorProto_DataType_UINT16);
+#undef Create_SupportedTypeOfTensor
 }  // namespace
+
+template <typename NodeOrValue, typename Sym,
+          typename = std::enable_if_t<std::is_same_v<NodeOrValue, Value> ||
+                                      std::is_same_v<NodeOrValue, Node>>>
+bool CheckKind(const NodeOrValue* nv, const Sym& symbol) {
+  Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
+  if constexpr (std::is_same_v<NodeOrValue, Value>) {
+    return nv->node()->kind() == s;
+  }
+  if constexpr (std::is_same_v<NodeOrValue, Node>) {
+    return nv->kind() == s;
+  }
+  return false;
+}
 
 template <typename T>
 T AddYIfNegative(T x, T y) {
@@ -66,14 +137,150 @@ inline const Tensor* FetchConstantTensor(const Value* v) {
   }
 }
 
-// fetch the only element when the tensor is a scalar or a tensor that only has
-// a element
-template <typename T>
-bool FetchSoleValueOfTensor(const Value* t, T& val);
+template <typename T, typename Sym,
+          typename = std::enable_if_t<SupportedTypeOfAttr<T>::value>>
+bool GetValueFromAttr(const Node* n, const Sym& attr_name, T& value) {
+  Symbol attr =
+      ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(attr_name);
+  if (!n->hasAttribute(attr)) {
+    return false;
+  }
+#define DEFINE_IF_CONSTEXPR_WITH_NO_CAST(cpp_type, method) \
+  if constexpr (std::is_same_v<T, cpp_type>) {             \
+    if (n->kindOf(attr) != SupportedTypeOfAttr<T>::kind) { \
+      return false;                                        \
+    }                                                      \
+    value = static_cast<T>(n->method(attr));               \
+    return true;                                           \
+  }
 
-// FetchSoleIntValueOfTensor is a wraper that fetchs int value(INT32 or INT64)
-// easier. E.g: get axis from axes tensor
-bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val);
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(float, f)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(double, f)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(std::string, s)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(int32_t, i)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(int64_t, i)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(std::vector<std::string>, ss)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(std::vector<double>, fs)
+  DEFINE_IF_CONSTEXPR_WITH_NO_CAST(std::vector<int64_t>, is)
+#undef DEFINE_IF_CONSTEXPR_WITH_NO_CAST
+
+#define DEFINE_IF_CONSTEXPR_WITH_CAST(cpp_type, method)                  \
+  if constexpr (std::is_same_v<T, cpp_type>) {                           \
+    if (n->kindOf(attr) != SupportedTypeOfAttr<T>::kind) {               \
+      return false;                                                      \
+    }                                                                    \
+    const auto& v = n->method(attr);                                     \
+    std::transform(v.cbegin(), v.cend(), std::back_inserter(value),      \
+                   [](const auto& d) { return static_cast<float>(d); }); \
+    return true;                                                         \
+  }
+
+  DEFINE_IF_CONSTEXPR_WITH_CAST(std::vector<float>, fs)
+  DEFINE_IF_CONSTEXPR_WITH_CAST(std::vector<int32_t>, is)
+#undef DEFINE_IF_CONSTEXPR_WITH_CAST
+
+  return false;
+}
+
+template <typename T, typename Sym>
+T GetValueFromAttrWithDefault(const Node* n, const Sym& attr_name,
+                              const T& default_value) {
+  T temp_;
+  if (GetValueFromAttr(n, attr_name, temp_)) {
+    return temp_;
+  } else {
+    return default_value;
+  }
+}
+
+template <typename Vec,
+          typename = std::enable_if_t<
+              std::is_same_v<Vec, std::vector<typename Vec::value_type>> &&
+              SupportedTypeOfTensor<Vec>::value>>
+bool GetValueFromInput(const Value* v, Vec& value) {
+  using value_type = typename Vec::value_type;
+  using store_value = typename SupportedTypeOfTensor<Vec>::store_type;
+  const Tensor* tensor = FetchConstantTensor(v);
+  if (!tensor || tensor->elem_type() != SupportedTypeOfTensor<Vec>::elem_type) {
+    return false;
+  }
+  auto temp_value = ParseData<value_type>(tensor);
+  if constexpr (std::is_same_v<Vec, store_value>) {
+    value = std::move(temp_value);
+    return true;
+  }
+  std::transform(temp_value.cbegin(), temp_value.cend(),
+                 std::back_inserter(value), [](const auto& t) {
+                   return static_cast<typename store_value::value_type>(t);
+                 });
+  return true;
+}
+template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+bool GetValueFromInput(const Value* v, T& value, size_t which_value = 0) {
+  using store_value =
+      typename SupportedTypeOfTensor<std::vector<T>>::store_type;
+  std::vector<typename store_value::value_type> temp_;
+  if (GetValueFromInput(v, temp_) && which_value < temp_.size()) {
+    value = static_cast<T>(temp_[which_value]);
+    return true;
+  }
+  return false;
+}
+
+template <typename Vec, typename = std::enable_if_t<std::is_same_v<
+                            Vec, std::vector<typename Vec::value_type>>>>
+bool GetValueFromInput(const Node* n, size_t which, Vec& value) {
+  if (which >= n->inputs().size()) {
+    return false;
+  }
+  return GetValueFromInput(n->inputs()[which], value);
+}
+
+template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+bool GetValueFromInput(const Node* n, size_t which_input, T& value,
+                       size_t which_value = 0) {
+  if (which_input >= n->inputs().size()) {
+    return false;
+  }
+  return GetValueFromInput(n->inputs()[which_input], value, which_value);
+}
+
+template <typename Vec, typename Sym,
+          typename = std::enable_if_t<
+              std::is_same_v<Vec, std::vector<typename Vec::value_type>>>>
+bool GetValueFromAttrOrInput(const Node* n, const Sym& attr_name,
+                             size_t which_input, Vec& value) {
+  return GetValueFromAttr(n, attr_name, value) ||
+         GetValueFromInput(n, which_input, value);
+}
+
+template <typename T, typename Sym,
+          typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+bool GetValueFromAttrOrInput(const Node* n, const Sym& attr_name,
+                             size_t which_input, T& value,
+                             size_t which_value = 0) {
+  return GetValueFromAttr(n, attr_name, value) ||
+         GetValueFromInput(n, which_input, value, which_value);
+}
+
+template <typename T, typename Sym>
+bool FetchSoleValueOfAttr(const Node* node, const Sym& symbol, T& val) {
+  Symbol attr_name =
+      ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
+  static std::unordered_set<AttributeKind> container_type{
+      AttributeKind::is, AttributeKind::fs, AttributeKind::ss};
+
+  if (container_type.count(node->kindOf(attr_name)) == 1) {
+    std::vector<T> temp_;
+    if (GetValueFromAttr(node, attr_name, temp_) && temp_.size() == 1) {
+      val = temp_[0];
+      return true;
+    }
+  } else {
+    return GetValueFromAttr(node, attr_name, val);
+  }
+  return false;
+}
 
 template <typename Sym>
 bool FetchSoleIntValueOfAttr(const Node* node, const Sym& symbol,
@@ -95,88 +302,27 @@ bool FetchSoleIntValueOfAttr(const Node* node, const Sym& symbol,
   }
 }
 
-template <typename Sym>
-bool CheckKind(const Value* v, const Sym& symbol) {
-  Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
-  return v->node()->kind() == s;
-}
+// fetch the only element when the tensor is a scalar or a tensor that only has
+// a element
+template <typename T>
+bool FetchSoleValueOfTensor(const Value* t, T& val);
 
-template <typename Sym>
-bool CheckKind(const Node* n, const Sym& symbol) {
-  Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
-  return n->kind() == s;
-}
+// FetchSoleIntValueOfTensor is a wraper that fetchs int value(INT32 or INT64)
+// easier. E.g: get axis from axes tensor
+bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val);
 
 inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
     const Node* shape) {
   ONNX_ASSERT(CheckKind(shape, "Shape") && shape->input()->has_sizes());
 
-  const int64_t start = AddYIfNegative<int64_t>(
-      shape->hasAttribute("start"_sym) ? shape->i("start"_sym) : 0,
-      shape->input()->sizes().size());
+  const int64_t start =
+      AddYIfNegative<int64_t>(GetValueFromAttrWithDefault(shape, "start", 0),
+                              shape->input()->sizes().size());
   const int64_t end = AddYIfNegative<int64_t>(
-      shape->hasAttribute("end"_sym) ? shape->i("end"_sym)
-                                     : shape->input()->sizes().size(),
+      GetValueFromAttrWithDefault(
+          shape, "end", static_cast<int64_t>(shape->input()->sizes().size())),
       shape->input()->sizes().size());
   return {start, end};
-}
-
-#define Create_GetValueFromAttr(type_, method)                                 \
-  template <typename Sym>                                                      \
-  bool GetValueFromAttr(const Node* n, const Sym& attr_name, type_& value) {   \
-    Symbol attr =                                                              \
-        ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(attr_name); \
-    if (!n->hasAttribute(attr)) {                                              \
-      return false;                                                            \
-    }                                                                          \
-    value = n->method(attr);                                                   \
-    return true;                                                               \
-  }                                                                            \
-  template <typename Sym>                                                      \
-  type_ GetValueFromAttrWithDefault(const Node* n, const Sym& attr_name,       \
-                                    const type_& default_value) {              \
-    Symbol attr =                                                              \
-        ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(attr_name); \
-    return n->hasAttribute(attr) ? n->method(attr) : default_value;            \
-  }
-
-Create_GetValueFromAttr(double, f);
-Create_GetValueFromAttr(float, f);
-Create_GetValueFromAttr(std::vector<double>, fs);
-Create_GetValueFromAttr(std::string, s);
-Create_GetValueFromAttr(std::vector<std::string>, ss);
-Create_GetValueFromAttr(int32_t, i);
-Create_GetValueFromAttr(int64_t, i);
-Create_GetValueFromAttr(std::vector<int64_t>, is);
-Create_GetValueFromAttr(Tensor, t);
-Create_GetValueFromAttr(std::vector<Tensor>, ts);
-#undef Create_GetValueFromAttr
-
-#define Create_GetValueFromInput(type_)                                      \
-  inline bool GetValueFromInput(const Node* n, size_t which, type_& value) { \
-    if (which >= n->inputs().size()) {                                       \
-      return false;                                                          \
-    }                                                                        \
-    const Tensor* tensor = FetchConstantTensor(n->inputs()[which]);          \
-    if (!tensor) {                                                           \
-      return false;                                                          \
-    }                                                                        \
-    value = ParseData<typename type_::value_type>(tensor);                   \
-    return true;                                                             \
-  }
-
-Create_GetValueFromInput(std::vector<float>);
-Create_GetValueFromInput(std::vector<double>);
-Create_GetValueFromInput(std::vector<int32_t>);
-Create_GetValueFromInput(std::vector<int64_t>);
-Create_GetValueFromInput(std::vector<uint64_t>);
-#undef Create_GetValueFromInput
-
-template <typename T, typename Sym>
-bool GetValueFromAttrOrInput(const Node* n, const Sym& attr_name,
-                             size_t which_input, T& value) {
-  return GetValueFromAttr(n, attr_name, value) ||
-         GetValueFromInput(n, which_input, value);
 }
 
 }  // namespace optimization
