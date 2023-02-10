@@ -127,7 +127,6 @@ inline bool IsConstantTensor(const Value* v) {
   return v->node()->kind() == kConstant || graph->is_constant_initializer(v);
 }
 
-
 template <typename W, typename... Args>
 bool IsConstantTensor(const Node* n, const W& which_input,
                       const Args&... args) {
@@ -344,7 +343,7 @@ inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
 }
 
 template <typename Sym>
-Node* ParrentNode(Node* node, const Sym& symbol) {
+Node* ParentNode(Node* node, const Sym& symbol) {
   Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
 
   for (auto* input : node->inputs()) {
