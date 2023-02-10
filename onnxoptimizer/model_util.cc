@@ -24,7 +24,7 @@ namespace optimization {
 namespace {
 struct ExternalDataInfo {
   std::string location;
-  int64_t offset = {-1};
+  std::ofstream::off_type offset = {-1};
   int64_t length = {-1};
 
   ExternalDataInfo(const std::string& location) : location(location) {}
