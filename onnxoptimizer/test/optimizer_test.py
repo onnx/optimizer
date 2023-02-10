@@ -4212,28 +4212,79 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[3].op_type == 'MatMul'
         assert optimized_model.graph.node[4].op_type == 'Slice'
 
-    def test_fuse_consecutive_slices(self):  # type: () -> None
-        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1, 3, 640, 640])
-        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [1, 3, 320, 320])
+    def test_fuse_consecutive_slices_1(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t0, t640, t2, t2)
+                  Z = Slice(Y, t0, t640, t3, t2)
+               }
+            """)
 
-        zero = helper.make_tensor('0', TensorProto.INT64, [1], [0])
-        one = helper.make_tensor('1', TensorProto.INT64, [1], [1])
-        two = helper.make_tensor('2', TensorProto.INT64, [1], [2])
-        three = helper.make_tensor('3', TensorProto.INT64, [1], [3])
-        max = helper.make_tensor('max', TensorProto.INT64, [1], [640])
-
-        node_def = helper.make_node('Slice', ['X', '0', 'max', '2', '2'], ['X1'])
-        node_def1 = helper.make_node('Slice', ['X1', '0', 'max', '3', '2'], ['Y'])
-
-        graph = helper.make_graph(
-            [node_def, node_def1],        # nodes
-            'test',      # name
-            [X],  # inputs
-            [Y],  # outputs
-            [zero, one, two, three, max]
-        )
         optimized_model = self._optimized(
-            graph, ['fuse_consecutive_slices', 'eliminate_deadend'], False)
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+
+    def test_fuse_consecutive_slices_2(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t1, t640, t2, t2)
+                  Z = Slice(Y, t0, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+
+    def test_fuse_consecutive_slices_3(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t0, t640, t2, t2)
+                  Z = Slice(Y, t1, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+
+    def test_fuse_consecutive_slices_4(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t1, t640, t2, t2)
+                  Z = Slice(Y, t1, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 5
 
