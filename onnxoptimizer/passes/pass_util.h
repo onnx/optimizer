@@ -312,17 +312,43 @@ bool FetchSoleValueOfTensor(const Value* t, T& val);
 bool FetchSoleIntValueOfTensor(const Value* t, int64_t& val);
 
 inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
+    const Node* shape, const int64_t rank) {
+  ONNX_ASSERT(CheckKind(shape, "Shape"));
+
+  const int64_t start = AddYIfNegative<int64_t>(
+      GetValueFromAttrWithDefault(shape, "start", 0), rank);
+  const int64_t end = AddYIfNegative<int64_t>(
+      GetValueFromAttrWithDefault(shape, "end", rank), rank);
+  return {start, end};
+}
+
+inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
     const Node* shape) {
   ONNX_ASSERT(CheckKind(shape, "Shape") && shape->input()->has_sizes());
+  return FetchStartAndEndAttrOfShape(
+      shape, static_cast<int64_t>(shape->input()->sizes().size()));
+}
 
-  const int64_t start =
-      AddYIfNegative<int64_t>(GetValueFromAttrWithDefault(shape, "start", 0),
-                              shape->input()->sizes().size());
-  const int64_t end = AddYIfNegative<int64_t>(
-      GetValueFromAttrWithDefault(
-          shape, "end", static_cast<int64_t>(shape->input()->sizes().size())),
-      shape->input()->sizes().size());
-  return {start, end};
+template <typename Sym>
+Node* ParrentNode(Node* node, const Sym& symbol) {
+  Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
+
+  for (auto* input : node->inputs()) {
+    if (CheckKind(input, s)) {
+      return input->node();
+    }
+  }
+  return nullptr;
+}
+
+template <typename T>
+bool IsIntersection(const std::vector<T>& v1, const std::vector<T>& v2) {
+  std::vector<T> intersect;
+  std::set<T> s1(v1.begin(), v1.end());
+  std::set<T> s2(v2.begin(), v2.end());
+  std::set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+                        std::back_inserter(intersect));
+  return !intersect.empty();
 }
 
 }  // namespace optimization
