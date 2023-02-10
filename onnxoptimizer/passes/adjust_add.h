@@ -33,7 +33,7 @@ After:
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
-
+#include "onnxoptimizer/passes/pass_util.h"
 namespace ONNX_NAMESPACE {
 namespace optimization {
 

@@ -4181,6 +4181,62 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[2].input[0] == "Y1"
         assert optimized_model.graph.node[2].input[1] == "Y2"
 
+    def test_adjust_slice_and_matmul(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 1, 6, 5])
+
+        indices = helper.make_tensor('indices', TensorProto.INT64, [], [0])
+        axes = helper.make_tensor('axes', TensorProto.INT64, [1], [0])
+        t1 = helper.make_tensor('t1', TensorProto.FLOAT, [3, 4, 5, 6], np.random.rand(3, 4, 5, 6).astype(np.float32))
+        t2 = helper.make_tensor('t2', TensorProto.FLOAT, [6, 6], np.random.rand(6, 6).astype(np.float32))
+
+        start = helper.make_tensor('start', TensorProto.INT64, [1], [0])
+        slice_axes = helper.make_tensor('slice_axes', TensorProto.INT64, [1], [1])
+        node_def = helper.make_node('Shape', ['X'], ['X1'])
+        node_def1 = helper.make_node('Gather', ['X1', 'indices'], ['X2'], axis=0)
+        node_def2 = helper.make_node('Unsqueeze', ['X2', 'axes'], ['X3'])
+        node_def3 = helper.make_node('Slice', ['t1', 'start', 'X3', 'slice_axes'], ['X4'])
+        node_def4 = helper.make_node('MatMul', ['X4', 't2'], ['Y'])
+
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3, node_def4, ],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [indices, axes, t1, t2, start, slice_axes]
+        )
+        optimized_model = self._optimized(
+            graph, ['adjust_slice_and_matmul', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[3].op_type == 'MatMul'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1, 3, 640, 640])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [1, 3, 320, 320])
+
+        zero = helper.make_tensor('0', TensorProto.INT64, [1], [0])
+        one = helper.make_tensor('1', TensorProto.INT64, [1], [1])
+        two = helper.make_tensor('2', TensorProto.INT64, [1], [2])
+        three = helper.make_tensor('3', TensorProto.INT64, [1], [3])
+        max = helper.make_tensor('max', TensorProto.INT64, [1], [640])
+
+        node_def = helper.make_node('Slice', ['X', '0', 'max', '2', '2'], ['X1'])
+        node_def1 = helper.make_node('Slice', ['X1', '0', 'max', '3', '2'], ['Y'])
+
+        graph = helper.make_graph(
+            [node_def, node_def1],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [zero, one, two, three, max]
+        )
+        optimized_model = self._optimized(
+            graph, ['fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+
 
 if __name__ == "__main__":
     unittest.main()
