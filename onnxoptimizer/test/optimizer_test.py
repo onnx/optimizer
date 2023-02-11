@@ -4230,6 +4230,11 @@ class TestOptimizer(unittest.TestCase):
             graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
 
     def test_fuse_consecutive_slices_2(self):  # type: () -> None
         graph = parser.parse_graph("""
@@ -4249,6 +4254,11 @@ class TestOptimizer(unittest.TestCase):
             graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
 
     def test_fuse_consecutive_slices_3(self):  # type: () -> None
         graph = parser.parse_graph("""
@@ -4268,6 +4278,11 @@ class TestOptimizer(unittest.TestCase):
             graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
 
     def test_fuse_consecutive_slices_4(self):  # type: () -> None
         graph = parser.parse_graph("""
@@ -4287,6 +4302,11 @@ class TestOptimizer(unittest.TestCase):
             graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
 
         assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ struct FuseConsecutiveSlices final : public PredicateBasedPass {
   bool runTransform(Node *n, Graph &graph,
                     NodeDestroyType &destroy_current) override {
     /*
-          Y
+          X
           |
         Slice2
           |
@@ -71,8 +71,6 @@ struct FuseConsecutiveSlices final : public PredicateBasedPass {
     }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
-
-    return false;
   }
 };
 
