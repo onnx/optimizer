@@ -110,6 +110,13 @@ bool CheckKind(const NodeOrValue* nv, const Sym& symbol) {
   return false;
 }
 
+template <typename Sym1, typename Which, typename Sym2, typename... Args>
+bool CheckKind(const Node* n, const Sym1& s1, const Which& which,
+               const Sym2& s2, const Args&... args) {
+  return CheckKind(n, s1) && which < n->inputs().size() &&
+         CheckKind(n->input(which)->node(), s2, args...);
+}
+
 template <typename T>
 T AddYIfNegative(T x, T y) {
   return x < 0 ? x + y : x;
@@ -120,9 +127,15 @@ inline bool IsConstantTensor(const Value* v) {
   return v->node()->kind() == kConstant || graph->is_constant_initializer(v);
 }
 
-inline bool IsConstantTensor(const Node* n, size_t which_input) {
+template <typename W, typename... Args>
+bool IsConstantTensor(const Node* n, const W& which_input,
+                      const Args&... args) {
   ONNX_ASSERT(which_input < n->inputs().size());
-  return IsConstantTensor(n->inputs()[which_input]);
+  if constexpr (sizeof...(args) == 0) {
+    return IsConstantTensor(n->input(which_input));
+  } else {
+    return IsConstantTensor(n->input(which_input)->node(), args...);
+  }
 }
 
 inline const Tensor* FetchConstantTensor(const Value* v) {
@@ -330,7 +343,7 @@ inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
 }
 
 template <typename Sym>
-Node* ParrentNode(Node* node, const Sym& symbol) {
+Node* ParentNode(Node* node, const Sym& symbol) {
   Symbol s = ToSymbol<typename CanonicalizeSymbolType<Sym>::type>::Call(symbol);
 
   for (auto* input : node->inputs()) {

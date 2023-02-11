@@ -4181,6 +4181,133 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[2].input[0] == "Y1"
         assert optimized_model.graph.node[2].input[1] == "Y2"
 
+    def test_adjust_slice_and_matmul(self):  # type: () -> None
+        X = helper.make_tensor_value_info('X', TensorProto.FLOAT, [1])
+        Y = helper.make_tensor_value_info('Y', TensorProto.FLOAT, [3, 1, 6, 5])
+
+        indices = helper.make_tensor('indices', TensorProto.INT64, [], [0])
+        axes = helper.make_tensor('axes', TensorProto.INT64, [1], [0])
+        t1 = helper.make_tensor('t1', TensorProto.FLOAT, [3, 4, 5, 6], np.random.rand(3, 4, 5, 6).astype(np.float32))
+        t2 = helper.make_tensor('t2', TensorProto.FLOAT, [6, 6], np.random.rand(6, 6).astype(np.float32))
+
+        start = helper.make_tensor('start', TensorProto.INT64, [1], [0])
+        slice_axes = helper.make_tensor('slice_axes', TensorProto.INT64, [1], [1])
+        node_def = helper.make_node('Shape', ['X'], ['X1'])
+        node_def1 = helper.make_node('Gather', ['X1', 'indices'], ['X2'], axis=0)
+        node_def2 = helper.make_node('Unsqueeze', ['X2', 'axes'], ['X3'])
+        node_def3 = helper.make_node('Slice', ['t1', 'start', 'X3', 'slice_axes'], ['X4'])
+        node_def4 = helper.make_node('MatMul', ['X4', 't2'], ['Y'])
+
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3, node_def4, ],        # nodes
+            'test',      # name
+            [X],  # inputs
+            [Y],  # outputs
+            [indices, axes, t1, t2, start, slice_axes]
+        )
+        optimized_model = self._optimized(
+            graph, ['adjust_slice_and_matmul', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[3].op_type == 'MatMul'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices_1(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t0, t640, t2, t2)
+                  Z = Slice(Y, t0, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices_2(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t1, t640, t2, t2)
+                  Z = Slice(Y, t0, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices_3(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t0, t640, t2, t2)
+                  Z = Slice(Y, t1, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices_4(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t1, t640, t2, t2)
+                  Z = Slice(Y, t1, t640, t3, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 5
+        assert optimized_model.graph.node[0].op_type == 'Concat'
+        assert optimized_model.graph.node[1].op_type == 'Concat'
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert optimized_model.graph.node[3].op_type == 'Concat'
+        assert optimized_model.graph.node[4].op_type == 'Slice'
+
 
 if __name__ == "__main__":
     unittest.main()
