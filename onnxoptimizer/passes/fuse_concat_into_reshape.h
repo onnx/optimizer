@@ -9,6 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -32,16 +33,15 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
   }
 
   inline bool matchConcatReshape(Node *node) {
-    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kConcat) &&
+    return CheckKind(node, kReshape, 1, kConcat) &&
            node->input(1)->node()->i(kaxis) == 0;
   }
 
   inline bool matchConcatCastReshape(Node *node) {
-    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kCast) &&
+    return CheckKind(node, kReshape, 1, kCast, 0, kConcat) &&
            node->inputs()[1]->node()->i(kto) ==
                ONNX_NAMESPACE::TensorProto_DataType_INT64 &&
-           CheckKind(node->inputs()[1]->node()->input(), kConcat) &&
-           node->inputs()[1]->node()->input()->node()->i(kaxis) == 0;
+           PrevNode(node, 1, 0)->i(kaxis) == 0;
   }
 
   bool patternMatchPredicate(Node *node) override {
@@ -54,9 +54,9 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
 
     Node *concat = nullptr;
     if (has_cast) {
-      concat = node->inputs()[1]->node()->input()->node();
+      concat = PrevNode(node, 1, 0);
     } else {
-      concat = node->inputs()[1]->node();
+      concat = PrevNode(node, 1);
     }
 
     std::vector<int64_t> shapes;

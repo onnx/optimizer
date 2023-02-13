@@ -12,6 +12,8 @@
 
 #include "onnx/onnx_pb.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/logging.h"
+#include "onnxoptimizer/passes/string_utils.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -354,6 +356,16 @@ Node* ParentNode(Node* node, const Sym& symbol) {
   return nullptr;
 }
 
+inline Node* PrevNode(Node* n) {
+  return n;
+}
+
+template <typename T, typename... Args>
+Node* PrevNode(Node* n, T which, Args... args) {
+  ONNX_ASSERT(which < n->inputs().size());
+  return PrevNode(n->input(which)->node(), args...);
+}
+
 template <typename T>
 bool IsIntersection(const std::vector<T>& v1, const std::vector<T>& v2) {
   std::vector<T> intersect;
@@ -362,6 +374,38 @@ bool IsIntersection(const std::vector<T>& v1, const std::vector<T>& v2) {
   std::set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
                         std::back_inserter(intersect));
   return !intersect.empty();
+}
+
+inline ArrayRef<Value*> GetInputsOfNode(Node* n) {
+  return n->inputs();
+}
+
+template <typename T, typename... Args>
+ArrayRef<Value*> GetInputsOfNode(Node* n, T which, Args... args) {
+  ONNX_ASSERT(which < n->inputs().size());
+  return GetInputsOfNode(n->input(which)->node(), args...);
+}
+
+
+inline bool HasDimsOfInputOfNode(Node* n,  size_t which) {
+  const auto vs = n->inputs();
+  ONNX_ASSERT(which < vs.size());
+  return vs[which]->has_sizes();
+}
+
+inline std::vector<int64_t> GetIntsFromValue(const Value* v) {
+  std::vector<int64_t> is64;
+  std::vector<int32_t> is32;
+  if (GetValueFromInput(v, is64)) {
+    return is64;
+  }
+  if (GetValueFromInput(v, is32)) {
+    std::transform(is32.cbegin(), is32.cend(), std::back_inserter(is64),
+                   [](const auto& d) { return static_cast<int64_t>(d); });
+    return is64;
+  }
+  LOG(FATAL) << "We expect that the int32s or int64s exists in Value ("
+             << Str(v->uniqueName(), "), but failed!");
 }
 
 }  // namespace optimization

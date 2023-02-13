@@ -26,11 +26,10 @@ struct FuseConsecutiveSlices final : public PredicateBasedPass {
 
   bool patternMatchPredicate(Node *node) override {
     std::vector<int64_t> slice1_axes, slice2_axes;
-    return CheckKind(node, kSlice, 0, kSlice)  &&
-           node->inputs().size() == 5 &&
-           node->input(0)->node()->inputs().size() == 5 &&
+    return CheckKind(node, kSlice, 0, kSlice) && node->inputs().size() == 5 &&
+           GetInputsOfNode(node, 0).size() == 5 &&
            GetValueFromInput(node, 3, slice1_axes) &&
-           GetValueFromInput(node->input(0)->node(), 3, slice2_axes) &&
+           GetValueFromInput(PrevNode(node, 0), 3, slice2_axes) &&
            !IsIntersection(slice1_axes, slice2_axes);
   }
   bool runTransform(Node *n, Graph &graph,
@@ -45,7 +44,7 @@ struct FuseConsecutiveSlices final : public PredicateBasedPass {
           Y
     */
     Node *slice1 = n;
-    Node *slice2 = n->input(0)->node();
+    Node *slice2 = PrevNode(n, 0);
 
     std::vector<Node *> new_nodes;
     for (int i = 1; i < 5; ++i) {
