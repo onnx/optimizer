@@ -54,6 +54,7 @@
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/split.h"
 #include "onnxoptimizer/passes/fuse_consecutive_slices.h"
+#include "onnxoptimizer/passes/eliminate_common_subexpression.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -99,6 +100,7 @@ struct GlobalPassRegistry {
     registerPass<SplitPredict>();
     registerPass<FuseConcatIntoReshape>();
     registerPass<EliminateNopReshape>();
+    registerPass<EliminateCommonSubexpression>();
     registerPass<EliminateDeadEnd>();
     registerPass<EliminateIdentity>();
     registerPass<EliminateShapeOp>();

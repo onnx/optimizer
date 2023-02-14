@@ -4308,6 +4308,26 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[3].op_type == 'Concat'
         assert optimized_model.graph.node[4].op_type == 'Slice'
 
+    def test_eliminate_common_subexression(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 1280] X) => (float[1, 1280] Z)
+               {
+                  S1 = Sigmoid(X)
+                  S2 = Sigmoid(X)
+                  M1 = Mul(X, S1)
+                  M2 = Mul(X, S2)
+                  Z = Add(M1, M2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['eliminate_common_subexpression', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == 'Sigmoid'
+        assert optimized_model.graph.node[1].op_type == 'Mul'
+        assert optimized_model.graph.node[2].op_type == 'Add'
+
 
 if __name__ == "__main__":
     unittest.main()
