@@ -16,63 +16,6 @@
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
-namespace details {
-enum class OpType : int {
-  UNARY,
-  BINARY,
-  TERNARY,
-};
-const static std::unordered_map<NodeKind, OpType> cse_supported_nodes{
-    {"Abs"_sym, OpType::UNARY},
-    {"Cos"_sym, OpType::UNARY},
-    {"Acosh"_sym, OpType::UNARY},
-    {kAdd, OpType::BINARY},
-    {"And"_sym, OpType::BINARY},
-    {"Asin"_sym, OpType::UNARY},
-    {"Asinh"_sym, OpType::UNARY},
-    {"Atan"_sym, OpType::UNARY},
-    {"Atanh"_sym, OpType::UNARY},
-
-    {"BitwiseAnd"_sym, OpType::BINARY},
-    {"BitwiseNot"_sym, OpType::UNARY},
-    {"BitwiseOr"_sym, OpType::BINARY},
-    {"BitwiseXor"_sym, OpType::BINARY},
-    {"Ceil"_sym, OpType::UNARY},
-    {"Clip"_sym, OpType::TERNARY},
-    {"Cos"_sym, OpType::UNARY},
-    {"Det"_sym, OpType::UNARY},
-    {kDiv, OpType::BINARY},
-    {"Equal"_sym, OpType::BINARY},
-    {"Erf"_sym, OpType::UNARY},
-    {kExp, OpType::UNARY},
-    {kExpand, OpType::BINARY},
-    {"GlobalAveragePool"_sym, OpType::UNARY},
-    {"GlobalMaxPool"_sym, OpType::UNARY},
-    {kGreater, OpType::BINARY},
-    {"GreaterOrEqual"_sym, OpType::BINARY},
-    {"HardSwish"_sym, OpType::UNARY},
-    {kIdentity, OpType::UNARY},
-    {kLess, OpType::BINARY},
-    {"kLessOrEqual"_sym, OpType::BINARY},
-    {kLog, OpType::UNARY},
-    {kMatMul, OpType::BINARY},
-    {kMul, OpType::BINARY},
-    {kNeg, OpType::UNARY},
-    {"NonZero"_sym, OpType::UNARY},
-    {"Not"_sym, OpType::UNARY},
-    {"Or"_sym, OpType::BINARY},
-    {kPRelu, OpType::BINARY},
-    {kPow, OpType::BINARY},
-    {"Relu"_sym, OpType::UNARY},
-    {kSigmoid, OpType::UNARY},
-    {"Sign"_sym, OpType::UNARY},
-    {"Sin"_sym, OpType::UNARY},
-    {"Sinh"_sym, OpType::UNARY},
-    {"Softplus"_sym, OpType::UNARY},
-    {kSub, OpType::BINARY}
-
-};
-}  // namespace details
 
 struct EliminateCommonSubexpression final : public FullGraphBasedPass {
   explicit EliminateCommonSubexpression()
@@ -92,14 +35,11 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
     for (auto it = node_list.begin(); it != node_list.end(); ++it) {
       auto node = *it;
       auto kind = node->kind();
-      if (details::cse_supported_nodes.count(kind) == 0 || !node->hasUses()) {
+      if (!node->hasUses() || node->hasAttributes() || node->inputs().empty()) {
         continue;
       }
-      auto optype = details::cse_supported_nodes.at(kind);
+
       const auto inputs = node->inputs();
-      if (inputs.size() != static_cast<int>(optype) + 1) {
-        continue;
-      }
       std::string name = kind.toString();
       for (auto *input : inputs) {
         name = Str(name, "+", input->uniqueName());
@@ -108,10 +48,21 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
         hash_map[name] = node;
       } else {
         auto other = hash_map.at(name);
-        if (tryReplacingAllUsesWith(node->output(), other->output())) {
-          VLOG(1) << Str("kind: ", kind.toString(), ", ", node->name(),
-                         " has been replaced by ", other->name());
-          cse_removed++;
+        auto outputs = other->outputs();
+        auto replaced_outputs = node->outputs();
+        LOG_IF(FATAL, (other->inputs().size() != node->inputs().size()) ||
+                          (outputs.size() != replaced_outputs.size()))
+            << Str(" kind: ", kind.toString(), " ", node->name(),
+                   " will be replaced by ", other->name(), " but inputs size  ",
+                   other->inputs().size(), " vs ", node->inputs().size(),
+                   ", outputs size ", outputs.size(), " vs ",
+                   replaced_outputs.size());
+        for (int i = 0; i < outputs.size(); ++i) {
+          if (tryReplacingAllUsesWith(replaced_outputs[i], outputs[i])) {
+            VLOG(1) << Str("kind: ", kind.toString(), ", ", node->name(), " [",
+                           i, "] output has been replaced by ", other->name());
+            cse_removed++;
+          }
         }
       }
     }
