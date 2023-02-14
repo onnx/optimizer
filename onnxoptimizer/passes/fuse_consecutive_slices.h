@@ -27,7 +27,7 @@ struct FuseConsecutiveSlices final : public PredicateBasedPass {
   bool patternMatchPredicate(Node *node) override {
     std::vector<int64_t> slice1_axes, slice2_axes;
     return CheckKind(node, kSlice, 0, kSlice) && node->inputs().size() == 5 &&
-           GetInputsOfNode(node, 0).size() == 5 &&
+           GetInputsOfPreNode(node, 0).size() == 5 &&
            GetValueFromInput(node, 3, slice1_axes) &&
            GetValueFromInput(PrevNode(node, 0), 3, slice2_axes) &&
            !IsIntersection(slice1_axes, slice2_axes);

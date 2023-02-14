@@ -356,14 +356,16 @@ Node* ParentNode(Node* node, const Sym& symbol) {
   return nullptr;
 }
 
-inline Node* PrevNode(Node* n) {
-  return n;
+template <typename T>
+Node* PrevNode(Node* n, T which) {
+  ONNX_ASSERT(which < n->inputs().size());
+  return n->input(which)->node();
 }
 
-template <typename T, typename... Args>
-Node* PrevNode(Node* n, T which, Args... args) {
+template <typename T, typename U, typename... Args>
+Node* PrevNode(Node* n, T which, U which1, Args... args) {
   ONNX_ASSERT(which < n->inputs().size());
-  return PrevNode(n->input(which)->node(), args...);
+  return PrevNode(n->input(which)->node(), which1, args...);
 }
 
 template <typename T>
@@ -376,18 +378,12 @@ bool IsIntersection(const std::vector<T>& v1, const std::vector<T>& v2) {
   return !intersect.empty();
 }
 
-inline ArrayRef<Value*> GetInputsOfNode(Node* n) {
-  return n->inputs();
-}
-
 template <typename T, typename... Args>
-ArrayRef<Value*> GetInputsOfNode(Node* n, T which, Args... args) {
-  ONNX_ASSERT(which < n->inputs().size());
-  return GetInputsOfNode(n->input(which)->node(), args...);
+ArrayRef<Value*> GetInputsOfPreNode(Node* n, T which, Args... args) {
+  return PrevNode(n, which, args...)->inputs();
 }
 
-
-inline bool HasDimsOfInputOfNode(Node* n,  size_t which) {
+inline bool HasDimsOfInputOfNode(Node* n, size_t which) {
   const auto vs = n->inputs();
   ONNX_ASSERT(which < vs.size());
   return vs[which]->has_sizes();
@@ -406,6 +402,7 @@ inline std::vector<int64_t> GetIntsFromValue(const Value* v) {
   }
   LOG(FATAL) << "We expect that the int32s or int64s exists in Value ("
              << Str(v->uniqueName(), "), but failed!");
+  return is64;
 }
 
 }  // namespace optimization

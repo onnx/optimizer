@@ -42,7 +42,7 @@ struct AdjustSliceAndMatmul final : public PredicateBasedPass {
                         // lhs should be constant tensor
                         IsConstantTensor(node, 0, 0) &&
                         // slice should have explicit axes
-                        GetInputsOfNode(node, 0).size() >= 4 &&
+                        GetInputsOfPreNode(node, 0).size() >= 4 &&
                         // axes of slice should be constant tensor
                         IsConstantTensor(node, 0, 3) &&
                         node->inputs()[0]->uses().size() == 1;

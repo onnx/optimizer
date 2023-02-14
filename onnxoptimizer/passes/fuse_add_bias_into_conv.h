@@ -35,7 +35,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
   }
   bool patternMatchPredicate(Node *node) override {
     return CheckKind(node, kAdd, 0, kConv) &&
-           GetInputsOfNode(node, 0).size() == 2;
+           GetInputsOfPreNode(node, 0).size() == 2;
   }
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                                       Value *input, Node *target_node,
