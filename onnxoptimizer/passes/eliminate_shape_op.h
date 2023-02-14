@@ -9,7 +9,7 @@
 
 #include "onnx/common/tensor.h"
 #include "onnxoptimizer/pass.h"
-#include "pass_util.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -24,19 +24,16 @@ struct EliminateShapeOp final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    if (!CheckKind(node, "Shape")) {
+    if (!CheckKind(node, "Shape") || !HasDimsOfInputOfNode(node, 0)) {
       return false;
     }
     const Value *input = node->input();
-    if (!input->has_sizes()) {
-      return false;
-    }
 
     const auto [start, end] = FetchStartAndEndAttrOfShape(node);
 
-    return std::all_of(input->sizes().cbegin() + start,
-                       input->sizes().cbegin() + end,
-                       [](const auto &dim) { return dim.is_int && dim.dim >= 0; });
+    return std::all_of(
+        input->sizes().cbegin() + start, input->sizes().cbegin() + end,
+        [](const auto &dim) { return dim.is_int && dim.dim >= 0; });
   }
 
   bool runTransform(Node *node, Graph &graph,

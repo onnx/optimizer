@@ -42,33 +42,19 @@ struct AdjustSliceAndMatmul final : public PredicateBasedPass {
                         // lhs should be constant tensor
                         IsConstantTensor(node, 0, 0) &&
                         // slice should have explicit axes
-                        node->inputs()[0]->node()->inputs().size() >= 4 &&
+                        GetInputsOfPreNode(node, 0).size() >= 4 &&
                         // axes of slice should be constant tensor
                         IsConstantTensor(node, 0, 3) &&
                         node->inputs()[0]->uses().size() == 1;
     if (!result) {
       return false;
     }
-    Node* slice = node->input(0)->node();
+    Node* slice = PrevNode(node, 0);
     const int64_t rank = slice->input(0)->sizes().size();
-
-    std::vector<int32_t> axes_i32;
-    std::vector<int64_t> axes_i64;
-    if (GetValueFromInput(slice, 3, axes_i32)) {
-      return std::none_of(axes_i32.cbegin(), axes_i32.cend(),
-                          [&rank](int32_t d) {
-                            return AddYIfNegative<int32_t>(d, rank) ==
-                                   static_cast<int32_t>(rank - 1);
-                          });
-    }
-    if (GetValueFromInput(slice, 3, axes_i64)) {
-      return std::none_of(axes_i64.cbegin(), axes_i64.cend(),
-                          [&rank](int64_t d) {
-                            return AddYIfNegative<int64_t>(d, rank) == rank - 1;
-                          });
-    }
-
-    return false;
+    std::vector<int64_t> axes = GetIntsFromValue(slice->input(3));
+    return std::none_of(axes.cbegin(), axes.cend(), [&rank](int64_t d) {
+      return AddYIfNegative<int64_t>(d, rank) == rank - 1;
+    });
   }
 
   bool runTransform(Node* n, Graph& graph,

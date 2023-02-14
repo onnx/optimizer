@@ -35,7 +35,7 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     return "fuse_matmul_add_bias_into_gemm";
   }
   bool patternMatchPredicate(Node* node) override {
-    return CheckKind(node, kAdd) && CheckKind(node->inputs()[0], kMatMul);
+    return CheckKind(node, kAdd, 0, kMatMul);
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {

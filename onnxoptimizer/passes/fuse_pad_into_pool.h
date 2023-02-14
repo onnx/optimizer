@@ -34,9 +34,8 @@ struct FusePadIntoPool final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return (node->kind() == Symbol("AveragePool") ||
-            node->kind() == Symbol("MaxPool")) &&
-           node->inputs()[0]->node()->kind() == kPad;
+    return CheckKind(node, "AveragePool", 0, kPad) ||
+           CheckKind(node, "MaxPool", 0, kPad);
   }
 
   bool runTransform(Node* n, Graph& graph,

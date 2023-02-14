@@ -33,7 +33,7 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     return "fuse_pad_into_conv";
   }
   bool patternMatchPredicate(Node* node) override {
-    return CheckKind(node, kConv) && CheckKind(node->inputs()[0], kPad);
+    return CheckKind(node, kConv, 0, kPad);
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
@@ -45,7 +45,7 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     }
 
     Node* conv = n;
-    Node* pad = n->inputs()[0]->node();
+    Node* pad = PrevNode(n, 0);
 
     // Process 'pads' data
     std::vector<int64_t> pads;
