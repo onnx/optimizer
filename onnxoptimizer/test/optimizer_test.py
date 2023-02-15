@@ -4308,6 +4308,66 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[3].op_type == 'Concat'
         assert optimized_model.graph.node[4].op_type == 'Slice'
 
+    def test_eliminate_common_subexression(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 1280] X) => (float[1, 1280] Z)
+               {
+                  S1 = Sigmoid(X)
+                  S2 = Sigmoid(X)
+                  M1 = Mul(X, S1)
+                  M2 = Mul(X, S2)
+                  Z = Add(M1, M2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['eliminate_common_subexpression', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == 'Sigmoid'
+        assert optimized_model.graph.node[1].op_type == 'Mul'
+        assert optimized_model.graph.node[2].op_type == 'Add'
+
+    def test_eliminate_common_subexression_with_attribute(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[4, 64, 160, 160] X) => (float[4, 64, 160, 160] Z)
+               {
+                  R1 = ReduceMean<axes=[2, 3], keepdims=1>(X)
+                  R2 = ReduceMean<axes=[2, 3], keepdims=1>(X)
+                  S1 = Add(X, R1)
+                  S2 = Add(X, R2)
+                  M1 = Sqrt(S2)
+                  Z = Div(S1, M1)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['eliminate_common_subexpression', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 4
+        assert optimized_model.graph.node[0].op_type == 'ReduceMean'
+        assert optimized_model.graph.node[1].op_type == 'Add'
+        assert optimized_model.graph.node[2].op_type == 'Sqrt'
+        assert optimized_model.graph.node[3].op_type == 'Div'
+
+    def test_eliminate_common_subexression_with_attribute1(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[4, 64, 160, 160] X) => (float[4, 64, 160, 160] Z)
+               {
+                  R1 = ReduceMean<axes=[2, 3], keepdims=1>(X)
+                  R2 = ReduceMean<axes=[3], keepdims=1>(X)
+                  S1 = Add(X, R1)
+                  S2 = Add(X, R2)
+                  M1 = Sqrt(S2)
+                  Z = Div(S1, M1)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['eliminate_common_subexpression', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 6
+
 
 if __name__ == "__main__":
     unittest.main()
