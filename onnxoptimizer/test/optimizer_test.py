@@ -4368,6 +4368,57 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 6
 
+    def test_fuse_qkv(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 4096, 320])
+        Y1 = helper.make_tensor_value_info("Y1", TensorProto.FLOAT, [1, 4096, 8, 40])
+        Y2 = helper.make_tensor_value_info("Y2", TensorProto.FLOAT, [1, 4096, 8, 40])
+        Y3 = helper.make_tensor_value_info("Y3", TensorProto.FLOAT, [1, 4096, 8, 40])
+
+        I0 = helper.make_tensor(
+            "I0", TensorProto.FLOAT, [320], np.random.random((320)).astype(np.float32)
+        )
+
+        I1 = helper.make_tensor(
+            "I1", TensorProto.FLOAT, [320], np.random.random((320)).astype(np.float32)
+        )
+
+        I2 = helper.make_tensor(
+            "I2", TensorProto.FLOAT, [320, 320], np.random.random((320, 320)).astype(np.float32)
+        )
+
+        I3 = helper.make_tensor(
+            "I3", TensorProto.FLOAT, [320, 320], np.random.random((320, 320)).astype(np.float32)
+        )
+
+        I4 = helper.make_tensor(
+            "I4", TensorProto.FLOAT, [320, 320], np.random.random((320, 320)).astype(np.float32)
+        )
+
+        shape = helper.make_tensor("shape", TensorProto.INT64, [4], [1, 4096, 8, 40])
+
+        node_def = helper.make_node("Mul", ["X", "I0"], ["Z1"])
+        node_def1 = helper.make_node("Add", ["Z1", "I1"], ["Z2"])
+        node_def2 = helper.make_node("MatMul", ["Z2", "I2"], ["Z3"])
+        node_def3 = helper.make_node("MatMul", ["Z2", "I3"], ["Z4"])
+        node_def4 = helper.make_node("MatMul", ["Z2", "I4"], ["Z5"])
+        node_def5 = helper.make_node("Reshape", ["Z3", "shape"], ["Y1"])
+        node_def6 = helper.make_node("Reshape", ["Z4", "shape"], ["Y2"])
+        node_def7 = helper.make_node("Reshape", ["Z5", "shape"], ["Y3"])
+        graph = helper.make_graph(
+            [node_def, node_def1, node_def2, node_def3, node_def4, node_def5, node_def6, node_def7],  # nodes
+            "test",  # name
+            [X],  # inputs
+            [Y1, Y2, Y3],  # outputs
+            [I0, I1, I2, I3, I4, shape],  # initializer
+        )
+        optimized_model = self._optimized(graph, ["fuse_qkv", "eliminate_deadend"], False)
+        assert len(optimized_model.graph.node) == 8
+        assert optimized_model.graph.node[0].op_type == "Mul"
+        assert optimized_model.graph.node[1].op_type == "Add"
+        assert optimized_model.graph.node[2].op_type == "Concat"
+        assert optimized_model.graph.node[3].op_type == "MatMul"
+        assert optimized_model.graph.node[4].op_type == "Split"
+
 
 if __name__ == "__main__":
     unittest.main()
