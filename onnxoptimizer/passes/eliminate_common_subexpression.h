@@ -11,6 +11,7 @@
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/logging.h"
+#include "onnxoptimizer/passes/node_hash.h"
 #include "onnxoptimizer/passes/pass_util.h"
 #include "onnxoptimizer/passes/string_utils.h"
 
@@ -31,32 +32,22 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
   unsigned int EliminateCSE(Graph &graph) {
     auto node_list = graph.nodes();
     unsigned int cse_removed = 0;
-    std::unordered_map<std::string, Node *> hash_map;
+    std::unordered_map<size_t, Node *> hash_map;
     for (auto it = node_list.begin(); it != node_list.end(); ++it) {
       auto node = *it;
       auto kind = node->kind();
-      if (!node->hasUses() || node->hasAttributes() || node->inputs().empty()) {
+      if (!node->hasUses() || !IsSupportedHash(node)) {
         continue;
       }
-
-      const auto inputs = node->inputs();
-      std::string name = kind.toString();
-      for (auto *input : inputs) {
-        name = Str(name, "+", input->uniqueName());
-      }
-      if (hash_map.count(name) == 0) {
-        hash_map[name] = node;
+      std::size_t hash = std::hash<Node>()(*node);
+      VLOG(1) << Str(node->name(), " hash: ", hash);
+      if (hash_map.count(hash) == 0) {
+        hash_map[hash] = node;
       } else {
-        auto other = hash_map.at(name);
+        auto other = hash_map.at(hash);
         auto outputs = other->outputs();
         auto replaced_outputs = node->outputs();
-        LOG_IF(FATAL, (other->inputs().size() != node->inputs().size()) ||
-                          (outputs.size() != replaced_outputs.size()))
-            << Str(" kind: ", kind.toString(), " ", node->name(),
-                   " will be replaced by ", other->name(), " but inputs size  ",
-                   other->inputs().size(), " vs ", node->inputs().size(),
-                   ", outputs size ", outputs.size(), " vs ",
-                   replaced_outputs.size());
+        ONNX_ASSERT(*other == *node);
         for (int i = 0; i < outputs.size(); ++i) {
           if (tryReplacingAllUsesWith(replaced_outputs[i], outputs[i])) {
             VLOG(1) << Str("kind: ", kind.toString(), ", ", node->name(), " [",
