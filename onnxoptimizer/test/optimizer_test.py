@@ -4350,6 +4350,24 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[2].op_type == 'Sqrt'
         assert optimized_model.graph.node[3].op_type == 'Div'
 
+    def test_eliminate_common_subexression_with_attribute1(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[4, 64, 160, 160] X) => (float[4, 64, 160, 160] Z)
+               {
+                  R1 = ReduceMean<axes=[2, 3], keepdims=1>(X)
+                  R2 = ReduceMean<axes=[3], keepdims=1>(X)
+                  S1 = Add(X, R1)
+                  S2 = Add(X, R2)
+                  M1 = Sqrt(S2)
+                  Z = Div(S1, M1)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['eliminate_common_subexpression', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 6
+
 
 if __name__ == "__main__":
     unittest.main()

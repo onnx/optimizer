@@ -10,8 +10,8 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/cse_util.h"
 #include "onnxoptimizer/passes/logging.h"
-#include "onnxoptimizer/passes/node_hash.h"
 #include "onnxoptimizer/passes/pass_util.h"
 #include "onnxoptimizer/passes/string_utils.h"
 
@@ -29,25 +29,23 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
     return PassAnalysisType::CountBased;
   }
 
-  unsigned int EliminateCSE(Graph &graph) {
+  unsigned int EliminateCommonSubexpressions(Graph &graph) {
     auto node_list = graph.nodes();
     unsigned int cse_removed = 0;
-    std::unordered_map<size_t, Node *> hash_map;
+    std::unordered_map<Node *, Node *, CSENodeHash, CSEEqual> hash_map;
     for (auto it = node_list.begin(); it != node_list.end(); ++it) {
       auto node = *it;
       auto kind = node->kind();
-      if (!node->hasUses() || !IsSupportedHash(node)) {
+      if (!node->hasUses() || !IsSupportedByCSE(node)) {
         continue;
       }
-      std::size_t hash = std::hash<Node>()(*node);
-      VLOG(1) << Str(node->name(), " hash: ", hash);
-      if (hash_map.count(hash) == 0) {
-        hash_map[hash] = node;
+      if (hash_map.find(node) == hash_map.end()) {
+        hash_map[node] = node;
       } else {
-        auto other = hash_map.at(hash);
+        auto other = hash_map.at(node);
         auto outputs = other->outputs();
         auto replaced_outputs = node->outputs();
-        ONNX_ASSERT(*other == *node);
+        ONNX_ASSERT(CSEEqual()(node, other));
         for (int i = 0; i < outputs.size(); ++i) {
           if (tryReplacingAllUsesWith(replaced_outputs[i], outputs[i])) {
             VLOG(1) << Str("kind: ", kind.toString(), ", ", node->name(), " [",
@@ -61,7 +59,7 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
   }
 
   std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) override {
-    auto cse_removed = this->EliminateCSE(graph);
+    auto cse_removed = this->EliminateCommonSubexpressions(graph);
     VLOG(1) << Str("cse_removed count: ", cse_removed);
     return std::shared_ptr<PostPassAnalysis>(
         new CountBasedPassAnalysis(this, cse_removed, false, false));
