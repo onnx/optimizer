@@ -56,6 +56,7 @@
 #include "onnxoptimizer/passes/fuse_consecutive_slices.h"
 #include "onnxoptimizer/passes/eliminate_common_subexpression.h"
 #include "onnxoptimizer/passes/fuse_qkv.h"
+#include "onnxoptimizer/passes/fuse_consecutive_unsqueezes.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -103,6 +104,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopReshape>();
     registerPass<EliminateCommonSubexpression>();
     registerPass<FuseQKV>();
+    registerPass<FuseConsecutiveUnsqueezes>();
     registerPass<EliminateDeadEnd>();
     registerPass<EliminateIdentity>();
     registerPass<EliminateShapeOp>();
