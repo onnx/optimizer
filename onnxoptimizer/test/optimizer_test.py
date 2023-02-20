@@ -4419,6 +4419,42 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[3].op_type == "MatMul"
         assert optimized_model.graph.node[4].op_type == "Split"
 
+    def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[4, 64, 160, 160] X) => (float[1, 1, 1, 4, 64, 1, 160, 160, 1, 1, 1] Z)
+               {
+                  R1 = Constant<value=int64[4]{0, 1, 4, -1}>()
+                  R2 = Constant<value=int64[3]{1, -1, -2}>()
+                  S1 = Unsqueeze(X, R1)
+                  Z = Unsqueeze(S1, R2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['fuse_consecutive_unsqueezes', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Unsqueeze"
+
+    def test_fuse_consecutive_unsqueezes_opset11(self):  # type: () -> None
+        model = parser.parse_model("""
+                <
+                    ir_version: 7,
+                    opset_import:["": 11]
+                >
+               agraph (float[4, 64, 160, 160] X) => (float[1, 1, 1, 4, 64, 1, 160, 160, 1, 1, 1] Z)
+               {
+                  S1 = Unsqueeze<axes=[0, 1, 4, -1]>(X)
+                  Z = Unsqueeze<axes=[1, -1, -2]>(S1)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            model, ['fuse_consecutive_unsqueezes', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Unsqueeze"
+
 
 if __name__ == "__main__":
     unittest.main()
