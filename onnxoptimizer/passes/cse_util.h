@@ -36,13 +36,40 @@ struct SymbolCompare {
   }
 };
 
-inline bool CSETensorCompare(const Tensor& lhs, const Tensor& rhs) {
-  ONNX_ASSERT(!lhs.is_segment() && !rhs.is_segment());
-  if (lhs.elem_type() != rhs.elem_type() || lhs.sizes() != rhs.sizes()) {
+inline std::vector<int32_t> FetchBoolDataFromTensor(const Tensor* tensor) {
+  ONNX_ASSERT(tensor &&
+              tensor->elem_type() == ONNX_NAMESPACE::TensorProto_DataType_BOOL);
+  if (!tensor->is_raw_data()) {
+    return tensor->int32s();
+  }
+  std::vector<int32_t> res;
+  res.reserve(tensor->raw().size());
+  /// Boolean type MUST be written one byte per tensor element (00000001 for
+  /// true,
+  /// 00000000 for false).
+  for (const auto& c : tensor->raw()) {
+    res.push_back(static_cast<int32_t>(c));
+  }
+  return res;
+}
+
+inline bool CSETensorCompare(const Tensor* lhs, const Tensor* rhs) {
+  // lhs and rhs maybe nullptr
+  if (!lhs) {
+    return !rhs;
+  } else if (!rhs) {
+    return !lhs;
+  }
+  ONNX_ASSERT(!lhs->is_segment() && !rhs->is_segment());
+  if (lhs->elem_type() != rhs->elem_type() || lhs->sizes() != rhs->sizes()) {
     return false;
   }
-  switch (lhs.elem_type()) {
+
+  switch (lhs->elem_type()) {
     case ONNX_NAMESPACE::TensorProto_DataType_BOOL:
+      if (FetchBoolDataFromTensor(lhs) != FetchBoolDataFromTensor(rhs))
+        return false;
+      break;
     case ONNX_NAMESPACE::TensorProto_DataType_INT8:
     case ONNX_NAMESPACE::TensorProto_DataType_INT16:
     case ONNX_NAMESPACE::TensorProto_DataType_INT32:
@@ -50,31 +77,34 @@ inline bool CSETensorCompare(const Tensor& lhs, const Tensor& rhs) {
     case ONNX_NAMESPACE::TensorProto_DataType_UINT16:
     case ONNX_NAMESPACE::TensorProto_DataType_FLOAT16:
     case ONNX_NAMESPACE::TensorProto_DataType_BFLOAT16:
-      if (lhs.int32s() != rhs.int32s())
+      if (ParseData<int32_t>(lhs) != ParseData<int32_t>(rhs))
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_FLOAT:
     case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX64:
-      if (lhs.floats() != rhs.floats())
+      if (ParseData<float>(lhs) != ParseData<float>(rhs))
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_DOUBLE:
     case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX128:
-      if (lhs.doubles() != rhs.doubles())
+      if (ParseData<double>(lhs) != ParseData<double>(rhs))
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_STRING:
-      if (lhs.strings() != rhs.strings())
+      if (lhs->strings() != rhs->strings())
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_UINT32:
     case ONNX_NAMESPACE::TensorProto_DataType_UINT64:
-      if (lhs.uint64s() != rhs.uint64s())
+      if (ParseData<uint64_t>(lhs) != ParseData<uint64_t>(rhs))
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_INT64:
-      if (lhs.int64s() != rhs.int64s())
+      if (ParseData<int64_t>(lhs) != ParseData<int64_t>(rhs))
         return false;
+      break;
+    case ONNX_NAMESPACE::TensorProto_DataType_UNDEFINED:
+      // tensor is empty
       break;
     default:
       return false;
@@ -114,18 +144,22 @@ struct CSEContainerHash {
 };
 
 struct CSETensorHash {
-  std::size_t operator()(const Tensor& tensor) const {
+  std::size_t operator()(const Tensor* tensor) const {
     /// https://github.com/onnx/onnx/issues/2630
-    ONNX_ASSERT(!tensor.is_segment());
+    ONNX_ASSERT(tensor && !tensor->is_segment());
     std::size_t seed = 0;
     auto int32_hasher = std::hash<int32_t>();
     auto size_hasher = std::hash<std::size_t>();
-    const auto elem_type = tensor.elem_type();
+    const auto elem_type = tensor->elem_type();
     /// dtype、dims、value
     hash_combine(seed, int32_hasher, elem_type);
-    hash_combine(seed, CSEContainerHash<int64_t>(), tensor.sizes());
+    hash_combine(seed, CSEContainerHash<int64_t>(), tensor->sizes());
+
     switch (elem_type) {
       case ONNX_NAMESPACE::TensorProto_DataType_BOOL:
+        hash_combine(seed, CSEContainerHash<int32_t>(),
+                     FetchBoolDataFromTensor(tensor));
+        break;
       case ONNX_NAMESPACE::TensorProto_DataType_INT8:
       case ONNX_NAMESPACE::TensorProto_DataType_INT16:
       case ONNX_NAMESPACE::TensorProto_DataType_INT32:
@@ -133,25 +167,31 @@ struct CSETensorHash {
       case ONNX_NAMESPACE::TensorProto_DataType_UINT16:
       case ONNX_NAMESPACE::TensorProto_DataType_FLOAT16:
       case ONNX_NAMESPACE::TensorProto_DataType_BFLOAT16:
-        hash_combine(seed, CSEContainerHash<int32_t>(), tensor.int32s());
+        hash_combine(seed, CSEContainerHash<int32_t>(),
+                     ParseData<int32_t>(tensor));
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_FLOAT:
       case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX64:
-        hash_combine(seed, CSEContainerHash<float>(), tensor.floats());
+        hash_combine(seed, CSEContainerHash<float>(), ParseData<float>(tensor));
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_DOUBLE:
       case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX128:
-        hash_combine(seed, CSEContainerHash<double>(), tensor.doubles());
+        hash_combine(seed, CSEContainerHash<double>(),
+                     ParseData<double>(tensor));
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_STRING:
-        hash_combine(seed, CSEContainerHash<std::string>(), tensor.strings());
+        hash_combine(seed, CSEContainerHash<std::string>(), tensor->strings());
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_UINT32:
       case ONNX_NAMESPACE::TensorProto_DataType_UINT64:
-        hash_combine(seed, CSEContainerHash<uint64_t>(), tensor.uint64s());
+        hash_combine(seed, CSEContainerHash<uint64_t>(),
+                     ParseData<uint64_t>(tensor));
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_INT64:
-        hash_combine(seed, CSEContainerHash<int64_t>(), tensor.int64s());
+        hash_combine(seed, CSEContainerHash<int64_t>(),
+                     ParseData<int64_t>(tensor));
+        break;
+      case ONNX_NAMESPACE::TensorProto_DataType_UNDEFINED:
         break;
       default:
         throw std::runtime_error(Str("no supported data type: ", elem_type));
@@ -169,7 +209,7 @@ struct CSEContainerHash<Tensor> {
                  std::string(typeid(Tensor).name()), std::hash<std::size_t>(),
                  container.size());
     for (const auto& d : container) {
-      hash_combine(seed, CSETensorHash(), d);
+      hash_combine(seed, CSETensorHash(), &d);
     }
     return seed;
   }
@@ -214,7 +254,7 @@ struct CSENodeHash {
           hash_combine(seed, CSEContainerHash<std::string>(), n->ss(name));
           break;
         case ONNX_NAMESPACE::AttributeKind::t:
-          hash_combine(seed, CSETensorHash(), n->t(name));
+          hash_combine(seed, CSETensorHash(), &n->t(name));
           break;
         case ONNX_NAMESPACE::AttributeKind::ts:
           hash_combine(seed, CSEContainerHash<Tensor>(), n->ts(name));
@@ -288,7 +328,7 @@ struct CSEEqual {
             return false;
           break;
         case AttributeKind::t:
-          if (!CSETensorCompare(lhs->t(attr_name), rhs->t(attr_name)))
+          if (!CSETensorCompare(&lhs->t(attr_name), &rhs->t(attr_name)))
             return false;
           break;
         case AttributeKind::ts: {
@@ -297,7 +337,7 @@ struct CSEEqual {
           if (lts.size() != rts.size())
             return false;
           for (std::size_t k = 0; k < lts.size(); ++k) {
-            if (!CSETensorCompare(lts[k], rts[k])) {
+            if (!CSETensorCompare(&lts[k], &rts[k])) {
               return false;
             }
           }
@@ -311,21 +351,9 @@ struct CSEEqual {
   }
 };
 
-struct CSETensorHashWrapper {
-  std::size_t operator()(const Tensor* t) const {
-    ONNX_ASSERT(t);
-    return CSETensorHash()(*t);
-  }
-};
-
-struct CSETensorEqualWrapper {
+struct CSETensorEqual {
   bool operator()(const Tensor* lhs, const Tensor* rhs) const {
-    if (!lhs) {
-      return rhs;
-    } else if (!rhs) {
-      return lhs;
-    }
-    return CSETensorCompare(*lhs, *rhs);
+    return CSETensorCompare(lhs, rhs);
   }
 };
 

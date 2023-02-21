@@ -76,9 +76,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
         output_set.emplace(out->uniqueName());
       }
     }
-
-    std::unordered_map<Tensor *, std::string, CSETensorHashWrapper,
-                       CSETensorEqualWrapper>
+    std::unordered_map<Tensor *, std::string, CSETensorHash, CSETensorEqual>
         initializer_map;
     std::vector<std::pair<std::string, std::string>> replaced_table;
     for (auto initializer : initializers) {
@@ -101,14 +99,17 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
             std::make_pair(name, initializer_map.at(&initializer)));
       }
     }
-
+    if (replaced_table.empty()) {
+      return initializers_removed;
+    }
     // workaround to  fetch initializer_node_ pointer in graph
     Tensor dummy_tensor;
     dummy_tensor.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
     Node *initializer_node =
         graph.addInitializerAndCreateValue(dummy_tensor)->node();
-
+    VLOG(1) << Str("====== Graph: ", graph.name(), "=====");
     for (const auto &p : replaced_table) {
+      VLOG(1) << Str("<", p.first, ",", p.second, ">");
       Value *old_value = findInitializerValueByName(initializer_node, p.first);
       Value *new_value = findInitializerValueByName(initializer_node, p.second);
       if (!old_value || !new_value) {
@@ -118,7 +119,8 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
       graph.eraseInitializerAndInput(old_value);
       initializers_removed++;
     }
-
+    VLOG(1) << Str("====== Graph: ", graph.name(),
+                   "=====, removed: ", initializers_removed);
     graph.eraseInitializer(dummy_tensor.name());
     return initializers_removed;
   }
