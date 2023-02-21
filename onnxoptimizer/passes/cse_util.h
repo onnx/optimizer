@@ -311,5 +311,23 @@ struct CSEEqual {
   }
 };
 
+struct CSETensorHashWrapper {
+  std::size_t operator()(const Tensor* t) const {
+    ONNX_ASSERT(t);
+    return CSETensorHash()(*t);
+  }
+};
+
+struct CSETensorEqualWrapper {
+  bool operator()(const Tensor* lhs, const Tensor* rhs) const {
+    if (!lhs) {
+      return rhs;
+    } else if (!rhs) {
+      return lhs;
+    }
+    return CSETensorCompare(*lhs, *rhs);
+  }
+};
+
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
