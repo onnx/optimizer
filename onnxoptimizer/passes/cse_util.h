@@ -125,6 +125,8 @@ inline bool IsSupportedByCSE(const Node* n) {
       case AttributeKind::tp:
       case AttributeKind::tps:
         return false;
+      default:
+        break;
     }
   }
   return true;
