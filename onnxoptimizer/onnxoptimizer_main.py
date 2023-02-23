@@ -52,7 +52,7 @@ def main():
         print(*fuse_and_elimination_passes)
         sys.exit(0)
 
-    passes = []
+    passes = args.passes
     if args.passes is None:
         passes = fuse_and_elimination_passes
 
