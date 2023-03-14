@@ -39,6 +39,7 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
       if (!node->hasUses() || !IsSupportedByCSE(node)) {
         continue;
       }
+      VLOG(1) <<  Str("kind: ", kind.toString(), ", ", node->name());
       if (hash_map.find(node) == hash_map.end()) {
         hash_map[node] = node;
       } else {

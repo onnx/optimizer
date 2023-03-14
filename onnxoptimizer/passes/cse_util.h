@@ -16,6 +16,7 @@
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/logging.h"
 #include "onnxoptimizer/passes/string_utils.h"
+#include "onnxoptimizer/passes/tensor_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -36,23 +37,6 @@ struct SymbolCompare {
   }
 };
 
-inline std::vector<int32_t> FetchBoolDataFromTensor(const Tensor* tensor) {
-  ONNX_ASSERT(tensor &&
-              tensor->elem_type() == ONNX_NAMESPACE::TensorProto_DataType_BOOL);
-  if (!tensor->is_raw_data()) {
-    return tensor->int32s();
-  }
-  std::vector<int32_t> res;
-  res.reserve(tensor->raw().size());
-  /// Boolean type MUST be written one byte per tensor element (00000001 for
-  /// true,
-  /// 00000000 for false).
-  for (const auto& c : tensor->raw()) {
-    res.push_back(static_cast<int32_t>(c));
-  }
-  return res;
-}
-
 inline bool CSETensorCompare(const Tensor* lhs, const Tensor* rhs) {
   // lhs and rhs maybe nullptr
   if (!lhs) {
@@ -65,42 +49,33 @@ inline bool CSETensorCompare(const Tensor* lhs, const Tensor* rhs) {
     return false;
   }
 
+#define DO_CASE(pb_type, cpp_type)                                        \
+  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type:                    \
+    if (ParseTensorData<cpp_type>(lhs) != ParseTensorData<cpp_type>(rhs)) \
+      return false;                                                       \
+    break;
+
   switch (lhs->elem_type()) {
-    case ONNX_NAMESPACE::TensorProto_DataType_BOOL:
-      if (FetchBoolDataFromTensor(lhs) != FetchBoolDataFromTensor(rhs))
-        return false;
-      break;
-    case ONNX_NAMESPACE::TensorProto_DataType_INT8:
-    case ONNX_NAMESPACE::TensorProto_DataType_INT16:
-    case ONNX_NAMESPACE::TensorProto_DataType_INT32:
-    case ONNX_NAMESPACE::TensorProto_DataType_UINT8:
-    case ONNX_NAMESPACE::TensorProto_DataType_UINT16:
-    case ONNX_NAMESPACE::TensorProto_DataType_FLOAT16:
-    case ONNX_NAMESPACE::TensorProto_DataType_BFLOAT16:
-      if (ParseData<int32_t>(lhs) != ParseData<int32_t>(rhs))
-        return false;
-      break;
-    case ONNX_NAMESPACE::TensorProto_DataType_FLOAT:
-    case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX64:
-      if (ParseData<float>(lhs) != ParseData<float>(rhs))
-        return false;
-      break;
-    case ONNX_NAMESPACE::TensorProto_DataType_DOUBLE:
-    case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX128:
-      if (ParseData<double>(lhs) != ParseData<double>(rhs))
-        return false;
-      break;
+    DO_CASE(BOOL, bool)
+    DO_CASE(INT8, int8_t)
+    DO_CASE(INT16, int16_t)
+    DO_CASE(INT32, int32_t)
+    DO_CASE(INT64, int64_t)
+    DO_CASE(UINT8, int8_t)
+    DO_CASE(UINT16, int16_t)
+    DO_CASE(UINT32, int32_t)
+    DO_CASE(UINT64, int64_t)
+    DO_CASE(FLOAT, float)
+    DO_CASE(DOUBLE, double)
+    DO_CASE(COMPLEX64, Complex64)
+    DO_CASE(COMPLEX128, Complex128)
+    DO_CASE(FLOAT16, Float16)
+    DO_CASE(BFLOAT16, BFloat16)
+
+#undef DO_CASE
+
     case ONNX_NAMESPACE::TensorProto_DataType_STRING:
       if (lhs->strings() != rhs->strings())
-        return false;
-      break;
-    case ONNX_NAMESPACE::TensorProto_DataType_UINT32:
-    case ONNX_NAMESPACE::TensorProto_DataType_UINT64:
-      if (ParseData<uint64_t>(lhs) != ParseData<uint64_t>(rhs))
-        return false;
-      break;
-    case ONNX_NAMESPACE::TensorProto_DataType_INT64:
-      if (ParseData<int64_t>(lhs) != ParseData<int64_t>(rhs))
         return false;
       break;
     case ONNX_NAMESPACE::TensorProto_DataType_UNDEFINED:
@@ -157,41 +132,32 @@ struct CSETensorHash {
     hash_combine(seed, int32_hasher, elem_type);
     hash_combine(seed, CSEContainerHash<int64_t>(), tensor->sizes());
 
+#define DO_CASE(pb_type, cpp_type)                     \
+  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type: \
+    hash_combine(seed, CSEContainerHash<cpp_type>(),   \
+                 ParseTensorData<cpp_type>(tensor));   \
+    break;
+
     switch (elem_type) {
-      case ONNX_NAMESPACE::TensorProto_DataType_BOOL:
-        hash_combine(seed, CSEContainerHash<int32_t>(),
-                     FetchBoolDataFromTensor(tensor));
-        break;
-      case ONNX_NAMESPACE::TensorProto_DataType_INT8:
-      case ONNX_NAMESPACE::TensorProto_DataType_INT16:
-      case ONNX_NAMESPACE::TensorProto_DataType_INT32:
-      case ONNX_NAMESPACE::TensorProto_DataType_UINT8:
-      case ONNX_NAMESPACE::TensorProto_DataType_UINT16:
-      case ONNX_NAMESPACE::TensorProto_DataType_FLOAT16:
-      case ONNX_NAMESPACE::TensorProto_DataType_BFLOAT16:
-        hash_combine(seed, CSEContainerHash<int32_t>(),
-                     ParseData<int32_t>(tensor));
-        break;
-      case ONNX_NAMESPACE::TensorProto_DataType_FLOAT:
-      case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX64:
-        hash_combine(seed, CSEContainerHash<float>(), ParseData<float>(tensor));
-        break;
-      case ONNX_NAMESPACE::TensorProto_DataType_DOUBLE:
-      case ONNX_NAMESPACE::TensorProto_DataType_COMPLEX128:
-        hash_combine(seed, CSEContainerHash<double>(),
-                     ParseData<double>(tensor));
-        break;
+      DO_CASE(BOOL, bool)
+      DO_CASE(INT8, int8_t)
+      DO_CASE(INT16, int16_t)
+      DO_CASE(INT32, int32_t)
+      DO_CASE(INT64, int64_t)
+      DO_CASE(UINT8, int8_t)
+      DO_CASE(UINT16, int16_t)
+      DO_CASE(UINT32, int32_t)
+      DO_CASE(UINT64, int64_t)
+      DO_CASE(FLOAT, float)
+      DO_CASE(DOUBLE, double)
+      DO_CASE(COMPLEX64, Complex64)
+      DO_CASE(COMPLEX128, Complex128)
+      DO_CASE(FLOAT16, Float16)
+      DO_CASE(BFLOAT16, BFloat16)
+
+#undef DO_CASE
       case ONNX_NAMESPACE::TensorProto_DataType_STRING:
         hash_combine(seed, CSEContainerHash<std::string>(), tensor->strings());
-        break;
-      case ONNX_NAMESPACE::TensorProto_DataType_UINT32:
-      case ONNX_NAMESPACE::TensorProto_DataType_UINT64:
-        hash_combine(seed, CSEContainerHash<uint64_t>(),
-                     ParseData<uint64_t>(tensor));
-        break;
-      case ONNX_NAMESPACE::TensorProto_DataType_INT64:
-        hash_combine(seed, CSEContainerHash<int64_t>(),
-                     ParseData<int64_t>(tensor));
         break;
       case ONNX_NAMESPACE::TensorProto_DataType_UNDEFINED:
         break;

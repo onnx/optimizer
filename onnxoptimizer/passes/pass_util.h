@@ -14,6 +14,7 @@
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/logging.h"
 #include "onnxoptimizer/passes/string_utils.h"
+#include "onnxoptimizer/passes/tensor_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -67,34 +68,28 @@ Create_SupportedTypeOfAttr(std::vector<int64_t>, AttributeKind::is);
 template <typename>
 struct SupportedTypeOfTensor : public std::false_type {};
 
-#define Create_SupportedTypeOfTensor(cpp_type_, store_type_, elem_type_) \
-  template <>                                                            \
-  struct SupportedTypeOfTensor<cpp_type_> : public std::true_type {      \
-    using cpp_type = cpp_type_;                                          \
-    using store_type = store_type_;                                      \
-    static constexpr int elem_type = elem_type_;                         \
-  }
+#define Create_SupportedTypeOfTensor(cpp_type_, elem_type_)             \
+  template <>                                                           \
+  struct SupportedTypeOfTensor<cpp_type_> : public std::true_type {     \
+    using cpp_type = cpp_type_;                                         \
+    static constexpr int elem_type = TensorProto_DataType_##elem_type_; \
+  };
 
-Create_SupportedTypeOfTensor(std::vector<int32_t>, std::vector<int32_t>,
-                             TensorProto_DataType_INT32);
-Create_SupportedTypeOfTensor(std::vector<int64_t>, std::vector<int64_t>,
-                             TensorProto_DataType_INT64);
-Create_SupportedTypeOfTensor(std::vector<uint64_t>, std::vector<uint64_t>,
-                             TensorProto_DataType_UINT64);
-Create_SupportedTypeOfTensor(std::vector<float>, std::vector<float>,
-                             TensorProto_DataType_FLOAT);
-Create_SupportedTypeOfTensor(std::vector<double>, std::vector<double>,
-                             TensorProto_DataType_DOUBLE);
-Create_SupportedTypeOfTensor(std::vector<uint32_t>, std::vector<uint64_t>,
-                             TensorProto_DataType_UINT32);
-Create_SupportedTypeOfTensor(std::vector<int8_t>, std::vector<int32_t>,
-                             TensorProto_DataType_INT8);
-Create_SupportedTypeOfTensor(std::vector<uint8_t>, std::vector<int32_t>,
-                             TensorProto_DataType_UINT8);
-Create_SupportedTypeOfTensor(std::vector<int16_t>, std::vector<int32_t>,
-                             TensorProto_DataType_INT16);
-Create_SupportedTypeOfTensor(std::vector<uint16_t>, std::vector<int32_t>,
-                             TensorProto_DataType_UINT16);
+Create_SupportedTypeOfTensor(std::vector<int32_t>, INT32);
+Create_SupportedTypeOfTensor(std::vector<int64_t>, INT64);
+Create_SupportedTypeOfTensor(std::vector<uint64_t>, UINT64);
+Create_SupportedTypeOfTensor(std::vector<float>, FLOAT);
+Create_SupportedTypeOfTensor(std::vector<double>, DOUBLE);
+Create_SupportedTypeOfTensor(std::vector<uint32_t>, UINT32);
+Create_SupportedTypeOfTensor(std::vector<int8_t>, INT8);
+Create_SupportedTypeOfTensor(std::vector<uint8_t>, UINT8);
+Create_SupportedTypeOfTensor(std::vector<int16_t>, INT16);
+Create_SupportedTypeOfTensor(std::vector<uint16_t>, UINT16);
+Create_SupportedTypeOfTensor(std::vector<Float16>, FLOAT16);
+Create_SupportedTypeOfTensor(std::vector<BFloat16>, BFLOAT16);
+Create_SupportedTypeOfTensor(std::vector<Complex64>, COMPLEX64);
+Create_SupportedTypeOfTensor(std::vector<Complex128>, COMPLEX128);
+Create_SupportedTypeOfTensor(std::vector<std::string>, STRING);
 #undef Create_SupportedTypeOfTensor
 }  // namespace
 
@@ -209,55 +204,43 @@ T GetValueFromAttrWithDefault(const Node* n, const Sym& attr_name,
 }
 
 template <typename Vec,
-          typename = std::enable_if_t<
-              std::is_same_v<Vec, std::vector<typename Vec::value_type>> &&
-              SupportedTypeOfTensor<Vec>::value>>
+          typename = std::enable_if_t<SupportedTypeOfTensor<Vec>::value>>
 bool GetValueFromInput(const Value* v, Vec& value) {
-  using value_type = typename Vec::value_type;
-  using store_value = typename SupportedTypeOfTensor<Vec>::store_type;
   const Tensor* tensor = FetchConstantTensor(v);
   if (!tensor || tensor->elem_type() != SupportedTypeOfTensor<Vec>::elem_type) {
     return false;
   }
-  auto temp_value = ParseData<value_type>(tensor);
-  if constexpr (std::is_same_v<Vec, store_value>) {
-    value = std::move(temp_value);
-    return true;
-  }
-  std::transform(temp_value.cbegin(), temp_value.cend(),
-                 std::back_inserter(value), [](const auto& t) {
-                   return static_cast<typename store_value::value_type>(t);
-                 });
+  value = ParseTensorData<typename Vec::value_type>(tensor);
   return true;
 }
-template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+template <typename T, typename = std::enable_if_t<
+                          SupportedTypeOfTensor<std::vector<T>>::value>>
 bool GetValueFromInput(const Value* v, T& value, size_t which_value = 0) {
-  using store_value =
-      typename SupportedTypeOfTensor<std::vector<T>>::store_type;
-  std::vector<typename store_value::value_type> temp_;
+  std::vector<T> temp_;
   if (GetValueFromInput(v, temp_) && which_value < temp_.size()) {
-    value = static_cast<T>(temp_[which_value]);
+    value = temp_[which_value];
     return true;
   }
   return false;
 }
 
-template <typename Vec, typename = std::enable_if_t<std::is_same_v<
-                            Vec, std::vector<typename Vec::value_type>>>>
+template <typename Vec,
+          typename = std::enable_if_t<SupportedTypeOfTensor<Vec>::value>>
 bool GetValueFromInput(const Node* n, size_t which, Vec& value) {
   if (which >= n->inputs().size()) {
     return false;
   }
-  return GetValueFromInput(n->inputs()[which], value);
+  return GetValueFromInput(n->input(which), value);
 }
 
-template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T>>>
+template <typename T, typename = std::enable_if_t<
+                          SupportedTypeOfTensor<std::vector<T>>::value>>
 bool GetValueFromInput(const Node* n, size_t which_input, T& value,
                        size_t which_value = 0) {
   if (which_input >= n->inputs().size()) {
     return false;
   }
-  return GetValueFromInput(n->inputs()[which_input], value, which_value);
+  return GetValueFromInput(n->input(which_input), value, which_value);
 }
 
 template <typename Vec, typename Sym,
@@ -320,7 +303,14 @@ bool FetchSoleIntValueOfAttr(const Node* node, const Sym& symbol,
 // fetch the only element when the tensor is a scalar or a tensor that only has
 // a element
 template <typename T>
-bool FetchSoleValueOfTensor(const Value* t, T& val);
+bool FetchSoleValueOfTensor(const Value* t, T& val) {
+  std::vector<T> temp_;
+  if (!GetValueFromInput(t, temp_) || temp_.size() != 1) {
+    return false;
+  }
+  val = temp_[0];
+  return true;
+}
 
 // FetchSoleIntValueOfTensor is a wraper that fetchs int value(INT32 or INT64)
 // easier. E.g: get axis from axes tensor

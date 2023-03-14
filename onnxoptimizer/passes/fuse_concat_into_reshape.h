@@ -81,24 +81,25 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
           tensor->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
         return false;
       }
-#define DO_CASE(pb_type, cpp_type)                                   \
-  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type: {             \
-    const auto data = ParseData<cpp_type>(tensor);                   \
-    std::transform(                                                  \
-        data.cbegin(), data.cend(), std::back_inserter(shapes),      \
-        [](const cpp_type &v) { return static_cast<cpp_type>(v); }); \
-    break;                                                           \
+#define DO_CASE(pb_type, cpp_type)                                         \
+  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type: {                   \
+    const auto data = ParseTensorData<cpp_type>(tensor);                   \
+    std::transform(data.cbegin(), data.cend(), std::back_inserter(shapes), \
+                   [](const auto &v) { return static_cast<int64_t>(v); }); \
+    break;                                                                 \
   }
-
+      /// support cast
       switch (tensor->elem_type()) {
         DO_CASE(FLOAT, float)
         DO_CASE(INT32, int32_t)
         DO_CASE(INT64, int64_t)
         DO_CASE(DOUBLE, double)
-        DO_CASE(UINT8, int32_t)
-        DO_CASE(INT8, int32_t)
-        DO_CASE(UINT16, int32_t)
-        DO_CASE(INT16, int32_t)
+        DO_CASE(UINT8, uint8_t)
+        DO_CASE(INT8, int8_t)
+        DO_CASE(UINT16, uint16_t)
+        DO_CASE(INT16, int16_t)
+        DO_CASE(UINT32, uint32_t)
+        DO_CASE(UINT64, uint64_t)
         default:
           return false;
       }
