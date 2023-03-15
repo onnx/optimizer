@@ -6,20 +6,26 @@
 // Adventurous users should note that the APIs will probably change.
 
 #pragma once
-
-#include <vector>
-
-#include "onnx/common/tensor.h"
-#include "onnxoptimizer/passes/data_type.h"
+#include <cstdlib>
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
-int64_t ElemCntOfTensor(const Tensor* tensor);
-int64_t ElemCntOfTensor(const Tensor& tensor);
+inline float FP32FromBits(uint32_t bits) {
+  union {
+    uint32_t as_bits;
+    float as_value;
+  } fp32{bits};
+  return fp32.as_value;
+}
 
-template <typename T>
-const std::vector<T> ParseTensorData(const Tensor* tensor);
+inline uint32_t FP32ToBits(float value) {
+  union {
+    float as_value;
+    uint32_t as_bits;
+  } fp32{value};
+  return fp32.as_bits;
+}
 
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
