@@ -39,14 +39,14 @@ struct EliminateCommonSubexpression final : public FullGraphBasedPass {
       if (!node->hasUses() || !IsSupportedByCSE(node)) {
         continue;
       }
-      VLOG(1) <<  Str("kind: ", kind.toString(), ", ", node->name());
+      VLOG(2) << Str("kind: ", kind.toString(), ", ", node->name(),
+                     " is processing");
       if (hash_map.find(node) == hash_map.end()) {
         hash_map[node] = node;
       } else {
         auto other = hash_map.at(node);
         auto outputs = other->outputs();
         auto replaced_outputs = node->outputs();
-        ONNX_ASSERT(CSEEqual()(node, other));
         for (int i = 0; i < outputs.size(); ++i) {
           if (tryReplacingAllUsesWith(replaced_outputs[i], outputs[i])) {
             VLOG(1) << Str("kind: ", kind.toString(), ", ", node->name(), " [",
