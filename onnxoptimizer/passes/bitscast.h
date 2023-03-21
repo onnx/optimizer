@@ -6,6 +6,7 @@
 // Adventurous users should note that the APIs will probably change.
 
 #pragma once
+#include <cstdint>
 #include <cstdlib>
 
 namespace ONNX_NAMESPACE {

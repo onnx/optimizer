@@ -22,30 +22,6 @@ struct EliminateNopExpand final : public PredicateBasedPass {
     return "eliminate_nop_expand";
   }
 
-  bool isABroadcastToB(const std::vector<int64_t>& dims_a,
-                       const std::vector<Dimension>& dims_b) {
-    int ndim_a = dims_a.size();
-    int ndim_b = dims_b.size();
-    if (ndim_a > ndim_b) {
-      return false;
-    }
-
-    ndim_a--;
-    ndim_b--;
-
-    for (; ndim_a >= 0; ndim_a--, ndim_b--) {
-      int d_a = dims_a[ndim_a];
-      auto const& d_b = dims_b[ndim_b];
-      if (d_a == 1) {
-        continue;
-      }
-      if (!d_b.is_int || (d_a != d_b.dim)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   bool patternMatchPredicate(Node* node) override {
     return node->kind() == kExpand && IsConstantTensor(node, 1);
   }
