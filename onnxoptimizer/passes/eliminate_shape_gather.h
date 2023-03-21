@@ -9,7 +9,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
-#include "pass_util.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -24,9 +24,8 @@ struct EliminateShapeGather final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    return CheckKind(node, "Gather") && IsConstantTensor(node, 1) &&
-           CheckKind(node->inputs()[0], "Shape") &&
-           node->inputs()[0]->node()->input()->has_sizes();
+    return CheckKind(node, "Gather", 0, "Shape") && IsConstantTensor(node, 1) &&
+           HasDimsOfInputOfNode(PrevNode(node, 0), 0);
   }
 
   bool runTransform(Node *node, Graph &graph,
@@ -48,7 +47,7 @@ struct EliminateShapeGather final : public PredicateBasedPass {
 
     ONNX_ASSERT(indices_val < dims.size());
 
-    if (!dims[indices_val].is_int) {
+    if (!dims[indices_val].is_int || dims[indices_val].dim == -1) {
       return false;
     }
 

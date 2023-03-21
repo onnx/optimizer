@@ -14,17 +14,21 @@
 #include "onnx/common/ir_pb_converter.h"
 #include "onnx/common/stl_backports.h"
 #include "onnx/proto_utils.h"
+#include "onnxoptimizer/passes/adjust_add.h"
+#include "onnxoptimizer/passes/adjust_slice_and_matmul.h"
 #include "onnxoptimizer/passes/eliminate_deadend.h"
 #include "onnxoptimizer/passes/eliminate_duplicate_initializer.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
 #include "onnxoptimizer/passes/eliminate_if_with_const_cond.h"
 #include "onnxoptimizer/passes/eliminate_nop_cast.h"
+#include "onnxoptimizer/passes/eliminate_nop_concat.h"
 #include "onnxoptimizer/passes/eliminate_nop_dropout.h"
 #include "onnxoptimizer/passes/eliminate_nop_expand.h"
 #include "onnxoptimizer/passes/eliminate_nop_flatten.h"
 #include "onnxoptimizer/passes/eliminate_nop_monotone_argmax.h"
 #include "onnxoptimizer/passes/eliminate_nop_pad.h"
 #include "onnxoptimizer/passes/eliminate_nop_reshape.h"
+#include "onnxoptimizer/passes/eliminate_nop_split.h"
 #include "onnxoptimizer/passes/eliminate_nop_transpose.h"
 #include "onnxoptimizer/passes/eliminate_shape_gather.h"
 #include "onnxoptimizer/passes/eliminate_shape_op.h"
@@ -46,9 +50,13 @@
 #include "onnxoptimizer/passes/lift_lexical_references.h"
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/rename_input_output.h"
+#include "onnxoptimizer/passes/replace_einsum_with_matmul.h"
 #include "onnxoptimizer/passes/set_unique_name_for_nodes.h"
 #include "onnxoptimizer/passes/split.h"
-#include "onnxoptimizer/passes/replace_einsum_with_matmul.h"
+#include "onnxoptimizer/passes/fuse_consecutive_slices.h"
+#include "onnxoptimizer/passes/eliminate_common_subexpression.h"
+#include "onnxoptimizer/passes/fuse_qkv.h"
+#include "onnxoptimizer/passes/fuse_consecutive_unsqueezes.h"
 #include "onnxoptimizer/passes/eliminate_nop_with_unit.h"
 
 namespace ONNX_NAMESPACE {
@@ -61,6 +69,7 @@ struct GlobalPassRegistry {
 
   GlobalPassRegistry() {
     // Register the optimization passes to the optimizer.
+    registerPass<AdjustAdd>();
     registerPass<RenameInputOutput>();
     registerPass<SetUniqueNameForNodes>();
     registerPass<NopEmptyPass>();
@@ -71,6 +80,8 @@ struct GlobalPassRegistry {
     registerPass<EliminateIfWithConstCond>();
     registerPass<EliminateNopMonotoneArgmax>();
     registerPass<EliminateNopPad>();
+    registerPass<EliminateNopConcat>();
+    registerPass<EliminateNopSplit>();
     registerPass<EliminateNopExpand>();
     registerPass<EliminateShapeGather>();
     registerPass<EliminateSliceAfterShape>();
@@ -93,11 +104,16 @@ struct GlobalPassRegistry {
     registerPass<FuseConcatIntoReshape>();
     registerPass<EliminateNopReshape>();
     registerPass<EliminateOpWithUnit>();
+    registerPass<EliminateCommonSubexpression>();
+    registerPass<FuseQKV>();
+    registerPass<FuseConsecutiveUnsqueezes>();
     registerPass<EliminateDeadEnd>();
     registerPass<EliminateIdentity>();
     registerPass<EliminateShapeOp>();
+    registerPass<FuseConsecutiveSlices>();
     registerPass<EliminateUnusedInitializer>();
     registerPass<EliminateDuplicateInitializer>();
+    registerPass<AdjustSliceAndMatmul>();
   }
 
   ~GlobalPassRegistry() {

@@ -9,12 +9,13 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
 
 // before
-// Z  = Reshape(X, Concat(...)) or Z = Reshape(X, Cast(Concat(...), to=INT64 ))
+// Z = Reshape(X, Concat(...)) or Z = Reshape(X, Cast(Concat(...), to=INT64 ))
 // after
 // Z = Reshape(X, Y) , Y is a constant tensor
 
@@ -32,16 +33,15 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
   }
 
   inline bool matchConcatReshape(Node *node) {
-    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kConcat) &&
+    return CheckKind(node, kReshape, 1, kConcat) &&
            node->input(1)->node()->i(kaxis) == 0;
   }
 
   inline bool matchConcatCastReshape(Node *node) {
-    return CheckKind(node, kReshape) && CheckKind(node->inputs()[1], kCast) &&
+    return CheckKind(node, kReshape, 1, kCast, 0, kConcat) &&
            node->inputs()[1]->node()->i(kto) ==
                ONNX_NAMESPACE::TensorProto_DataType_INT64 &&
-           CheckKind(node->inputs()[1]->node()->input(), kConcat) &&
-           node->inputs()[1]->node()->input()->node()->i(kaxis) == 0;
+           PrevNode(node, 1, 0)->i(kaxis) == 0;
   }
 
   bool patternMatchPredicate(Node *node) override {
@@ -52,12 +52,11 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     const bool has_cast = matchConcatCastReshape(node);
 
-    Value *shape_value = node->inputs()[1];
     Node *concat = nullptr;
     if (has_cast) {
-      concat = node->inputs()[1]->node()->input()->node();
+      concat = PrevNode(node, 1, 0);
     } else {
-      concat = node->inputs()[1]->node();
+      concat = PrevNode(node, 1);
     }
 
     std::vector<int64_t> shapes;
@@ -82,24 +81,25 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
           tensor->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
         return false;
       }
-#define DO_CASE(pb_type, cpp_type)                                   \
-  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type: {             \
-    const auto data = ParseData<cpp_type>(tensor);                   \
-    std::transform(                                                  \
-        data.cbegin(), data.cend(), std::back_inserter(shapes),      \
-        [](const cpp_type &v) { return static_cast<cpp_type>(v); }); \
-    break;                                                           \
+#define DO_CASE(pb_type, cpp_type)                                         \
+  case ONNX_NAMESPACE::TensorProto_DataType_##pb_type: {                   \
+    const auto data = ParseTensorData<cpp_type>(tensor);                   \
+    std::transform(data.cbegin(), data.cend(), std::back_inserter(shapes), \
+                   [](const auto &v) { return static_cast<int64_t>(v); }); \
+    break;                                                                 \
   }
-
+      /// support cast
       switch (tensor->elem_type()) {
         DO_CASE(FLOAT, float)
         DO_CASE(INT32, int32_t)
         DO_CASE(INT64, int64_t)
         DO_CASE(DOUBLE, double)
-        DO_CASE(UINT8, int32_t)
-        DO_CASE(INT8, int32_t)
-        DO_CASE(UINT16, int32_t)
-        DO_CASE(INT16, int32_t)
+        DO_CASE(UINT8, uint8_t)
+        DO_CASE(INT8, int8_t)
+        DO_CASE(UINT16, uint16_t)
+        DO_CASE(INT16, int16_t)
+        DO_CASE(UINT32, uint32_t)
+        DO_CASE(UINT64, uint64_t)
         default:
           return false;
       }
@@ -118,10 +118,7 @@ struct FuseConcatIntoReshape final : public PredicateBasedPass {
     t.int64s().swap(shapes);
     Value *value = graph.addInitializerAndCreateValue(t);
 
-    const bool replacing_success = tryReplacingAllUsesWith(shape_value, value);
-    if (!replacing_success) {
-      return false;
-    }
+    node->replaceInput(1, value);
     destroy_current = NodeDestroyType::DestroyZero;
     return true;
   }

@@ -20,6 +20,7 @@ import shlex
 import subprocess
 import sys
 import platform
+import re
 from textwrap import dedent
 import multiprocessing
 
@@ -29,6 +30,7 @@ SRC_DIR = os.path.join(TOP_DIR, 'onnxoptimizer')
 CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build')
 
 WINDOWS = (os.name == 'nt')
+MACOS = sys.platform.startswith("darwin")
 
 CMAKE = find_executable('cmake')
 
@@ -186,6 +188,11 @@ class cmake_build(setuptools.Command):
                     cmake_args.extend(['-A', 'x64', '-T', 'host=x64'])
                 else:
                     cmake_args.extend(['-A', 'Win32', '-T', 'host=x86'])
+            if MACOS:
+                # Cross-compile support for macOS - respect ARCHFLAGS if set
+                archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
+                if archs:
+                    cmake_args += ["-DCMAKE_OSX_ARCHITECTURES={}".format(";".join(archs))]
             if ONNX_ML:
                 cmake_args.append('-DONNX_ML=1')
             if ONNX_VERIFY_PROTO3:
@@ -312,6 +319,11 @@ if sys.version_info[0] == 3:
 # Final
 ################################################################################
 
+# read the contents of your README file
+from pathlib import Path
+this_directory = Path(__file__).parent
+long_description = (this_directory / "README.md").read_text()
+
 setuptools.setup(
     name="onnxoptimizer",
     version=VersionInfo.version,
@@ -327,4 +339,12 @@ setuptools.setup(
     author='ONNX Optimizer Authors',
     author_email='onnx-technical-discuss@lists.lfai.foundation',
     url='https://github.com/onnx/optimizer',
+    keywords='deep-learning ONNX',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    entry_points={
+        'console_scripts': [
+            'onnxoptimizer=onnxoptimizer:main',
+        ],
+    },
 )

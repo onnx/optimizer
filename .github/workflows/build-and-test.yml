@@ -5,20 +5,22 @@ on: [push, pull_request]
 jobs:
   build_wheels:
     env:
+      CIBW_ARCHS_MACOS: x86_64 universal2
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp38-cp38/bin/python -m pip install cmake && cp /opt/_internal/cpython-3.8.13/bin/cmake /usr/local/bin/cmake && cmake --version && whereis cmake
+      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp38-cp38/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp38-cp38/bin/python -m pip install cmake && cmake --version && whereis cmake
       CIBW_BEFORE_ALL_MACOS: WD=`pwd` && pip install cmake
-      CIBW_TEST_REQUIRES_LINUX: pytest==5.4.3 nbval flake8 mypy onnxruntime
-      CIBW_TEST_REQUIRES_MACOS: pytest==5.4.3 nbval
-      CIBW_TEST_REQUIRES_WINDOWS: pytest==5.4.3 nbval
-      # latest pytorch is not available on py3.5, just ignore the error
-      CIBW_BEFORE_TEST_LINUX: pip install torch==1.7.1+cpu torchvision==0.8.2+cpu torchaudio==0.7.2 -f https://download.pytorch.org/whl/torch_stable.html || true
+      CIBW_TEST_REQUIRES_LINUX: pytest nbval flake8 mypy onnxruntime
+      CIBW_TEST_REQUIRES_MACOS: pytest nbval
+      CIBW_TEST_REQUIRES_WINDOWS: pytest nbval
+      CIBW_BEFORE_TEST_LINUX: pip install torch==1.13.1+cpu torchvision==0.14.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
+      # Python3.11 doesn't have torchvision prebuilt wheel
+      CIBW_TEST_SKIP: "cp311-* *_arm64 *_universal2:arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       # Only build on Python 3 and skip 32-bit builds
-      CIBW_BUILD: cp3?-*
+      CIBW_BUILD: "cp3?-* cp310-* cp311-*"
       # Skip python 3.6
       CIBW_SKIP: "cp36-* *-win32 *-manylinux_i686 *-musllinux_*"
     name: Build wheels on ${{ matrix.os }}
@@ -31,7 +33,7 @@ jobs:
       with:
         submodules: recursive
     - name: Build wheels
-      uses: pypa/cibuildwheel@v2.7.0
+      uses: pypa/cibuildwheel@v2.11.4
     - uses: actions/upload-artifact@v2
       with:
         path: ./wheelhouse/*.whl
@@ -57,3 +59,26 @@ jobs:
     - uses: actions/upload-artifact@v2
       with:
         path: dist/*.tar.gz
+
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          # unpacks default artifact into dist/
+          # if `name: artifact` is omitted, the action will create extra parent dir
+          name: artifact
+          path: dist
+      - name: Publish distribution 📦 to Test PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+          skip_existing: true
+      - name: Publish distribution 📦 to PyPI
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}

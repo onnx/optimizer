@@ -22,6 +22,7 @@
 
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -34,7 +35,7 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     return "fuse_matmul_add_bias_into_gemm";
   }
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kMatMul;
+    return CheckKind(node, kAdd, 0, kMatMul);
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
@@ -43,11 +44,7 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     destroy_current = NodeDestroyType::DestroyZero;
     auto orig_matmul = n->inputs()[0];
     auto orig_bias = n->inputs()[1];
-    // check if bias is Const or in graph's initializers
-    if (orig_bias->node()->kind() != kConstant &&
-        orig_bias->node()->kind() != kParam) {
-      return false;
-    }
+
     // check if MatMul is only used by Add
     if (orig_matmul->uses().size() > 1) {
       return false;

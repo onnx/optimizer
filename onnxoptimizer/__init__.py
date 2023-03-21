@@ -7,16 +7,13 @@
 
 This enables users to optimize their models.
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
 
 import onnx
 import onnxoptimizer.onnx_opt_cpp2py_export as C
+from .version import version as __version__  # noqa
 from onnx import ModelProto
 from typing import Text, Sequence, Optional
-
+from onnxoptimizer.onnxoptimizer_main import main
 import tempfile
 import os
 
@@ -37,11 +34,7 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
     """
 
     if passes is None:
-        print('WARNING: defualt optimization passes will be enlarged to all fuse and elimination passes in the next version')
-        passes = ['eliminate_nop_transpose',
-                  'eliminate_nop_pad',
-                  'fuse_consecutive_transposes',
-                  'fuse_transpose_into_gemm']
+        passes = get_fuse_and_elimination_passes()
     if not isinstance(model, ModelProto):
         raise ValueError(
             'Optimizer only accepts ModelProto, incorrect type: {}'.format(type(model)))
@@ -74,4 +67,4 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
             os.remove(data_file_dest.name)
 
 
-__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes']
+__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes', 'main']

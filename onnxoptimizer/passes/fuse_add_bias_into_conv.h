@@ -21,6 +21,7 @@
 
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -33,8 +34,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     return "fuse_add_bias_into_conv";
   }
   bool patternMatchPredicate(Node *node) override {
-    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
-           node->inputs()[0]->node()->inputs().size() == 2;
+    return CheckKind(node, kAdd, 0, kConv) &&
+           GetInputsOfPreNode(node, 0).size() == 2;
   }
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                                       Value *input, Node *target_node,

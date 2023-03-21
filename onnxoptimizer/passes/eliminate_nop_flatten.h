@@ -8,6 +8,7 @@
 #pragma once
 
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -22,7 +23,7 @@ struct EliminateNopFlatten final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node *node) override {
-    if (node->kind() != Symbol("Flatten")) {
+    if (!CheckKind(node, "Flatten")) {
       return false;
     }
     const Value *input = node->input();
@@ -30,7 +31,7 @@ struct EliminateNopFlatten final : public PredicateBasedPass {
       return false;
     }
     const auto input_shape = input->sizes();
-    const int axis = node->hasAttribute(kaxis) ? node->i(kaxis) : 1;
+    const int64_t axis = GetValueFromAttrWithDefault(node, kaxis, 1);
     if (input_shape.size() == 2) {
       if (axis == 1 || axis == -1) {
         return true;

@@ -20,6 +20,7 @@
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -32,7 +33,7 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     return "fuse_pad_into_conv";
   }
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kConv && node->inputs()[0]->node()->kind() == kPad;
+    return CheckKind(node, kConv, 0, kPad);
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
@@ -44,99 +45,59 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     }
 
     Node* conv = n;
-    Node* pad = n->inputs()[0]->node();
+    Node* pad = PrevNode(n, 0);
 
     // Process 'pads' data
     std::vector<int64_t> pads;
-    if (pad->hasAttribute(kpads)) {
-      // opset 10 and below
-      pads = pad->is(kpads);
-    } else {
-      // opset 11 and above - first check if 'pad' node has 'pads' input
-      // initialized
-      const auto& pads_name = pad->inputs()[1]->uniqueName();
-      const auto pads_initializer = graph.getInitializer(pads_name);
-      // 'pad' node has the 'pads' input which has not been initialized -
-      // can't proceed with fusing
-      if (pads_initializer == graph.initializers().end()) {
-        return false;
-      }
-
-      // make sure the type of 'pads' is INT64
-      if (pads_initializer->elem_type() != TensorProto::INT64) {
-        return false;
-      }
-
-      // parse 'pads' data from the initialized input
-      pads = ParseData<int64_t>(&*pads_initializer);
+    if (!GetValueFromAttrOrInput(pad, kpads, 1, pads)) {
+      return false;
     }
 
     // Process 'mode'
-    std::string pad_mode;
-    if (pad->hasAttribute(kmode)) {
-      pad_mode = pad->s(kmode);
-    } else {
-      pad_mode = "constant";
-    }
+    std::string default_pad_mode{"constant"};
 
     // cannot fuse if the pad mode is not "Constant"
-    if (pad_mode != "constant") {
+    if (GetValueFromAttrWithDefault(pad, kmode, default_pad_mode) !=
+        default_pad_mode) {
       return false;
     }
 
     // Process 'Constant_value'
-    // opset 10 and below
-    if (pad->hasAttribute(kvalue) &&
-        static_cast<double>(pad->f(kvalue)) != 0.0) {
-      return false;
-    } else if (pad->inputs().size() == 3) {
-      // opset 11 and above - check if the 'pad' node has the optional
-      // 'Constant_value' input check if it has data initialized
-      const auto& value_name = pad->inputs()[2]->uniqueName();
-      const auto value_initializer = graph.getInitializer(value_name);
+    {
+      union ConstantValueType {
+        int32_t i32;
+        int64_t i64;
+        float f32;
+        double f64;
+        uint8_t ui8;
+        int8_t i8;
+        uint16_t ui16;
+        int16_t i16;
+      } cv;
 
-      // 'pad' node has the 'Constant_value' input which has not been
-      // initialized - can't proceed with fusing
-      if (value_initializer == graph.initializers().end()) {
-        return false;
-      }
+#define Define_GetConstantValueFromInput(token) \
+  (GetValueFromInput(pad, 2, cv.token) && cv.token == decltype(cv.token)(0))
 
-      // parse 'Constant_value' data from the initialized input and stop
-      // optimizer if the Constant_value is non-zero
-      switch (value_initializer->elem_type()) {
-        case TensorProto::FLOAT:
-          if (ParseData<float>(&*value_initializer)[0] != 0)
-            return false;  // cannot fuse Pad into Conv
-          else
+      do {
+        if (GetValueFromAttr(pad, kvalue, cv.f64) && cv.f64 == double(0)) {
+          break;
+        }
+        if (pad->inputs().size() >= 3) {
+          if (Define_GetConstantValueFromInput(i32) ||
+              Define_GetConstantValueFromInput(i64) ||
+              Define_GetConstantValueFromInput(f32) ||
+              Define_GetConstantValueFromInput(f64) ||
+              Define_GetConstantValueFromInput(ui8) ||
+              Define_GetConstantValueFromInput(i8) ||
+              Define_GetConstantValueFromInput(ui16) ||
+              Define_GetConstantValueFromInput(i16)) {
             break;
+          }
+          return false;
+        }
+      } while (0);
 
-        case TensorProto::DOUBLE:
-          if (ParseData<double>(&*value_initializer)[0] != 0)
-            return false;  // cannot fuse Pad into Conv
-          else
-            break;
-
-        case TensorProto::INT32:
-          if (ParseData<int32_t>(&*value_initializer)[0] != 0)
-            return false;  // cannot fuse Pad into Conv
-          else
-            break;
-
-        case TensorProto::INT64:
-          if (ParseData<int64_t>(&*value_initializer)[0] != 0)
-            return false;  // cannot fuse Pad into Conv
-          else
-            break;
-
-        // TODO: Support more uncommon but valid types for Pad op (int8, uint8,
-        // int16, uint16, etc.)
-
-        default:
-          return false;  // Either type of Constant_value is invalid or not yet
-                         // supported by data parsing logic. Since we canot
-                         // validate the data present in 'Constant_value', we
-                         // exit the optimizer
-      }
+#undef Define_GetConstantValueFromInput
     }
 
     // check if some values in 'pads' prevents us from fusing it into 'Conv'
