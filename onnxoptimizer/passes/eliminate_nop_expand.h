@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
 #include "pass_util.h"
 
@@ -57,7 +56,7 @@ struct EliminateNopExpand final : public PredicateBasedPass {
     const auto* shape_tensor = FetchConstantTensor(node->input(1));
 
     if (!shape_tensor ||
-        !isABroadcastToB(ParseData<int64_t>(shape_tensor),
+        !isABroadcastToB(ParseTensorData<int64_t>(shape_tensor),
                          input_value->sizes()) ||
         !tryReplacingAllUsesWith(node->output(), input_value)) {
       return false;
