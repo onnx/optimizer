@@ -23,20 +23,20 @@ struct EliminateOpWithUnit final : public PredicateBasedPass {
     return "eliminate_nop_with_unit";
   }
 
-#define PROTO_DTYPE_LIST(_)      \
-  _(TensorProto_DataType_BFLOAT16)  \
+#define PROTO_DTYPE_LIST(_)        \
+  _(TensorProto_DataType_BFLOAT16) \
   _(TensorProto_DataType_FLOAT16)  \
-  _(TensorProto_DataType_FLOAT)  \
-  _(TensorProto_DataType_DOUBLE) \
-  _(TensorProto_DataType_UINT8)  \
-  _(TensorProto_DataType_INT8)   \
-  _(TensorProto_DataType_UINT16) \
-  _(TensorProto_DataType_INT16)  \
-  _(TensorProto_DataType_UINT32) \
-  _(TensorProto_DataType_INT32)  \
-  _(TensorProto_DataType_UINT64)\
-  _(TensorProto_DataType_INT64)  \
-  _(TensorProto_DataType_BOOL)   
+  _(TensorProto_DataType_FLOAT)    \
+  _(TensorProto_DataType_DOUBLE)   \
+  _(TensorProto_DataType_UINT8)    \
+  _(TensorProto_DataType_INT8)     \
+  _(TensorProto_DataType_UINT16)   \
+  _(TensorProto_DataType_INT16)    \
+  _(TensorProto_DataType_UINT32)   \
+  _(TensorProto_DataType_INT32)    \
+  _(TensorProto_DataType_UINT64)   \
+  _(TensorProto_DataType_INT64)    \
+  _(TensorProto_DataType_BOOL)
 
   bool isAllOf(const Tensor& tensor, int value) {
     int elem_type = tensor.elem_type();
@@ -55,13 +55,23 @@ struct EliminateOpWithUnit final : public PredicateBasedPass {
     return false;
   }
 
+  bool isAllOne(const Tensor& tensor) {
+    if (tensor.elem_type() == TensorProto_DataType_FLOAT16) {
+      return isAllOf(tensor, 0x3c00);
+    }
+    if (tensor.elem_type() == TensorProto_DataType_BFLOAT16) {
+      return isAllOf(tensor, BFloat16(1.f));
+    }
+    return isAllOf(tensor, 1);
+  }
+
   bool patternMatchPredicate(Node* node) override {
     return true;
   };
 
   bool isUnit(const Tensor& tensor, NodeKind kind, int index) {
     if (kind == Symbol("And") || kind == kMul) {
-      return isAllOf(tensor, 1);
+      return isAllOne(tensor);
     }
     if (kind == Symbol("Or") || kind == kAdd) {
       return isAllOf(tensor, 0);
@@ -70,7 +80,7 @@ struct EliminateOpWithUnit final : public PredicateBasedPass {
       return index == 1 && isAllOf(tensor, 0);
     }
     if (kind == kDiv || kind == kPow) {
-      return index == 1 && isAllOf(tensor, 1);
+      return index == 1 && isAllOne(tensor);
     }
     if (kind == kConcat) {
       return ElemCntOfTensor(tensor) == 0;
@@ -84,7 +94,6 @@ struct EliminateOpWithUnit final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
-
     for (int i = 0; i < node->inputs().size(); i++) {
       auto* input = node->inputs()[i];
       if (auto* tensor = FetchConstantTensor(input)) {
