@@ -3935,6 +3935,7 @@ class TestOptimizer(unittest.TestCase):
         zero = helper.make_tensor('zero', TensorProto.FLOAT, [2], np.array([0, 0], dtype=np.float32))
         bool_one = helper.make_tensor('bool_one', TensorProto.BOOL, [2], np.array([1, 1], dtype=np.int32))
         bool_zero = helper.make_tensor('bool_zero', TensorProto.BOOL, [2], np.array([0, 0], dtype=np.int32))
+        empty = helper.make_tensor('empty', TensorProto.BOOL, [0], np.array([], dtype=bool))
         X9 = helper.make_tensor_value_info('X9', TensorProto.BOOL, [2])
         X10 = helper.make_tensor_value_info('X10', TensorProto.BOOL, [2])
 
@@ -3949,22 +3950,26 @@ class TestOptimizer(unittest.TestCase):
         node_def8 = helper.make_node('Cast', ['X8'], ['X9'], to=TensorProto.BOOL)
         node_def9 = helper.make_node('Or', ['bool_zero', 'X9'], ['X10'],)
         node_def10 = helper.make_node('And', ['bool_one', 'X10'], ['X11'],)
-        node_def11 = helper.make_node('Identity', ['X11'], ['Y'],)
+        node_def11 = helper.make_node('Concat', ['empty', 'X11'], ['X12'], axis=0)
+        node_def12 = helper.make_node('Concat', ['X12', 'X12', 'empty'], ['X13'], axis=0)
+        node_def13 = helper.make_node('Identity', ['X13'], ['Y'],)
 
         graph = helper.make_graph(
             [node_def, node_def1, node_def2, node_def3, node_def4, node_def5,
-            node_def6, node_def7, node_def8, node_def9, node_def10, node_def11],        # nodes
+            node_def6, node_def7, node_def8, node_def9, node_def10, node_def11,
+            node_def12, node_def13],        # nodes
             'test',      # name
             [X],  # inputs
             [Y],  # outputs
-            [one, zero, bool_one, bool_zero],   # initialzer
+            [one, zero, bool_one, bool_zero, empty],   # initialzer
             value_info=[X9, X10],
         )
         optimized_model = self._optimized(
-            graph, ["eliminate_nop_with_unit"], False)
+            graph, ["eliminate_nop_with_unit", "eliminate_deadend", "eliminate_nop_concat"], True)
 
-        assert len(optimized_model.graph.node) == 3
-        assert optimized_model.graph.node[0].op_type == "Neg"
+        assert len(optimized_model.graph.node) == 4
+        assert optimized_model.graph.node[2].op_type == 'Concat'
+        assert len(optimized_model.graph.node[2].input) == 2
 
     def test_fuse_reduction_unsqueeze(self):  # type: () -> None
         # type: (Tuple[int, ...], List[int], List[int], bool) -> Tuple[int, ...]

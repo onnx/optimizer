@@ -395,6 +395,78 @@ inline std::vector<int64_t> GetIntsFromValue(const Value* v) {
   return is64;
 }
 
+inline bool isABroadcastToB(const std::vector<int64_t>& dims_a,
+                            const std::vector<Dimension>& dims_b) {
+  int ndim_a = dims_a.size();
+  int ndim_b = dims_b.size();
+  if (ndim_a > ndim_b) {
+    return false;
+  }
+
+  ndim_a--;
+  ndim_b--;
+
+  for (; ndim_a >= 0; ndim_a--, ndim_b--) {
+    int d_a = dims_a[ndim_a];
+    auto const& d_b = dims_b[ndim_b];
+    if (d_a == 1) {
+      continue;
+    }
+    if (!d_b.is_int || (d_a != d_b.dim)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <onnx::TensorProto_DataType>
+struct ToCppType;
+
+template <>
+struct ToCppType<TensorProto_DataType_INT8> {
+  using type = int8_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_INT16> {
+  using type = int16_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_INT32> {
+  using type = int32_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_INT64> {
+  using type = int64_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_UINT8> {
+  using type = uint8_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_UINT16> {
+  using type = uint16_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_UINT32> {
+  using type = uint32_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_UINT64> {
+  using type = uint64_t;
+};
+template <>
+struct ToCppType<TensorProto_DataType_FLOAT> {
+  using type = float;
+};
+template <>
+struct ToCppType<TensorProto_DataType_DOUBLE> {
+  using type = double;
+};
+template <>
+struct ToCppType<TensorProto_DataType_BOOL> {
+  using type = bool;
+};
+
 }  // namespace optimization
 
 }  // namespace ONNX_NAMESPACE
