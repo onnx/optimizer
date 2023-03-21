@@ -24,17 +24,19 @@ struct EliminateOpWithUnit final : public PredicateBasedPass {
   }
 
 #define PROTO_DTYPE_LIST(_)      \
+  _(TensorProto_DataType_BFLOAT16)  \
+  _(TensorProto_DataType_FLOAT16)  \
   _(TensorProto_DataType_FLOAT)  \
-  _(TensorProto_DataType_INT32)  \
-  _(TensorProto_DataType_INT64)  \
   _(TensorProto_DataType_DOUBLE) \
   _(TensorProto_DataType_UINT8)  \
   _(TensorProto_DataType_INT8)   \
   _(TensorProto_DataType_UINT16) \
   _(TensorProto_DataType_INT16)  \
-  _(TensorProto_DataType_BOOL)   \
   _(TensorProto_DataType_UINT32) \
-  _(TensorProto_DataType_UINT64)
+  _(TensorProto_DataType_INT32)  \
+  _(TensorProto_DataType_UINT64)\
+  _(TensorProto_DataType_INT64)  \
+  _(TensorProto_DataType_BOOL)   
 
   bool isAllOf(const Tensor& tensor, int value) {
     int elem_type = tensor.elem_type();

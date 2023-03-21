@@ -455,6 +455,14 @@ struct ToCppType<TensorProto_DataType_UINT64> {
   using type = uint64_t;
 };
 template <>
+struct ToCppType<TensorProto_DataType_BFLOAT16> {
+  using type = BFloat16;
+};
+template <>
+struct ToCppType<TensorProto_DataType_FLOAT16> {
+  using type = Float16;
+};
+template <>
 struct ToCppType<TensorProto_DataType_FLOAT> {
   using type = float;
 };
