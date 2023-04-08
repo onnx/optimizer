@@ -17,6 +17,7 @@
 
 #include "model_util.h"
 #include "onnx/common/file_utils.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -42,8 +43,47 @@ struct ExternalDataInfo {
     }
   }
 
-  void setExternalData(TensorProto* tensor) {
+  void setExternalData(TensorProto* tensor, int32_t size_threshold = 0) {
+    const auto& dims = tensor->dims();
+    int64_t elem_cnt = std::accumulate(dims.cbegin(), dims.cend(), int64_t(1),
+                                       std::multiplies<int64_t>{});
+    VLOG(3) << Str("tensor name: ", tensor->name(), ",elem count: ", elem_cnt);
+    /// ignore empty tensor
+    if (elem_cnt == 0) {
+      return;
+    }
+
     if (!tensor->has_raw_data()) {
+#define DO_CASE(pb_type, storage_field)                                        \
+  case TensorProto_DataType_##pb_type: {                                       \
+    using cpp_type = typename ToCppType<TensorProto_DataType_##pb_type>::type; \
+    std::vector<cpp_type> datas(tensor->storage_field().cbegin(),              \
+                                tensor->storage_field().cend());               \
+    std::string raw_data;                                                      \
+    size_t raw_data_size = datas.size() * sizeof(cpp_type);                    \
+    if (raw_data_size < size_threshold) {                                      \
+      return;                                                                  \
+    }                                                                          \
+    raw_data.resize(raw_data_size);                                            \
+    memcpy(&raw_data[0], &datas[0], raw_data_size);                            \
+    tensor->mutable_raw_data()->swap(raw_data);                                \
+    tensor->clear_##storage_field();                                           \
+    break;                                                                     \
+  }
+
+      switch (tensor->data_type()) {
+        DO_CASE(FLOAT, float_data)
+        DO_CASE(DOUBLE, double_data)
+        DO_CASE(INT32, int32_data)
+        DO_CASE(INT64, int64_data)
+        DO_CASE(UINT64, uint64_data)
+
+        default:
+          return;
+      }
+#undef DO_CASE
+    }
+    if (tensor->raw_data().size() < size_threshold) {
       return;
     }
     tensor->set_data_location(TensorProto_DataLocation_EXTERNAL);
@@ -107,12 +147,12 @@ std::vector<TensorProto*> getInitializerTensors(ModelProto* m) {
 
 std::vector<TensorProto*> getAttributeTensors(ModelProto* m) {
   std::vector<TensorProto*> tensors;
-  for(auto& node : *m->mutable_graph()->mutable_node()){
-    for(auto& attr : *node.mutable_attribute()){
-      if(attr.has_t()){
+  for (auto& node : *m->mutable_graph()->mutable_node()) {
+    for (auto& attr : *node.mutable_attribute()) {
+      if (attr.has_t()) {
         tensors.push_back(attr.mutable_t());
       }
-      for(auto& tensor: *attr.mutable_tensors()){
+      for (auto& tensor : *attr.mutable_tensors()) {
         tensors.push_back(&tensor);
       }
     }
@@ -210,10 +250,8 @@ void convertModelToExternalData(ModelProto* m, const std::string& location = {},
     file_name = location;
   }
   for (auto& tensor : tensors) {
-    if (tensor->has_raw_data() && tensor->raw_data().size() >= size_threshold) {
-      ExternalDataInfo info(file_name);
-      info.setExternalData(tensor);
-    }
+    ExternalDataInfo info(file_name);
+    info.setExternalData(tensor, size_threshold);
   }
 }
 
