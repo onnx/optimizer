@@ -6,8 +6,11 @@
 // Adventurous users should note that the APIs will probably change.
 
 #include <algorithm>
+#include <cstddef>  // size_t
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <numeric>
 #include <random>
 #include <sstream>
 #include <stdexcept>
@@ -17,7 +20,7 @@
 
 #include "model_util.h"
 #include "onnx/common/file_utils.h"
-#include "onnxoptimizer/passes/pass_util.h"
+#include "onnxoptimizer/passes/logging.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -54,29 +57,28 @@ struct ExternalDataInfo {
     }
 
     if (!tensor->has_raw_data()) {
-#define DO_CASE(pb_type, storage_field)                                        \
-  case TensorProto_DataType_##pb_type: {                                       \
-    using cpp_type = typename ToCppType<TensorProto_DataType_##pb_type>::type; \
-    std::vector<cpp_type> datas(tensor->storage_field().cbegin(),              \
-                                tensor->storage_field().cend());               \
-    std::string raw_data;                                                      \
-    size_t raw_data_size = datas.size() * sizeof(cpp_type);                    \
-    if (raw_data_size < size_threshold) {                                      \
-      return;                                                                  \
-    }                                                                          \
-    raw_data.resize(raw_data_size);                                            \
-    memcpy(&raw_data[0], &datas[0], raw_data_size);                            \
-    tensor->mutable_raw_data()->swap(raw_data);                                \
-    tensor->clear_##storage_field();                                           \
-    break;                                                                     \
+#define DO_CASE(pb_type, storage_field, cpp_type)                 \
+  case TensorProto_DataType_##pb_type: {                          \
+    std::vector<cpp_type> datas(tensor->storage_field().cbegin(), \
+                                tensor->storage_field().cend());  \
+    std::string raw_data;                                         \
+    size_t raw_data_size = datas.size() * sizeof(cpp_type);       \
+    if (raw_data_size < size_threshold) {                         \
+      return;                                                     \
+    }                                                             \
+    raw_data.resize(raw_data_size);                               \
+    memcpy(&raw_data[0], &datas[0], raw_data_size);               \
+    tensor->mutable_raw_data()->swap(raw_data);                   \
+    tensor->clear_##storage_field();                              \
+    break;                                                        \
   }
 
       switch (tensor->data_type()) {
-        DO_CASE(FLOAT, float_data)
-        DO_CASE(DOUBLE, double_data)
-        DO_CASE(INT32, int32_data)
-        DO_CASE(INT64, int64_data)
-        DO_CASE(UINT64, uint64_data)
+        DO_CASE(FLOAT, float_data, float)
+        DO_CASE(DOUBLE, double_data, double)
+        DO_CASE(INT32, int32_data, int32_t)
+        DO_CASE(INT64, int64_data, int64_t)
+        DO_CASE(UINT64, uint64_data, uint64_t)
 
         default:
           return;
