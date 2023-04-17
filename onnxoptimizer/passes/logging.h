@@ -6,7 +6,8 @@
 // Adventurous users should note that the APIs will probably change.
 
 #pragma once
-#include <cstdlib>  // abort getenv
+#include <algorithm>  // min
+#include <cstdlib>    // abort getenv
 #include <iostream>
 #include <mutex>
 #include <ostream>
@@ -44,8 +45,9 @@ class MessageControl {
   MessageControl(const char* file, const char* function, int line, int severity)
       : severity_(severity) {
     std::call_once(read_log_threshold_flag, ReadLogThresholdFromEnv);
-    stream_ << "[" << logging_prefix[std::min(4, LOG_FATAL - severity_)] << " "
-            << StripFilename(file) << ":" << line << " " << function << "]: ";
+    stream_ << "[" << logging_prefix[std::min<int>(4, LOG_FATAL - severity_)]
+            << " " << StripFilename(file) << ":" << line << " " << function
+            << "]: ";
   }
 
   ~MessageControl() {
