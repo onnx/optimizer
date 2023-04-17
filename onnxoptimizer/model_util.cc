@@ -20,6 +20,7 @@
 
 #include "model_util.h"
 #include "onnx/common/file_utils.h"
+#include "onnx/common/platform_helpers.h"
 #include "onnxoptimizer/passes/logging.h"
 
 namespace ONNX_NAMESPACE {
@@ -57,6 +58,9 @@ struct ExternalDataInfo {
     }
 
     if (!tensor->has_raw_data()) {
+      if (!is_processor_little_endian()) {
+        return;
+      }
 #define DO_CASE(pb_type, storage_field, cpp_type)                 \
   case TensorProto_DataType_##pb_type: {                          \
     std::vector<cpp_type> datas(tensor->storage_field().cbegin(), \
