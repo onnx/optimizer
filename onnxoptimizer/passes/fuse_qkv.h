@@ -62,18 +62,24 @@ struct FuseQKV final : public PredicateBasedPass {
     matmul->addInput(q->input(0));
     matmul->addInput(cat->output());
 
-    Tensor split_t;
-    split_t.sizes().push_back(3);
-    split_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
-    split_t.int64s().push_back(q_t->sizes().back());
-    split_t.int64s().push_back(k_t->sizes().back());
-    split_t.int64s().push_back(v_t->sizes().back());
-
     Node* split = graph.create("Split"_sym, 3);
     split->i_(kaxis, -1);
     split->insertAfter(matmul);
     split->addInput(matmul->output());
-    split->addInput(graph.addInitializerAndCreateValue(split_t));
+    const auto opset_version = getOpsetVersion(graph);
+    if (opset_version >= 13) {
+      Tensor split_t;
+      split_t.sizes().push_back(3);
+      split_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
+      split_t.int64s().push_back(q_t->sizes().back());
+      split_t.int64s().push_back(k_t->sizes().back());
+      split_t.int64s().push_back(v_t->sizes().back());
+      split->addInput(graph.addInitializerAndCreateValue(split_t));
+    } else {
+      split->is_(ksplit,
+                 std::vector<int64_t>{q_t->sizes().back(), k_t->sizes().back(),
+                                      v_t->sizes().back()});
+    }
     if (!tryReplacingAllUsesWith(q->output(), split->outputs()[0])) {
       return false;
     }

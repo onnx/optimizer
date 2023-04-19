@@ -4403,7 +4403,7 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 6
 
-    def test_fuse_qkv(self):  # type: () -> None
+    def _test_fuse_qkv_with_opset(self, opset_version):  # type: (int) -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 4096, 320])
         Y1 = helper.make_tensor_value_info("Y1", TensorProto.FLOAT, [1, 4096, 8, 40])
         Y2 = helper.make_tensor_value_info("Y2", TensorProto.FLOAT, [1, 4096, 8, 40])
@@ -4446,13 +4446,18 @@ class TestOptimizer(unittest.TestCase):
             [Y1, Y2, Y3],  # outputs
             [I0, I1, I2, I3, I4, shape],  # initializer
         )
-        optimized_model = self._optimized(graph, ["fuse_qkv", "eliminate_deadend"], False)
+        optimized_model = self._optimized(graph, ["fuse_qkv", "eliminate_deadend"], False, opset_imports=[helper.make_opsetid("", opset_version)])
         assert len(optimized_model.graph.node) == 8
         assert optimized_model.graph.node[0].op_type == "Mul"
         assert optimized_model.graph.node[1].op_type == "Add"
         assert optimized_model.graph.node[2].op_type == "Concat"
         assert optimized_model.graph.node[3].op_type == "MatMul"
         assert optimized_model.graph.node[4].op_type == "Split"
+
+    def test_fuse_qkv(self):  # type: () -> None
+        for opset_version in [11, 15]:
+            self._test_fuse_qkv_with_opset(opset_version)
+        self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
