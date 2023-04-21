@@ -83,6 +83,9 @@ struct FusePadIntoConv final : public PredicateBasedPass {
           break;
         }
         if (pad->inputs().size() >= 3) {
+          if (pad->input(2)->uniqueName().empty()) {
+            break;
+          }
           if (Define_GetConstantValueFromInput(i32) ||
               Define_GetConstantValueFromInput(i64) ||
               Define_GetConstantValueFromInput(f32) ||
@@ -138,3 +141,4 @@ struct FusePadIntoConv final : public PredicateBasedPass {
 
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
+
