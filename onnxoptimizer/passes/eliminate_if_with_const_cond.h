@@ -8,6 +8,7 @@
 #pragma once
 
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -50,13 +51,8 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
   bool runTransform(Node *if_node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
     const auto cond_value = if_node->input();
-    Tensor cond_tensor;
-    if (cond_value->node()->kind() == kConstant) {
-      cond_tensor = cond_value->node()->t(kvalue);
-    } else {
-      cond_tensor = *graph.getInitializer(cond_value->uniqueName());
-    }
-    const bool cond = static_cast<bool>(cond_tensor.data<int32_t>()[0]);
+    const Tensor *cond_tensor = FetchConstantTensor(cond_value);
+    const bool cond = ParseTensorData<bool>(cond_tensor)[0];
     auto &parent_graph = graph;
     const auto subgraph = if_node->g(cond ? kthen_branch : kelse_branch);
 
