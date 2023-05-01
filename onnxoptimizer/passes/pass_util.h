@@ -114,8 +114,8 @@ bool CheckKind(const Node* n, const Sym1& s1, const Which& which,
          CheckKind(n->input(which)->node(), s2, args...);
 }
 
-template <typename T>
-T AddYIfNegative(T x, T y) {
+template <typename T1, typename T2>
+T1 AddYIfNegative(T1 x, T2 y) {
   return x < 0 ? x + y : x;
 }
 
@@ -359,11 +359,11 @@ Node* PrevNode(Node* n, T which, U which1, Args... args) {
 }
 
 template <typename T>
-bool IsIntersection(const std::vector<T>& v1, const std::vector<T>& v2) {
+bool HasIntersection(std::vector<T> v1, std::vector<T> v2) {
   std::vector<T> intersect;
-  std::set<T> s1(v1.begin(), v1.end());
-  std::set<T> s2(v2.begin(), v2.end());
-  std::set_intersection(s1.begin(), s1.end(), s2.begin(), s2.end(),
+  std::sort(v1.begin(), v1.end());
+  std::sort(v2.begin(), v2.end());
+  std::set_intersection(v1.begin(), v1.end(), v2.begin(), v2.end(),
                         std::back_inserter(intersect));
   return !intersect.empty();
 }
