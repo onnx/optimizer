@@ -393,7 +393,7 @@ class TestOptimizer(unittest.TestCase):
 
         assert optimized_model.graph == graph
 
-    def test_eliminate_if_with_const_cond(self):  # type: () -> None
+    def test_eliminate_if_with_const_true_cond(self):  # type: () -> None
         true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
 
         subgraph_output_info = helper.make_tensor_value_info(
@@ -433,6 +433,46 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Sin"
         assert optimized_model.graph.node[2].op_type == "HardSigmoid"
+
+    def test_eliminate_if_with_const_false_cond(self):  # type: () -> None
+        true = helper.make_tensor("condition", TensorProto.BOOL, (), [False])
+
+        subgraph_output_info = helper.make_tensor_value_info(
+            "C", TensorProto.FLOAT, (5,)
+        )
+
+        sin = helper.make_node("Sin", ["A"], ["B"])
+        hard_sigmoid = helper.make_node(
+            "HardSigmoid", ["B"], ["C"], alpha=0.4, beta=0.6
+        )
+        true_graph = helper.make_graph(
+            [sin, hard_sigmoid], "true_graph", [], [subgraph_output_info]
+        )
+
+        identity = helper.make_node("Identity", ["A"], ["C"])
+        false_graph = helper.make_graph(
+            [identity], "false_graph", [], [subgraph_output_info]
+        )
+
+        graph = helper.make_graph(
+            [
+                helper.make_node("Constant", [], ["condition"], value=true),
+                helper.make_node(
+                    "If",
+                    ["condition"],
+                    ["result"],
+                    then_branch=true_graph,
+                    else_branch=false_graph,
+                ),
+            ],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))],
+        )
+        optimized_model = self._optimized(graph, ["eliminate_if_with_const_cond"])
+        assert len(optimized_model.graph.node) == 2
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Identity"
 
     def test_eliminate_if_with_const_cond_with_subgraph_param(self):  # type: () -> None
         true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
@@ -4342,6 +4382,28 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[2].op_type == 'Concat'
         assert optimized_model.graph.node[3].op_type == 'Concat'
         assert optimized_model.graph.node[4].op_type == 'Slice'
+
+    def test_fuse_consecutive_slices_with_same_axes(self):  # type: () -> None
+        graph = parser.parse_graph("""
+               agraph (float[1, 3, 640, 640] X) => (float[1, 3, 320, 320] Z)
+               {
+                  t0 = Constant<value=int64[1]{0}>()
+                  t1 = Constant<value=int64[1]{1}>()
+                  t2 = Constant<value=int64[1]{2}>()
+                  tn2 = Constant<value=int64[1]{-2}>()
+                  t3 = Constant<value=int64[1]{3}>()
+                  t640 = Constant<value=int64[1]{640}>()
+                  Y = Slice(X, t1, t640, t2, t2)
+                  Z = Slice(Y, t1, t640, tn2, t2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            graph, ['extract_constant_to_initializer', 'fuse_consecutive_slices', 'eliminate_deadend'], False)
+
+        assert len(optimized_model.graph.node) == 2
+        assert optimized_model.graph.node[0].op_type == 'Slice'
+        assert optimized_model.graph.node[1].op_type == 'Slice'
 
     def test_eliminate_common_subexression(self):  # type: () -> None
         graph = parser.parse_graph("""
