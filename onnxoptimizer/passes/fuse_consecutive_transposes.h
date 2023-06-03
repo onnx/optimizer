@@ -57,7 +57,8 @@ struct FuseConsecutiveTransposes final : public PredicateBasedPass {
       if (!replacing_success) {
         return false;
       }
-      destroy_current = NodeDestroyType::DestroyTwo;
+      // only destroy the first transpose and DCE will take care of the another
+      destroy_current = NodeDestroyType::DestroyOne;
       return true;
     }
     if (!n->hasAttribute(kperm) || !origInput->node()->hasAttribute(kperm)) {

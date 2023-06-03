@@ -74,8 +74,9 @@ enum NodeDestroyType {
   DestroyZero = 0,
   // Equivalent to calling it.destroyCurrent() once.
   DestroyOne = 1,
-  // Equivalent to calling it.destroyCurrent() twice.
-  DestroyTwo = 2
+  // Previously we have `DestroyTwo` (call destroyCurrent() twice),
+  // but it is actually not well-defined -- there are multiple possible
+  // topological orders. So we remove it.
 };
 
 // Base class for all optimizations within ONNX. A pass must contain the

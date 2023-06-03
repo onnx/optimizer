@@ -45,7 +45,7 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
       return false;
     }
     log_node->removeAllInputs();
-    destroy_current = NodeDestroyType::DestroyTwo;
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

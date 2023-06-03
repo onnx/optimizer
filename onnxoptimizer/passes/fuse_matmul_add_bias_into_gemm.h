@@ -98,7 +98,8 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     if (!replacing_success) {
       return false;
     }
-    destroy_current = NodeDestroyType::DestroyTwo;
+    // only destroy MatMul here and DCE will take care of the Add
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

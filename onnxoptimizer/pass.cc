@@ -69,10 +69,6 @@ unsigned int PredicateBasedPass::_runPassInternal(Graph& graph) {
       if (destroy_type == NodeDestroyType::DestroyOne) {
         it.destroyCurrent();
       }
-      if (destroy_type == NodeDestroyType::DestroyTwo) {
-        it.destroyCurrent();
-        it.destroyCurrent();
-      }
     }
   }
   return num_changes;
