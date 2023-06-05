@@ -16,6 +16,7 @@
 #include "onnx/proto_utils.h"
 #include "onnxoptimizer/passes/adjust_add.h"
 #include "onnxoptimizer/passes/adjust_slice_and_matmul.h"
+#include "onnxoptimizer/passes/eliminate_consecutive_idempotent_ops.h"
 #include "onnxoptimizer/passes/eliminate_deadend.h"
 #include "onnxoptimizer/passes/eliminate_duplicate_initializer.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
@@ -78,6 +79,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopDropout>();
     registerPass<EliminateNopFlatten>();
     registerPass<ExtractConstantToInitializer>();
+    registerPass<EliminateConsecutiveIdempotentOps>();
     registerPass<EliminateIfWithConstCond>();
     registerPass<EliminateNopMonotoneArgmax>();
     registerPass<EliminateNopPad>();

@@ -4557,6 +4557,30 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Unsqueeze"
 
+    def test_eliminate_consecutive_idempotent_op(self):
+        model = parser.parse_model("""
+                <
+                    ir_version: 7,
+                    opset_import:["": 11]
+                >
+               agraph (float[1, 4, 5] X) => (float[2, 5, 2] Z)
+               {
+                  Shape1 = Constant<value=int64[2]{5, 4}>()
+                  Shape2 = Constant<value=int64[3]{1, 20, 1}>()
+                  Shape3 = Constant<value=int64[3]{2, 5, 2}>()
+                  T1 = Reshape(X, Shape1)
+                  T2 = Reshape(T1, Shape2)
+                  Z = Reshape(T2, Shape3)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            model, ['eliminate_consecutive_idempotent_ops', 'eliminate_deadend'], True)
+
+        assert len(optimized_model.graph.node) == 2
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Reshape"
+
 
 if __name__ == "__main__":
     unittest.main()
