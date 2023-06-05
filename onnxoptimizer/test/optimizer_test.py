@@ -3831,6 +3831,22 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Identity"
 
+    def test_eliminate_nop_reshape_with_neg_1_and_another_unknown_dim(self):  # type: () -> None
+        graph = parser.parse_graph("""
+           agraph (float[2, N, 4] X) => (float[2, 8, M, 2] Z)
+           {
+              Shape = Constant<value=int64[4]{2, 8, -1, 2}> ()
+              Y = Reshape (X, Shape)
+              Z = Identity(Y)
+           }
+        """)
+        optimized_model = self._optimized(graph, ["eliminate_nop_reshape", "eliminate_deadend"], False, input_shapes_for_comparing={'X': [2, 4, 4]})
+
+        assert len(optimized_model.graph.node) == 3
+        assert optimized_model.graph.node[0].op_type == "Constant"
+        assert optimized_model.graph.node[1].op_type == "Reshape"
+        assert optimized_model.graph.node[2].op_type == "Identity"
+
     def test_eliminate_nop_reshape_with_allowzero(self):  # type: () -> None
         graph = parser.parse_graph("""
            agraph (float[N, 0] X) => (float[0, M] Z)

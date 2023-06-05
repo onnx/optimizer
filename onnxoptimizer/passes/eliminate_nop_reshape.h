@@ -29,39 +29,41 @@ struct EliminateNopReshape final : public PredicateBasedPass {
 
   bool runTransform(Node *node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
-    const auto &data_input_dims = node->inputs()[0]->sizes();
-    const auto *shape_input = node->inputs()[1];
+    const auto &old_shape = node->inputs()[0]->sizes();
+    const auto *new_shape_input = node->inputs()[1];
 
-    const Tensor *shape_tensor = FetchConstantTensor(shape_input);
-    if (!shape_tensor) {
+    const Tensor *new_shape_tensor = FetchConstantTensor(new_shape_input);
+    if (!new_shape_tensor) {
       return false;
     }
 
-    if (shape_tensor->elem_type() !=
+    if (new_shape_tensor->elem_type() !=
         ONNX_NAMESPACE::TensorProto_DataType_INT64) {
       return false;
     }
-    const auto shape_input_data = ParseTensorData<int64_t>(shape_tensor);
+    const auto new_shape = ParseTensorData<int64_t>(new_shape_tensor);
 
-    if (shape_input_data.size() != data_input_dims.size()) {
+    if (new_shape.size() != old_shape.size()) {
       return false;
     }
 
     int unknown_dim_count = 0;
-    for (int i = 0; i < shape_input_data.size(); ++i) {
-      const auto d = shape_input_data[i];
+    for (int i = 0; i < new_shape.size(); ++i) {
+      const auto new_dim = new_shape[i];
       // the dim can be copied from the input only when allowzero == 0
-      if (d == 0 && !(node->hasAttribute(Symbol("allowzero")) &&
+      if (new_dim == 0 && !(node->hasAttribute(Symbol("allowzero")) &&
                       node->i(Symbol("allowzero")) == 1)) {
         continue;
       }
-      if (data_input_dims[i].is_int) {
-        if (data_input_dims[i].dim != d && d != -1) {
+      if (old_shape[i].is_int) {
+        if (new_dim == -1) {
+          unknown_dim_count++;
+        } else if (old_shape[i].dim != new_dim) {
           return false;
         }
-        continue;
+      } else {
+        unknown_dim_count++;
       }
-      unknown_dim_count++;
     }
     if (unknown_dim_count > 1) {
       return false;
