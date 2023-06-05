@@ -27,7 +27,8 @@ struct EliminateConsecutiveIdempotentOps final : public PredicateBasedPass {
         "Ceil", "Floor", "Round", "Relu", "Reshape"};
     for (const auto& op : idempotent_ops) {
       // TODO: support uses().size() > 1 for ops except Reshape
-      if (CheckKind(node, Symbol(op), 0, Symbol(op)) && node->input(0)->uses().size() == 1) {
+      if (CheckKind(node, Symbol(op), 0, Symbol(op)) &&
+          node->input(0)->uses().size() == 1) {
         return true;
       }
     }
@@ -36,7 +37,17 @@ struct EliminateConsecutiveIdempotentOps final : public PredicateBasedPass {
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     Node* previous_node = node->input(0)->node();
-    return tryReplacingAllUsesWith(node->input(0), previous_node->input(0));
+    std::vector<Dimension> sizes = previous_node->input(0)->sizes();
+    bool replacing_success =
+        tryReplacingAllUsesWith(node->input(0), previous_node->input(0));
+    if (replacing_success) {
+      if (node->kind() == kReshape) {
+        // restore the correct sizes
+        previous_node->input(0)->setSizes(sizes);
+      }
+      return true;
+    }
+    return false;
   }
 };
 
