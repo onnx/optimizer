@@ -47,7 +47,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     return "fuse_bn_into_conv";
   }
 
-  bool modify_conv(Node* conv, Node* bn, Graph& graph) {
+  bool modify_conv(Node* conv, Node* bn, Graph& graph, const bool is_conv) {
     const auto& bn_inputs = bn->inputs();
     const auto& conv_inputs = conv->inputs();
 
@@ -123,10 +123,9 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     Node* unsqueeze = graph.create(kUnsqueeze, 1);
     unsqueeze->insertAfter(scale);
     unsqueeze->addInput(scale->output());
-    std::vector<int64_t> insert_dims;
-    for (int i = 1; i < conv_W.sizes().size(); ++i) {
-      insert_dims.push_back(i);
-    }
+    std::vector<int64_t> insert_dims(conv_W.sizes().size());
+    std::iota(insert_dims.begin(), insert_dims.end(), 0);
+    insert_dims.erase(insert_dims.begin() + (is_conv ? 0 : 1));
     if (getOpsetVersion(graph) > 11) {
       Tensor shape_s_t;
       shape_s_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
@@ -181,7 +180,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* n) override {
-    return CheckKind(n, kBatchNormalization, 0, kConv) &&
+    return (CheckKind(n, kBatchNormalization, 0, kConv) ||
+           CheckKind(n, kBatchNormalization, 0, kConvTranspose)) &&
            GetValueFromAttrWithDefault(n, "training_mode", (int64_t)0) == 0 &&
            n->input(0)->uses().size() == 1 && n->outputs().size() == 1 &&
            IsConstantTensor(n, 1) && IsConstantTensor(n, 2) &&
@@ -190,10 +190,12 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
+    const bool is_conv = CheckKind(n, kBatchNormalization, 0, kConv);
+
     Node* bn = n;
     Node* conv = PrevNode(n, 0);
     auto origInput = bn->inputs()[0];
-    if (!modify_conv(conv, bn, graph)) {
+    if (!modify_conv(conv, bn, graph, is_conv)) {
       destroy_current = NodeDestroyType::DestroyZero;
       return false;
     }
