@@ -127,7 +127,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     for (int i = 1; i < conv_W.sizes().size(); ++i) {
       insert_dims.push_back(i);
     }
-    if (getOpsetVersion(graph) > 11) {
+    if (getOpsetVersion(graph) >= 13) {
       Tensor shape_s_t;
       shape_s_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
       shape_s_t.sizes().push_back(insert_dims.size());
