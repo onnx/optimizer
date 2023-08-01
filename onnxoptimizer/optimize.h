@@ -46,11 +46,22 @@ struct Optimizer {
     ModelProto mp_out = PrepareOutput(mp_in);
     this->pass_manager->run(*g);
     ExportModelProto(&mp_out, g);
+
+    // Maybe we can optimize these functions, now just copy
+    AddFunctionsToModel(mp_in, mp_out);
     return mp_out;
   }
 
  private:
   std::shared_ptr<PassManager> pass_manager;
+
+  void AddFunctionsToModel(const ModelProto &original_model,
+                           ModelProto &output_model) {
+    for (const auto& function_proto : original_model.functions()) {
+      auto* p_f = output_model.add_functions();
+      p_f->CopyFrom(function_proto);
+    }
+  }
 
   ModelProto AddInitializerToInput(const ModelProto &original_model) {
     ModelProto model = original_model;
