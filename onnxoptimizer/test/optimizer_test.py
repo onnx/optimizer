@@ -4613,9 +4613,10 @@ class TestOptimizer(unittest.TestCase):
             """)
 
         optimized_model = self._optimized(
-            model, ['eliminate_consecutive_idempotent_ops', 'eliminate_deadend'], True) 
+            model, ['eliminate_consecutive_idempotent_ops', 'eliminate_deadend'], True)
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Sign"
+
 
 if __name__ == "__main__":
     unittest.main()
