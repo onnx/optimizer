@@ -4615,13 +4615,12 @@ class TestOptimizer(unittest.TestCase):
             """)
 
         optimized_model = self._optimized(
-            model,["rewrite_where"], True)
+            model, ["rewrite_where"], True)
 
         assert len(optimized_model.graph.node) == 5
         assert set([i.op_type for i in optimized_model.graph.node]) == {'Where', 'And', 'Sign'}
         assert optimized_model.graph.node[0].input == ['A', 'Y', 'X']
         assert optimized_model.graph.node[3].input == ['M', 'X', 'Y']
-
 
 
 if __name__ == "__main__":
