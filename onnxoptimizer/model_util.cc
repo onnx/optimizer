@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <cstddef>  // size_t
-#include <filesystem>
+#include <experimental/filesystem>
 #include <fstream>
 #include <limits>
 #include <numeric>
@@ -180,7 +180,7 @@ bool usesExternalData(TensorProto* tensor) {
 }
 
 void loadExternalDataForTensor(TensorProto* tensor,
-                               const std::filesystem::path& base_dir) {
+                               const std::experimental::filesystem::path& base_dir) {
   ExternalDataInfo info(tensor);
   auto external_data_file_path = base_dir;
   external_data_file_path /= (info.location);
@@ -212,7 +212,7 @@ void loadExternalDataForTensor(TensorProto* tensor,
 }
 
 void loadExternalDataForModel(ModelProto* m,
-                              const std::filesystem::path& base_dir) {
+                              const std::experimental::filesystem::path& base_dir) {
   auto tensors = getAllTensors(m);
   for (auto& tensor : tensors) {
     if (usesExternalData(tensor)) {
@@ -222,7 +222,7 @@ void loadExternalDataForModel(ModelProto* m,
 }
 
 void saveExternalData(TensorProto* tensor,
-                      const std::filesystem::path& base_dir) {
+                      const std::experimental::filesystem::path& base_dir) {
   ExternalDataInfo info(tensor);
   auto external_data_file_path = base_dir;
   external_data_file_path /= (info.location);
@@ -262,7 +262,7 @@ void convertModelToExternalData(ModelProto* m, const std::string& location = {},
 }
 
 void writeExternalDataTensors(ModelProto* m,
-                              const std::filesystem::path& base_dir) {
+                              const std::experimental::filesystem::path& base_dir) {
   auto tensors = getAllTensors(m);
   for (auto& tensor : tensors) {
     if (usesExternalData(tensor) && tensor->has_raw_data()) {
@@ -278,7 +278,7 @@ void loadModel(ModelProto* m, const std::string& model_path,
                bool load_external_data) {
   LoadProtoFromPath<ModelProto>(model_path, *m);
   if (load_external_data) {
-    const auto parent_path = std::filesystem::path(model_path).parent_path();
+    const auto parent_path = std::experimental::filesystem::path(model_path).parent_path();
     loadExternalDataForModel(m, parent_path);
   }
 }
@@ -289,7 +289,7 @@ void saveModel(ModelProto* m, const std::string& model_path,
   if (save_external_data) {
     convertModelToExternalData(m, data_file_name);
   }
-  const auto parent_path = std::filesystem::path(model_path).parent_path();
+  const auto parent_path = std::experimental::filesystem::path(model_path).parent_path();
   writeExternalDataTensors(m, parent_path);
 
   std::string serialize;
