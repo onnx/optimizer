@@ -7,7 +7,7 @@ jobs:
     env:
       CIBW_ARCHS_MACOS: x86_64 universal2
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp38-cp38/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp38-cp38/bin/python -m pip install cmake && cmake --version && whereis cmake
+      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp38-cp38/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp39-cp39/bin/python -m pip install cmake && cmake --version && whereis cmake
       CIBW_BEFORE_ALL_MACOS: WD=`pwd` && pip install cmake
       CIBW_TEST_REQUIRES_LINUX: pytest nbval flake8 mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest nbval
