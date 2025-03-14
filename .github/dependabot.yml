@@ -26,6 +26,5 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 20
-    labels:      
-      - "github_actions"
+
     
