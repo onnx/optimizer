@@ -327,7 +327,7 @@ long_description = (this_directory / "README.md").read_text()
 setuptools.setup(
     name="onnxoptimizer",
     version=VersionInfo.version,
-    description="Actively maintained ONNX Optimizer",
+    description="ONNX Optimizer",
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=packages,
