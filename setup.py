@@ -23,7 +23,7 @@ import platform
 import re
 from textwrap import dedent
 import multiprocessing
-
+import shutil
 
 TOP_DIR = os.path.realpath(os.path.dirname(__file__))
 SRC_DIR = os.path.join(TOP_DIR, 'onnxoptimizer')
@@ -32,7 +32,8 @@ CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build')
 WINDOWS = (os.name == 'nt')
 MACOS = sys.platform.startswith("darwin")
 
-CMAKE = find_executable('cmake')
+CMAKE = shutil.which('cmake')
+
 
 install_requires = []
 setup_requires = []
