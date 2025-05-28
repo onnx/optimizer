@@ -23,15 +23,13 @@ jobs:
       CIBW_TEST_SKIP: "cp311-* *_arm64 *_universal2:arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
-      CIBW_BUILD: "${{ matrix.python }}-*"
-      # Skip python 3.6
-      CIBW_SKIP: "cp36-* *-win32 *-manylinux_i686 *-musllinux_*"
+      CIBW_BUILD: "${{ matrix.python }}-*"      
+      CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_*"
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019, macos-15]
-        # Only build on Python 3 and skip 32-bit builds
+        os: [ubuntu-22.04, windows-2019, macos-15]        
         python: ["cp39", "cp310", "cp311", "cp312"]
     steps:
     - uses: actions/checkout@v4
@@ -75,8 +73,6 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          # unpacks default artifact into dist/
-          # if `name: artifact` is omitted, the action will create extra parent dir
           name: artifact
           path: dist
       - name: Publish distribution 📦 to Test PyPI
@@ -87,6 +83,6 @@ jobs:
           skip_existing: true
       - name: Publish distribution 📦 to PyPI
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
