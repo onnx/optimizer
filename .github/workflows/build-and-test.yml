@@ -16,7 +16,7 @@ jobs:
       CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8 mypy onnxruntime==1.19.2
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
-      CIBW_BEFORE_TEST_LINUX: pip install torch==1.13.1+cpu torchvision==0.14.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      CIBW_BEFORE_TEST_LINUX: pip install torch==2.2.0+cpu torchvision==0.17.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
       # Python3.11 doesn't have torchvision prebuilt wheel
@@ -32,7 +32,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04, windows-2019, macos-15]
         # Only build on Python 3 and skip 32-bit builds
-        python: ["cp39", "cp310", "cp311"]
+        python: ["cp39", "cp310", "cp311", "cp312"]
     steps:
     - uses: actions/checkout@v4
       with:

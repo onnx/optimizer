@@ -5,7 +5,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from distutils.spawn import find_executable
 from distutils import sysconfig, log
 import setuptools
 import setuptools.command.build_py
@@ -17,6 +16,7 @@ from contextlib import contextmanager
 import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import platform
@@ -32,7 +32,7 @@ CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build{0}.{1}'.format(
 WINDOWS = (os.name == 'nt')
 MACOS = sys.platform.startswith("darwin")
 
-CMAKE = find_executable('cmake')
+CMAKE = shutil.which('cmake')
 
 install_requires = []
 setup_requires = []
