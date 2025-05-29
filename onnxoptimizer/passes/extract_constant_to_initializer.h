@@ -30,7 +30,7 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kConstant;
+    return node->kind() == kConstant && node->hasAttribute(kvalue);
   }
 
   bool runTransform(Node* node, Graph& graph,
