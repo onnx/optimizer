@@ -1,6 +1,11 @@
 name: Build and Test
 
-on: [push, pull_request]
+on: 
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build_wheels:
@@ -29,7 +34,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019, macos-15]        
+        os: [ubuntu-22.04, windows-2022, macos-15]        
         python: ["cp39", "cp310", "cp311", "cp312"]
     steps:
     - uses: actions/checkout@v4
