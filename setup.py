@@ -5,7 +5,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from distutils.spawn import find_executable
 from distutils import sysconfig, log
 import setuptools
 import setuptools.command.build_py
@@ -17,6 +16,7 @@ from contextlib import contextmanager
 import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 import platform
@@ -27,12 +27,12 @@ import multiprocessing
 
 TOP_DIR = os.path.realpath(os.path.dirname(__file__))
 SRC_DIR = os.path.join(TOP_DIR, 'onnxoptimizer')
-CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build')
+CMAKE_BUILD_DIR = os.path.join(TOP_DIR, '.setuptools-cmake-build{0}.{1}'.format(*sys.version_info[:2]))
 
 WINDOWS = (os.name == 'nt')
 MACOS = sys.platform.startswith("darwin")
 
-CMAKE = find_executable('cmake')
+CMAKE = shutil.which('cmake')
 
 install_requires = []
 setup_requires = []
@@ -157,7 +157,7 @@ class cmake_build(setuptools.Command):
             cmake_args = [
                 CMAKE,
                 '-DPython_INCLUDE_DIR={}'.format(sysconfig.get_python_inc()),
-                '-DPython_EXECUTABLE={}'.format(sys.executable),
+                '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
                 '-DBUILD_ONNX_PYTHON=ON',
                 '-DONNX_USE_LITE_PROTO={}'.format('ON' if ONNX_USE_LITE_PROTO else 'OFF'),
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
@@ -179,8 +179,7 @@ class cmake_build(setuptools.Command):
                     # we need to link with libpython on windows, so
                     # passing python version to window in order to
                     # find python in cmake
-                    '-DPY_VERSION={}'.format('{0}.{1}'.format(* \
-                                                              sys.version_info[:2])),
+                    '-DPY_VERSION={}'.format('{0}.{1}'.format(*sys.version_info[:2])),
                 ])
                 if USE_MSVC_STATIC_RUNTIME:
                     cmake_args.append('-DONNX_USE_MSVC_STATIC_RUNTIME=ON')
@@ -259,8 +258,9 @@ class build_ext(setuptools.command.build_ext.build_ext):
                 elif os.path.exists(release_lib_dir):
                     lib_path = release_lib_dir
             src = os.path.join(lib_path, filename)
-            dst = os.path.join(os.path.realpath(
-                self.build_lib), "onnxoptimizer", filename)
+            lib_dir = os.path.join(os.path.realpath(self.build_lib), "onnxoptimizer")
+            dst = os.path.realpath(os.path.join(lib_dir, filename))
+            os.makedirs(lib_dir, exist_ok=True)
             self.copy_file(src, dst)
 
 
@@ -310,6 +310,7 @@ install_requires.extend([
 ################################################################################
 
 setup_requires.append('pytest-runner')
+setup_requires.append('protobuf')
 
 if sys.version_info[0] == 3:
     # Mypy doesn't work with Python 2
@@ -327,7 +328,7 @@ long_description = (this_directory / "README.md").read_text()
 setuptools.setup(
     name="onnxoptimizer",
     version=VersionInfo.version,
-    description="Open Neural Network Exchange",
+    description="ONNX Optimizer",
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=packages,
