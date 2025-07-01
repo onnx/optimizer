@@ -4612,6 +4612,31 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Reshape"
 
+    def test_rewrite_where(self):
+        model = parser.parse_model("""
+                <
+                    ir_version: 7,
+                    opset_import:["": 11]
+                >
+               agraph (bool[4] A, float[4] X, float[4] Y) => (float[4] F, float[4] H)
+               {
+                  B = Not(A)
+                  Z = Where(B, X, Y)
+                  F = Sign(Z)
+                  M = And(A,A)
+                  G = Where(M, X, Y)
+                  H = Sign(G)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            model, ["rewrite_where"], True)
+
+        assert len(optimized_model.graph.node) == 5
+        assert set([i.op_type for i in optimized_model.graph.node]) == {'Where', 'And', 'Sign'}
+        assert optimized_model.graph.node[0].input == ['A', 'Y', 'X']
+        assert optimized_model.graph.node[3].input == ['M', 'X', 'Y']
+
 
 if __name__ == "__main__":
     unittest.main()

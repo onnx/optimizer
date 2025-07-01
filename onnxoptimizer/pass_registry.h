@@ -59,6 +59,7 @@
 #include "onnxoptimizer/passes/fuse_consecutive_unsqueezes.h"
 #include "onnxoptimizer/passes/eliminate_nop_with_unit.h"
 #include "onnxoptimizer/passes/rewrite_input_dtype.h"
+#include "onnxoptimizer/passes/rewrite_where.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -117,6 +118,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateDuplicateInitializer>();
     registerPass<AdjustSliceAndMatmul>();
     registerPass<RewriteInputDtype>();
+    registerPass<RewriteWhere>();
   }
 
   ~GlobalPassRegistry() {
