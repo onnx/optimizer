@@ -138,7 +138,7 @@ bool IsConstantTensor(const Node* n, const W& which_input,
 inline const Tensor* FetchConstantTensor(const Value* v) {
   const uint32_t kind = v->node()->kind();
   auto* graph = v->owningGraph();
-  if (kind == kConstant) {
+  if (kind == kConstant && v->node()->hasAttribute(kvalue)) {
     return &v->node()->t(kvalue);
   } else if (graph->is_constant_initializer(v)) {
     return &*graph->getInitializer(v->uniqueName());
