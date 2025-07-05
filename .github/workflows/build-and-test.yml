@@ -76,25 +76,28 @@ jobs:
         path: dist/*.tar.gz
 
   # TODO: Discuss release workflow
-  # upload_pypi:
-  #   name: Upload to PyPI
-  #   needs: [build_wheels, build_sdist]
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/download-artifact@v4
-  #       with:
-  #         name: artifact
-  #         path: dist
-          
-  #     - name: Publish distribution 📦 to Test PyPI
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-  #         repository-url: https://test.pypi.org/legacy/
-  #         skip-existing: true
-          
-  #     - name: Publish distribution 📦 to PyPI
-  #       if: startsWith(github.ref, 'refs/tags/v')
-  #       uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         password: ${{ secrets.PYPI_API_TOKEN }}
+  upload_pypi:
+    name: Upload to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+
+    environment:
+      name: pypi-release # TODO: trusted publishing has to be configured at github and pypi
+      
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: artifact
+          path: dist
+         
+      - name: Publish distribution 📦 to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+         
+      - name: Publish distribution 📦 to PyPI
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://upload.pypi.org/legacy/
