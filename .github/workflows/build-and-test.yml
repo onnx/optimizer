@@ -80,6 +80,8 @@ jobs:
     name: Upload to PyPI
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     environment:
       name: pypi-release # TODO: trusted publishing has to be configured at github and pypi
