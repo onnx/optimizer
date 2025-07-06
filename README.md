@@ -6,15 +6,6 @@
 [![PyPI license](https://img.shields.io/pypi/l/onnxoptimizer.svg)](https://pypi.python.org/pypi/onnxoptimizer/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/onnx/optimizer/pulls)
 
-## 🛠 Maintainer Wanted
-
-We are currently **looking for a new maintainer** to help support and evolve the `onnxoptimizer` project.
-
-If you're passionate about ONNX, graph optimizations, or contributing to the open source machine learning ecosystem, we'd love to hear from you! This is a great opportunity to contribute to a widely used project and collaborate with the ONNX community.
-
-**To express interest:**  
-Please open an issue or comment on [this thread](https://github.com/onnx/optimizer/issues) and let us know about your interest and background.
-
 ## Introduction
 
 ONNX provides a C++ library for performing arbitrary optimizations on ONNX models, as well as a growing list of prepackaged optimization passes.
