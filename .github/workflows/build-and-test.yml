@@ -1,50 +1,65 @@
+# Copyright (c) ONNX Project Contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
 name: Build and Test
 
-on: [push, pull_request]
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 jobs:
   build_wheels:
     env:
       CIBW_ARCHS_MACOS: x86_64 universal2
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp38-cp38/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp38-cp38/bin/python -m pip install cmake && cmake --version && whereis cmake
+      MACOSX_DEPLOYMENT_TARGET: "10.15"
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+      CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp39-cp39/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp39-cp39/bin/python -m pip install cmake && cmake --version && whereis cmake
       CIBW_BEFORE_ALL_MACOS: WD=`pwd` && pip install cmake
-      CIBW_TEST_REQUIRES_LINUX: pytest nbval flake8 mypy onnxruntime
-      CIBW_TEST_REQUIRES_MACOS: pytest nbval
-      CIBW_TEST_REQUIRES_WINDOWS: pytest nbval
-      CIBW_BEFORE_TEST_LINUX: pip install torch==1.13.1+cpu torchvision==0.14.1+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      CIBW_BEFORE_BUILD_LINUX: pip install protobuf
+      CIBW_BEFORE_BUILD_WINDOWS: python -m pip install protobuf
+      CIBW_BEFORE_BUILD_MACOS: pip install protobuf
+      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8 mypy onnxruntime==1.19.2
+      CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
+      CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
+      CIBW_BEFORE_TEST_LINUX: pip install torch==2.2.0+cpu torchvision==0.17.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
       # Python3.11 doesn't have torchvision prebuilt wheel
       CIBW_TEST_SKIP: "cp311-* *_arm64 *_universal2:arm64"
-      CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
+      CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
-      # Only build on Python 3 and skip 32-bit builds
-      CIBW_BUILD: "cp3?-* cp310-* cp311-*"
-      # Skip python 3.6
-      CIBW_SKIP: "cp36-* *-win32 *-manylinux_i686 *-musllinux_*"
-    name: Build wheels on ${{ matrix.os }}
+      CIBW_BUILD: "${{ matrix.python }}-*"      
+      CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_*"
+    name: Build whls ${{ matrix.os }}${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2019, macos-10.15]
+        os: [ubuntu-24.04, windows-2022, macos-15]        
+        python: ["cp39", "cp310", "cp311", "cp312"]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
     - name: Build wheels
-      uses: pypa/cibuildwheel@v2.11.4
-    - uses: actions/upload-artifact@v2
+      uses: pypa/cibuildwheel@v3.0.0
+    - uses: actions/upload-artifact@v4
       with:
+        name: artifact-${{ matrix.os }}-${{ matrix.python }}
         path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - run: python3 -m pip install protobuf
 
     - name: Build sdist
       run: pipx run build --sdist
@@ -56,29 +71,30 @@ jobs:
         python3 -m pip install *.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         path: dist/*.tar.gz
 
-  upload_pypi:
-    name: Upload to PyPI
-    needs: [build_wheels, build_sdist]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v3
-        with:
-          # unpacks default artifact into dist/
-          # if `name: artifact` is omitted, the action will create extra parent dir
-          name: artifact
-          path: dist
-      - name: Publish distribution 📦 to Test PyPI
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
-          skip_existing: true
-      - name: Publish distribution 📦 to PyPI
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: pypa/gh-action-pypi-publish@master
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+  # TODO: Discuss release workflow
+  # upload_pypi:
+  #   name: Upload to PyPI
+  #   needs: [build_wheels, build_sdist]
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/download-artifact@v4
+  #       with:
+  #         name: artifact
+  #         path: dist
+          
+  #     - name: Publish distribution 📦 to Test PyPI
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+  #         repository-url: https://test.pypi.org/legacy/
+  #         skip-existing: true
+          
+  #     - name: Publish distribution 📦 to PyPI
+  #       if: startsWith(github.ref, 'refs/tags/v')
+  #       uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         password: ${{ secrets.PYPI_API_TOKEN }}

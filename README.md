@@ -71,8 +71,6 @@ optional arguments:
 
 * [onnx-simplifier](https://github.com/daquexian/onnx-simplifier): A handy and popular tool based on onnxoptimizer
 
-* [convertmodel.com](https://convertmodel.com/#outputFormat=onnx&inputFormat=onnx): onnx optimizer compiled as WebAssembly so that it can be used out-of-the-box
-
 ## Code of Conduct
 
 [ONNX Open Source Code of Conduct](https://onnx.ai/codeofconduct.html)
