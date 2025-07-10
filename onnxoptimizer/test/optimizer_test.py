@@ -4626,7 +4626,7 @@ class TestOptimizer(unittest.TestCase):
             model, ['eliminate_consecutive_idempotent_ops', 'eliminate_deadend'], True)
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Sign"
-        
+
     def test_rewrite_where(self):
         model = parser.parse_model("""
                 <
