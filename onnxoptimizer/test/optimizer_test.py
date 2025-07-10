@@ -1150,7 +1150,6 @@ class TestOptimizer(unittest.TestCase):
         # Transpose
         assert len(optimized_model.graph.node[3].attribute[0].g.node) == 1
 
-    @pytest.mark.xfail
     def test_fuse_transpose_default_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         trans1 = helper.make_node("Transpose", ["A"], ["B"])
@@ -1165,7 +1164,7 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("C", TensorProto.FLOAT, (2, 3))],
         )
         # The existence of shape infos of graoh outputs is checked in _optimized
-        optimized_model = self._optimized(graph, ["fuse_consecutive_transposes"])
+        optimized_model = self._optimized(graph, ["fuse_consecutive_transposes", "eliminate_deadend"])
 
         def check_transpose(node):  # type: (NodeProto) -> None
             assert node.op_type != "Transpose"
@@ -1173,7 +1172,6 @@ class TestOptimizer(unittest.TestCase):
         self._visit_all_nodes_recursive(optimized_model.graph, check_transpose)
         assert len(optimized_model.graph.node) == 1
 
-    @pytest.mark.xfail
     def test_fuse_transpose_default(self):  # type: () -> None
         identity1 = helper.make_node("Identity", ["A"], ["X"])
         trans1 = helper.make_node("Transpose", ["X"], ["Y"])
@@ -1185,7 +1183,7 @@ class TestOptimizer(unittest.TestCase):
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (2, 3, 4))],
             [helper.make_tensor_value_info("B", TensorProto.FLOAT, (2, 3, 4))],
         )
-        optimized_model = self._optimized(graph, ["fuse_consecutive_transposes"])
+        optimized_model = self._optimized(graph, ["fuse_consecutive_transposes", "eliminate_deadend"])
 
         assert len(list(optimized_model.graph.node)) == 2
         assert optimized_model.graph.node[0].op_type == "Identity"
@@ -1468,7 +1466,6 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Conv"
         assert optimized_model.graph.node[1].op_type == "Add"
 
-    @pytest.mark.xfail
     def test_fuse_matmul_add_bias_into_gemm(self):  # type: () -> None
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
@@ -1482,12 +1479,11 @@ class TestOptimizer(unittest.TestCase):
             ],
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (32, 16))],
         )
-        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm"])
+        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm", "eliminate_deadend"])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "Gemm"
 
-    @pytest.mark.xfail
     def test_fuse_matmul_add_bias_into_gemm_2d_bias(self):  # type: () -> None
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
@@ -1501,13 +1497,12 @@ class TestOptimizer(unittest.TestCase):
             ],
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (32, 16))],
         )
-        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm"])
+        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm", "eliminate_deadend"])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "Gemm"
 
     # type: () -> None
-    @pytest.mark.xfail
     def test_fuse_matmul_add_bias_into_gemm_2d_bias_same_shape(self):
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
@@ -1521,7 +1516,7 @@ class TestOptimizer(unittest.TestCase):
             ],
             [helper.make_tensor_value_info("A", TensorProto.FLOAT, (32, 16))],
         )
-        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm"])
+        optimized_model = self._optimized(graph, ["fuse_matmul_add_bias_into_gemm", "eliminate_deadend"])
 
         assert len(list(optimized_model.graph.node)) == 1
         assert optimized_model.graph.node[0].op_type == "Gemm"
@@ -4631,6 +4626,31 @@ class TestOptimizer(unittest.TestCase):
             model, ['eliminate_consecutive_idempotent_ops', 'eliminate_deadend'], True)
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Sign"
+        
+    def test_rewrite_where(self):
+        model = parser.parse_model("""
+                <
+                    ir_version: 7,
+                    opset_import:["": 11]
+                >
+               agraph (bool[4] A, float[4] X, float[4] Y) => (float[4] F, float[4] H)
+               {
+                  B = Not(A)
+                  Z = Where(B, X, Y)
+                  F = Sign(Z)
+                  M = And(A,A)
+                  G = Where(M, X, Y)
+                  H = Sign(G)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            model, ["rewrite_where"], True)
+
+        assert len(optimized_model.graph.node) == 5
+        assert set([i.op_type for i in optimized_model.graph.node]) == {'Where', 'And', 'Sign'}
+        assert optimized_model.graph.node[0].input == ['A', 'Y', 'X']
+        assert optimized_model.graph.node[3].input == ['M', 'X', 'Y']
 
 
 if __name__ == "__main__":
