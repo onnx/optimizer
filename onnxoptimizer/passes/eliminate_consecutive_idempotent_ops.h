@@ -24,7 +24,7 @@ struct EliminateConsecutiveIdempotentOps final : public PredicateBasedPass {
 
   bool patternMatchPredicate(Node* node) override {
     static const std::unordered_set<std::string> idempotent_ops = {
-        "Ceil", "Floor", "Round", "Relu", "Reshape"};
+        "Ceil", "Floor", "Round", "Relu", "Reshape", "Sign"};
     for (const auto& op : idempotent_ops) {
       // TODO: support uses().size() > 1 for ops except Reshape
       if (CheckKind(node, Symbol(op), 0, Symbol(op)) &&
