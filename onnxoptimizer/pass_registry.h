@@ -9,6 +9,7 @@
 
 #include <unordered_set>
 #include <vector>
+#include <map>
 
 #include "onnx/common/ir.h"
 #include "onnx/common/ir_pb_converter.h"

@@ -158,7 +158,7 @@ class cmake_build(setuptools.Command):
                 CMAKE,
                 '-DPython_INCLUDE_DIR={}'.format(sysconfig.get_python_inc()),
                 '-DPYTHON_EXECUTABLE={}'.format(sys.executable),
-                '-DBUILD_ONNX_PYTHON=ON',
+                '-DONNX_BUILD_PYTHON=ON',
                 '-DONNX_USE_LITE_PROTO={}'.format('ON' if ONNX_USE_LITE_PROTO else 'OFF'),
                 '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
                 '-DONNX_NAMESPACE={}'.format(ONNX_NAMESPACE),

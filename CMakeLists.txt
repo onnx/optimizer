@@ -19,11 +19,15 @@ if (NOT DEFINED ONNX_TARGET_NAME)
   set(ONNX_TARGET_NAME onnx)
 endif()
 
+if(DEFINED BUILD_ONNX_PYTHON AND NOT DEFINED ONNX_BUILD_PYTHON)
+  set(ONNX_BUILD_PYTHON ${BUILD_ONNX_PYTHON})
+endif()
+
 option(ONNX_OPT_USE_SYSTEM_PROTOBUF "" OFF)
 if(NOT ONNX_OPT_USE_SYSTEM_PROTOBUF)
   option(protobuf_BUILD_TESTS "" OFF)
   option(protobuf_MSVC_STATIC_RUNTIME "" ${ONNX_USE_MSVC_STATIC_RUNTIME})
-  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf/cmake libprotobuf)
+  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf libprotobuf)
 endif()
 
 
@@ -33,7 +37,7 @@ add_subdirectory_if_no_target(${ONNX_ROOT} ${ONNX_TARGET_NAME})
 file(READ "${PROJECT_SOURCE_DIR}/VERSION_NUMBER" ONNX_OPTIMIZER_VERSION)
 string(STRIP "${ONNX_OPTIMIZER_VERSION}" ONNX_OPTIMIZER_VERSION)
 
-file(GLOB onnx_opt_srcs "onnxoptimizer/*.cc"
+file(GLOB onnx_opt_srcs CONFIGURE_DEPENDS "onnxoptimizer/*.cc"
     "onnxoptimizer/*.h"
     "onnxoptimizer/passes/*.cc"
     "onnxoptimizer/passes/*.h"
@@ -51,7 +55,7 @@ onnxopt_add_executable(onnx_optimizer_exec examples/onnx_optimizer_exec.cpp)
 target_link_libraries(onnx_optimizer_exec onnx_optimizer)
 
 
-file(GLOB onnx_opt_c_api_srcs "onnxoptimizer/c_api/*.cc"
+file(GLOB onnx_opt_c_api_srcs CONFIGURE_DEPENDS "onnxoptimizer/c_api/*.cc"
   "onnxoptimizer/c_api/*.h"
     )
 
@@ -62,7 +66,7 @@ target_include_directories(onnx_optimizer_c_api PUBLIC
     $<INSTALL_INTERFACE:include>
     )
 
-if(BUILD_ONNX_PYTHON)
+if(ONNX_BUILD_PYTHON)
   if("${PY_EXT_SUFFIX}" STREQUAL "")
     if(MSVC)
       set(PY_EXT_SUFFIX ".pyd")
