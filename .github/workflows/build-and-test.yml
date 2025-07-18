@@ -22,14 +22,13 @@ jobs:
       CIBW_BEFORE_BUILD_LINUX: pip install protobuf
       CIBW_BEFORE_BUILD_WINDOWS: python -m pip install protobuf
       CIBW_BEFORE_BUILD_MACOS: pip install protobuf
-      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8 mypy onnxruntime==1.19.2
+      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8 mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
-      CIBW_BEFORE_TEST_LINUX: pip install torch==2.2.0+cpu torchvision==0.17.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+      CIBW_BEFORE_TEST_LINUX: pip install torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
-      # Python3.11 doesn't have torchvision prebuilt wheel
-      CIBW_TEST_SKIP: "cp311-* *_arm64 *_universal2:arm64"
+      CIBW_TEST_SKIP: " *_arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
       CIBW_BUILD: "${{ matrix.python }}-*"      
@@ -37,9 +36,10 @@ jobs:
     name: Build whls ${{ matrix.os }}${{ matrix.python }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15]        
-        python: ["cp39", "cp310", "cp311", "cp312"]
+        python: ["cp39", "cp310", "cp311", "cp312", "cp313"]
     steps:
     - uses: actions/checkout@v4
       with:
@@ -75,7 +75,6 @@ jobs:
       with:
         path: dist/*.tar.gz
 
-  # TODO: Discuss release workflow
   release:
     name: Release
     environment: 
