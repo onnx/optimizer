@@ -288,10 +288,21 @@ cmdclass = {
 # Extensions
 ################################################################################
 
+py_limited_api = sys.version_info[0] >= 3 and sys.version_info[1] >= 12
+if py_limited_api:
+    setup_opts = {
+        'bdist_wheel': {
+            'py_limited_api': 'cp312'
+        },
+    }
+else:
+    setup_opts = {}
+
 ext_modules = [
     setuptools.Extension(
         name=str('onnxoptimizer.onnx_opt_cpp2py_export'),
-        sources=[])
+        sources=[],
+        py_limited_api=py_limited_api)
 ]
 
 ################################################################################
@@ -348,4 +359,5 @@ setuptools.setup(
             'onnxoptimizer=onnxoptimizer:main',
         ],
     },
+    options=setup_opts,
 )

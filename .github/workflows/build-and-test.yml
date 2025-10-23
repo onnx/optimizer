@@ -46,6 +46,11 @@ jobs:
         submodules: recursive
     - name: Build wheels
       uses: pypa/cibuildwheel@v3.2.0
+    - name: Check ABI3
+      run: |
+        pip install abi3audit
+        abi3audit --strict -v --report ./wheelhouse/*.whl
+      if: ${{ contains(fromJSON('["cp312", "cp313"]'), matrix.python) }}
     - uses: actions/upload-artifact@v4
       with:
         name: artifact-${{ matrix.os }}-${{ matrix.python }}
