@@ -18,9 +18,6 @@ dependencies = [
   "onnx",
 ]
 
-[project.optional-dependencies]
-mypy = ['mypy==0.600']
-
 [project.urls]
 Homepage = 'https://github.com/onnx/optimizer'
 
