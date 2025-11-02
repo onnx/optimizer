@@ -51,7 +51,7 @@ jobs:
         pip install abi3audit
         abi3audit --strict -v --report ./wheelhouse/*.whl
       if: ${{ contains(fromJSON('["cp312", "cp313"]'), matrix.python) }}
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       with:
         name: artifact-${{ matrix.os }}-${{ matrix.python }}
         path: ./wheelhouse/*.whl
@@ -74,7 +74,7 @@ jobs:
         python3 -m pip install *.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       with:
         path: dist/*.tar.gz
 
