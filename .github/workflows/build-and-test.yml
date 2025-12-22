@@ -22,12 +22,12 @@ jobs:
       CIBW_BEFORE_BUILD_LINUX: pip install protobuf
       CIBW_BEFORE_BUILD_WINDOWS: python -m pip install protobuf
       CIBW_BEFORE_BUILD_MACOS: pip install protobuf
-      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8 mypy onnxruntime
+      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8-pyproject mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
       CIBW_BEFORE_TEST_LINUX: pip install torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
-      CIBW_TEST_COMMAND_LINUX: cd {project} && flake8 && pytest
+      CIBW_TEST_COMMAND_LINUX: cd {project} && flake8p && pytest
       CIBW_TEST_SKIP: " *_arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"
@@ -45,8 +45,13 @@ jobs:
       with:
         submodules: recursive
     - name: Build wheels
-      uses: pypa/cibuildwheel@v3.2.0
-    - uses: actions/upload-artifact@v4
+      uses: pypa/cibuildwheel@v3.2.1
+    - name: Check ABI3
+      run: |
+        pip install abi3audit
+        abi3audit --strict -v --report ./wheelhouse/*.whl
+      if: ${{ contains(fromJSON('["cp312", "cp313"]'), matrix.python) }}
+    - uses: actions/upload-artifact@v5
       with:
         name: artifact-${{ matrix.os }}-${{ matrix.python }}
         path: ./wheelhouse/*.whl
@@ -59,8 +64,6 @@ jobs:
       with:
         submodules: recursive
 
-    - run: python3 -m pip install protobuf
-
     - name: Build sdist
       run: pipx run build --sdist
 
@@ -71,7 +74,7 @@ jobs:
         python3 -m pip install *.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v5
       with:
         path: dist/*.tar.gz
 
@@ -87,7 +90,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')  
     needs: [build_wheels, build_sdist]      
     steps:
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           name: artifact
           path: dist

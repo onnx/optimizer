@@ -67,9 +67,12 @@ target_include_directories(onnx_optimizer_c_api PUBLIC
     )
 
 if(ONNX_BUILD_PYTHON)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
-  find_package(pybind11)
-  pybind11_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc")
+  find_package(
+    Python 3
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule)
+  add_subdirectory(third_party/nanobind EXCLUDE_FROM_ALL)
+  nanobind_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc" STABLE_ABI)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 endif()
 
