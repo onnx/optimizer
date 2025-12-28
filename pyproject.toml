@@ -1,0 +1,110 @@
+[project]
+dynamic = ["version"]
+name = "onnxoptimizer"
+description = "ONNX Optimizer"
+license = 'Apache-2.0'
+license-files = [
+  "LICENSE"
+]
+authors = [
+  {name = 'ONNX Optimizer Authors', email = "onnx-technical-discuss@lists.lfai.foundation"},
+]
+readme = "README.md"
+keywords = [
+  "deep-learning",
+  "ONNX",
+]
+dependencies = [
+  "onnx",
+]
+
+[project.urls]
+Homepage = 'https://github.com/onnx/optimizer'
+
+[console_scripts]
+onnxoptimizer = "onnxoptimizer:main"
+
+[build-system]
+requires = [
+  "setuptools>=68",
+  "wheel",
+  "cmake>=3.22",
+  "protobuf>=4.25.1"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+# addopts = --nbval --current-env
+addopts = "-n auto"
+testpaths = [
+  "onnxoptimizer/test/"
+]
+
+[[tool.mypy]]
+# follow-imports = silent  # TODO remove this
+mypy_path = "stubs:third_party/onnx/third_party/pybind11"
+strict_optional = true
+warn_return_any = true
+warn_no_return = true
+# TODO warn_unused_ignores = true
+warn_redundant_casts = true
+warn_incomplete_stub = true
+# TODO disallow_untyped_calls = true
+check_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+# TODO disallow_incomplete_defs = true
+# TODO disallow_subclassing_any = true
+disallow_untyped_decorators = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "onnxoptimizer.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "onnx_opt_cpp2py_export"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnx.*"
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tools.*"
+disallow_untyped_defs = true
+
+# Ignore errors in setup.py
+[[tool.mypy.overrides]]
+module = "setup"
+ignore_errors = true
+
+[tool.flake8]
+select = ["B","C","E","F","P","T4","W","B9"]
+max-line-length = 80
+### DEFAULT IGNORES FOR 4-space INDENTED PROJECTS ###
+# E127, E128 are hard to silence in certain nested formatting situations.
+# E265, E266 talk about comment formatting which is too opinionated.
+# E402 warns on imports coming after statements. There are important use cases
+# like demandimport (https://fburl.com/demandimport) that require statements
+# before imports.
+# E501 is not flexible enough, we're using B950 instead.
+# E722 is a duplicate of B001.
+# F405 is hard to silence since we indeed do star import
+# P207 is a duplicate of B003.
+# P208 is a duplicate of C403.
+# W503 talks about operator formatting which is too opinionated.
+# F401 clashes with PEP484 requiring us to import types that are only used in
+# type comments.
+ignore = ["E127", "E128", "E265", "E266", "E402", "E501", "E722", "F405", "P207", "P208", "W503", "F401"]
+exclude = [
+  ".git",
+  "__pycache__",
+  "build/*",
+  "third_party/*",
+  "*_pb2.py",
+  ".cache/*",
+  ".eggs",
+  ".setuptools-cmake-build*/*",
+]

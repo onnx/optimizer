@@ -3,7 +3,7 @@ include(${PROJECT_SOURCE_DIR}/third_party/onnx/cmake/Utils.cmake)
 # Poor man's FetchContent
 function(add_subdirectory_if_no_target dir target)
   if (NOT TARGET ${target})
-    add_subdirectory(${dir})
+    add_subdirectory(${dir} EXCLUDE_FROM_ALL)
   endif()
 endfunction()
 
