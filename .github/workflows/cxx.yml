@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-name: Build and Test
+name: cmake Build and Test
 
 on:
   push:
@@ -12,12 +12,14 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_and_test:
+  cxx:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
+        persist-credentials: false
+        
     - run: cmake -GNinja -DONNX_BUILD_TESTS=ON -B build -S .
     - run: cmake --build build
     - run: cmake --build build -t test
