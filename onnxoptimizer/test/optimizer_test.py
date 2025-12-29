@@ -4204,9 +4204,9 @@ class TestOptimizer(unittest.TestCase):
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_fasterrcnn_fpn(self):  # type: () -> None
         model = tv.models.detection.fasterrcnn_resnet50_fpn(pretrained=False)
-        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        x = (torch.rand(3, 300, 400), torch.rand(3, 500, 400))
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f, opset_version=18)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
@@ -4216,9 +4216,9 @@ class TestOptimizer(unittest.TestCase):
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_maskrcnn_fpn_opset11(self):  # type: () -> None
         model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
-        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        x = (torch.rand(3, 300, 400), torch.rand(3, 500, 400))
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f, opset_version=18)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
@@ -4229,9 +4229,9 @@ class TestOptimizer(unittest.TestCase):
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_keypointrcnn_fpn(self):  # type: () -> None
         model = tv.models.detection.keypointrcnn_resnet50_fpn(pretrained=False)
-        x = [torch.rand(3, 300, 400), torch.rand(3, 500, 400)]
+        x = (torch.rand(3, 300, 400), torch.rand(3, 500, 400))
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, opset_version=11)
+            torch.onnx.export(model, x, f, opset_version=18)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
