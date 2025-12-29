@@ -101,3 +101,11 @@ install(TARGETS
   onnx_optimizer onnx_optimizer_c_api
   EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+if(ONNX_BUILD_TESTS)
+  enable_testing()
+  include(third_party/onnx/cmake/external/googletest.cmake)
+  add_executable(test_simple tests/test_simple.cc)
+  target_link_libraries(test_simple onnx_optimizer gtest gtest_main) 
+  add_test(NAME test_simple COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_simple)
+  add_dependencies(test_simple onnx_gtests)
+endif()
