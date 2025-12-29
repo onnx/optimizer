@@ -67,9 +67,12 @@ target_include_directories(onnx_optimizer_c_api PUBLIC
     )
 
 if(ONNX_BUILD_PYTHON)
-  find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module)
-  find_package(pybind11)
-  pybind11_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc")
+  find_package(
+    Python 3
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule)
+  add_subdirectory(third_party/nanobind EXCLUDE_FROM_ALL)
+  nanobind_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc" STABLE_ABI)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 endif()
 
@@ -98,3 +101,10 @@ install(TARGETS
   onnx_optimizer onnx_optimizer_c_api
   EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+if(ONNX_BUILD_TESTS)
+  enable_testing()
+  include(third_party/onnx/cmake/external/googletest.cmake)
+  add_executable(test_simple tests/test_simple.cc)
+  target_link_libraries(test_simple onnx_optimizer gtest gtest_main) 
+  add_test(NAME test_simple COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_simple)
+endif()

@@ -36,10 +36,6 @@ MACOS = sys.platform.startswith("darwin")
 
 CMAKE = shutil.which('cmake')
 
-install_requires = []
-setup_requires = []
-extras_require = {}
-
 ################################################################################
 # Global variables for controlling the build variant
 ################################################################################
@@ -290,10 +286,21 @@ cmdclass = {
 # Extensions
 ################################################################################
 
+py_limited_api = sys.version_info[0] >= 3 and sys.version_info[1] >= 12
+if py_limited_api:
+    setup_opts = {
+        'bdist_wheel': {
+            'py_limited_api': 'cp312'
+        },
+    }
+else:
+    setup_opts = {}
+
 ext_modules = [
     setuptools.Extension(
         name=str('onnxoptimizer.onnx_opt_cpp2py_export'),
-        sources=[])
+        sources=[],
+        py_limited_api=py_limited_api)
 ]
 
 ################################################################################
@@ -303,51 +310,15 @@ ext_modules = [
 # no need to do fancy stuff so far
 packages = setuptools.find_packages()
 
-install_requires.extend([
-    'onnx'
-])
-
 ################################################################################
 # Test
 ################################################################################
 
-setup_requires.append('pytest-runner')
-setup_requires.append('protobuf')
-
-if sys.version_info[0] == 3:
-    # Mypy doesn't work with Python 2
-    extras_require['mypy'] = ['mypy==0.600']
-
-################################################################################
-# Final
-################################################################################
-
-# read the contents of your README file
-from pathlib import Path
-this_directory = Path(__file__).parent
-long_description = (this_directory / "README.md").read_text()
-
 setuptools.setup(
-    name="onnxoptimizer",
     version=VersionInfo.version,
-    description="ONNX Optimizer",
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=packages,
-    license='Apache License v2.0',
     include_package_data=True,
-    install_requires=install_requires,
-    setup_requires=setup_requires,
-    extras_require=extras_require,
-    author='ONNX Optimizer Authors',
-    author_email='onnx-technical-discuss@lists.lfai.foundation',
-    url='https://github.com/onnx/optimizer',
-    keywords='deep-learning ONNX',
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    entry_points={
-        'console_scripts': [
-            'onnxoptimizer=onnxoptimizer:main',
-        ],
-    },
+    options=setup_opts,
 )
