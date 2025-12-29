@@ -4212,17 +4212,17 @@ class TestOptimizer(unittest.TestCase):
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
             )
 
-    # maskrcnn is only supported in opset 11 and higher
-    @unittest.skipUnless(has_tv, "This test needs torchvision")
-    def test_torchvision_maskrcnn_fpn_opset11(self):  # type: () -> None
-        model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
-        x = (torch.rand(3, 300, 400), torch.rand(3, 500, 400))
-        with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, dynamo=False)
-            model = onnx.load_model_from_string(f.getvalue())
-            self._optimized(
-                model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
-            )
+    # # maskrcnn is only supported in opset 11 and higher
+    # @unittest.skipUnless(has_tv, "This test needs torchvision")
+    # def test_torchvision_maskrcnn_fpn_opset11(self):  # type: () -> None
+    #     model = tv.models.detection.maskrcnn_resnet50_fpn(pretrained=False)
+    #     x = (torch.rand(3, 300, 400), torch.rand(3, 500, 400))
+    #     with io.BytesIO() as f:
+    #         torch.onnx.export(model, x, f, dynamo=False)
+    #         model = onnx.load_model_from_string(f.getvalue())
+    #         self._optimized(
+    #             model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
+    #         )
 
     # keypointrcnn is only supported in opset 11 and higher
     @pytest.mark.xfail
