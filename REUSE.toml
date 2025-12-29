@@ -1,0 +1,20 @@
+# Copyright (c) ONNX Project Contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+version = 1
+SPDX-PackageName = "onnxoptimizer"
+
+[[annotations]]
+path = [
+  ".clang-format",
+  ".github/CODEOWNERS",
+  ".gitignore",
+  ".gitmodules",
+  "CMakeLists.txt",
+  "MANIFEST.in",
+  "VERSION_NUMBER"
+]
+precedence = "override"
+SPDX-FileCopyrightText = "Copyright (c) ONNX Project Contributors"
+SPDX-License-Identifier = "Apache-2.0"
