@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 #pragma once
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
