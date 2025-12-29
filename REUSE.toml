@@ -16,4 +16,5 @@ path = [
   "VERSION_NUMBER"
 ]
 precedence = "override"
-SPDX-License-Identifier = "NONE"
+SPDX-FileCopyrightText = "Copyright (c) ONNX Project Contributors"
+SPDX-License-Identifier = "Apache-2.0"
