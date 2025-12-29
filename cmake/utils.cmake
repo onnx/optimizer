@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ONNX Project Contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
 include(${PROJECT_SOURCE_DIR}/third_party/onnx/cmake/Utils.cmake)
 
 # Poor man's FetchContent
