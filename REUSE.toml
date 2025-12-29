@@ -13,7 +13,9 @@ path = [
   ".gitmodules",
   "CMakeLists.txt",
   "MANIFEST.in",
-  "VERSION_NUMBER"
+  "VERSION_NUMBER",
+  "cmake/ONNXOptimizerConfigVersion.cmake.in",
+  "cmake/ONNXOptimizerConfig.cmake.in"
 ]
 precedence = "override"
 SPDX-FileCopyrightText = "Copyright (c) ONNX Project Contributors"

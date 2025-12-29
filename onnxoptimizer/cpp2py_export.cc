@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// SPDX-FileCopyrightText: ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 #include <nanobind/nanobind.h>
 #include <nanobind/stl/string.h>

@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
+# SPDX-FileCopyrightText: ONNX Project Contributors
+#
 # SPDX-License-Identifier: Apache-2.0
-
 
 import subprocess
 import os
