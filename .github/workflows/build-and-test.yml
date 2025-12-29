@@ -25,7 +25,7 @@ jobs:
       CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8-pyproject mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
-      CIBW_BEFORE_TEST_LINUX: pip install torch==2.6.0+cpu torchvision==0.21.0+cpu --index-url https://download.pytorch.org/whl/cpu
+      CIBW_BEFORE_TEST_LINUX: pip install onnxscript torch==2.9.1 torchvision==0.24.1
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && flake8p && pytest
       CIBW_TEST_SKIP: " *_arm64"
@@ -94,14 +94,6 @@ jobs:
         with:
           name: artifact
           path: dist
-
-      # TODO: get acccess for test.pypi   
-      # - name: Publish distribution 📦 to Test PyPI
-      #   uses: pypa/gh-action-pypi-publish@release/v1
-      #   with:
-      #     repository-url: https://test.pypi.org/legacy/
-      #     skip-existing: true
-      #     attestations: true
          
       - name: Publish distribution 📦 to PyPI
         if: startsWith(github.ref, 'refs/tags/v')
