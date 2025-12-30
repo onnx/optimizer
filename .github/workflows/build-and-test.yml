@@ -53,9 +53,9 @@ jobs:
         pip install abi3audit
         abi3audit --strict -v --report ./wheelhouse/*.whl
       if: ${{ contains(fromJSON('["cp312", "cp313"]'), matrix.python) }}
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
-        name: artifact-${{ matrix.os }}-${{ matrix.python }}
+        name: wheels-${{ matrix.os }}-${{ matrix.python }}
         path: ./wheelhouse/*.whl
 
   build_sdist:
@@ -78,28 +78,68 @@ jobs:
 
     - uses: actions/upload-artifact@v6
       with:
+        name: sdist
         path: dist/*.tar.gz
+
+  collect_dist:
+    name: Collect distributions
+    runs-on: ubuntu-latest
+    needs: [build_wheels, build_sdist]
+  
+    steps:
+      - name: Download wheels
+        uses: actions/download-artifact@v7
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+  
+      - name: Download sdist
+        uses: actions/download-artifact@v7
+        with:
+          name: sdist
+          path: dist
+  
+      - name: Verify distributions
+        run: |
+          echo "Wheels:"
+          ls -lh dist/*.whl
+          echo
+          echo "Source distributions:"
+          ls -lh dist/*.tar.gz
+  
+      - name: Twine check
+        run: |
+          pip install -U twine packaging
+          twine check dist/*
+
+      - name: Upload merged dist
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist/*
 
   release:
     name: Release
-    environment: 
-      name: release
-      url: https://pypi.org/p/onnxoptimizer     
     runs-on: ubuntu-latest
+    needs: collect_dist
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  
     permissions:
       id-token: write
-      
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')  
-    needs: [build_wheels, build_sdist]      
+  
+    environment:
+      name: release
+      url: https://pypi.org/p/onnxoptimizer
+  
     steps:
-      - uses: actions/download-artifact@v7
+      - name: Download distributions
+        uses: actions/download-artifact@v7
         with:
-          name: artifact
+          name: dist
           path: dist
-         
-      - name: Publish distribution 📦 to PyPI
-        if: startsWith(github.ref, 'refs/tags/v')
+  
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: https://upload.pypi.org/legacy/
           attestations: true

@@ -6,10 +6,7 @@
 dynamic = ["version"]
 name = "onnxoptimizer"
 description = "ONNX Optimizer"
-license = 'Apache-2.0'
-license-files = [
-  "LICENSE"
-]
+license = "Apache-2.0"
 authors = [
   {name = 'ONNX Optimizer Authors', email = "onnx-technical-discuss@lists.lfai.foundation"},
 ]
@@ -38,13 +35,12 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
-# addopts = --nbval --current-env
 addopts = "-n auto"
 testpaths = [
   "onnxoptimizer/test/"
 ]
 
-[[tool.mypy]]
+[tool.mypy]
 # follow-imports = silent  # TODO remove this
 mypy_path = "stubs:third_party/onnx/third_party/pybind11"
 strict_optional = true
