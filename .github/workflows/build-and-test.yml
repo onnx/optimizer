@@ -142,4 +142,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           attestations: true
+          repository-url: https://upload.pypi.org/legacy/
 
