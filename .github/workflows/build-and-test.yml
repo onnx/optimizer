@@ -78,6 +78,7 @@ jobs:
 
     - uses: actions/upload-artifact@v6
       with:
+        name: sdist
         path: dist/*.tar.gz
 
   collect_dist:
