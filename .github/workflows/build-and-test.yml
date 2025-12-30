@@ -110,7 +110,7 @@ jobs:
   
       - name: Twine check
         run: |
-          pip install twine
+          pip install -U twine packaging
           twine check dist/*
 
       - name: Upload merged dist
