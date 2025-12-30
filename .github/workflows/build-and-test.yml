@@ -8,6 +8,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - v*
   pull_request:
   workflow_dispatch:
 
@@ -74,7 +76,7 @@ jobs:
         python3 -m pip install *.tar.gz
         python3 -c "import onnxoptimizer; print(onnxoptimizer.get_fuse_and_elimination_passes())"
 
-    - uses: actions/upload-artifact@v5
+    - uses: actions/upload-artifact@v6
       with:
         path: dist/*.tar.gz
 
@@ -90,7 +92,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')  
     needs: [build_wheels, build_sdist]      
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: artifact
           path: dist
