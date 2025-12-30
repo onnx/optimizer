@@ -6,7 +6,7 @@
 dynamic = ["version"]
 name = "onnxoptimizer"
 description = "ONNX Optimizer"
-license = {text = "Apache-2.0"}
+license = "Apache-2.0"
 authors = [
   {name = 'ONNX Optimizer Authors', email = "onnx-technical-discuss@lists.lfai.foundation"},
 ]
