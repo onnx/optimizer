@@ -65,12 +65,13 @@ TEST(OptimizerTest, SplitPredictPreservesElemType) {
         FAIL() << "Optimized model failed validation: " << e.what();
     }
     
-    // Verify all inputs have valid elem_type (not UNDEFINED which is 0)
+    // Verify all inputs have valid elem_type (not UNDEFINED)
     for (const auto& input : optimized_model.graph().input()) {
         ASSERT_TRUE(input.has_type()) << "Input " << input.name() << " missing type";
         ASSERT_TRUE(input.type().has_tensor_type()) << "Input " << input.name() << " missing tensor_type";
-        // TensorProto_DataType_UNDEFINED has value 0
-        ASSERT_NE(input.type().tensor_type().elem_type(), 0) 
+        // Check elem_type is not UNDEFINED
+        ASSERT_NE(input.type().tensor_type().elem_type(), 
+                  ONNX_NAMESPACE::TensorProto_DataType_UNDEFINED) 
             << "Input " << input.name() << " has UNDEFINED elem_type";
     }
 }

@@ -28,26 +28,26 @@ static constexpr const char* impure_operators[] = {
 // may return an incorrect type, but that would have been present in the
 // original model's value_info if available.
 static int32_t inferElemType(const Value* v) {
-  if (v->elemType() != 0) {
+  if (v->elemType() != TensorProto_DataType_UNDEFINED) {
     return v->elemType();
   }
   
   // Check if the value has a producing node
   const Node* producer = v->node();
   if (!producer) {
-    return 0;
+    return TensorProto_DataType_UNDEFINED;
   }
   
   // For many operators, output type matches input type
   // Check if any input has a known elem_type
   for (const Value* input : producer->inputs()) {
-    if (input->elemType() != 0) {
+    if (input->elemType() != TensorProto_DataType_UNDEFINED) {
       return input->elemType();
     }
   }
   
   // Couldn't infer - return UNDEFINED
-  return 0;
+  return TensorProto_DataType_UNDEFINED;
 }
 
 static bool is_pure_operator(Node* n) {
@@ -157,9 +157,9 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
         continue;
       }
       // Ensure the value has elem_type set before registering as output
-      if (v->elemType() == 0) {
+      if (v->elemType() == TensorProto_DataType_UNDEFINED) {
         int32_t elem_type = inferElemType(v);
-        if (elem_type != 0) {
+        if (elem_type != TensorProto_DataType_UNDEFINED) {
           v->setElemType(elem_type);
         }
       }
@@ -215,10 +215,10 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
         }
         // For elem_type, try to infer if not set
         int32_t elem_type = inferElemType(v);
-        if (elem_type != 0) {
+        if (elem_type != TensorProto_DataType_UNDEFINED) {
           newv->setElemType(elem_type);
         }
-        // Note: If elem_type is still UNDEFINED (0), the resulting model
+        // Note: If elem_type is still UNDEFINED, the resulting model
         // may be invalid. This indicates the input model lacks proper
         // type information for intermediate values. The model validation
         // will catch this error during onnx.checker.check_model().
