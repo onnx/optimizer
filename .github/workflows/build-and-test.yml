@@ -124,7 +124,6 @@ jobs:
   
     environment:
       name: release
-      url: https://pypi.org/p/onnxoptimizer
   
     steps:
       - name: Download wheels
