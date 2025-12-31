@@ -28,6 +28,10 @@ static constexpr const char* impure_operators[] = {
 // may return an incorrect type, but that would have been present in the
 // original model's value_info if available.
 static int32_t inferElemType(const Value* v) {
+  if (!v) {
+    return TensorProto_DataType_UNDEFINED;
+  }
+  
   if (v->elemType() != TensorProto_DataType_UNDEFINED) {
     return v->elemType();
   }
