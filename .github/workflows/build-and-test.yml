@@ -113,12 +113,6 @@ jobs:
           pip install -U twine packaging
           twine check dist/*
 
-      - name: Upload merged dist
-        uses: actions/upload-artifact@v6
-        with:
-          name: dist
-          path: dist/*
-
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -133,10 +127,17 @@ jobs:
       url: https://pypi.org/p/onnxoptimizer
   
     steps:
-      - name: Download distributions
+      - name: Download wheels
         uses: actions/download-artifact@v7
         with:
-          name: dist
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+  
+      - name: Download sdist
+        uses: actions/download-artifact@v7
+        with:
+          name: sdist
           path: dist
   
       - name: Publish to PyPI
