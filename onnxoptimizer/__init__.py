@@ -16,14 +16,14 @@ import tempfile
 import onnx
 from onnx import ModelProto
 
-import onnxoptimizer.onnx_opt_cpp2py_export as C
+import onnxoptimizer.onnx_opt_cpp2py_export as onnx_opt_cpp2py_export
 from onnxoptimizer.onnxoptimizer_main import main
 
 from .version import version as __version__  # noqa
 
-get_available_passes = C.get_available_passes
+get_available_passes = onnx_opt_cpp2py_export.get_available_passes
 
-get_fuse_and_elimination_passes = C.get_fuse_and_elimination_passes
+get_fuse_and_elimination_passes = onnx_opt_cpp2py_export.get_fuse_and_elimination_passes
 
 
 def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optional[Sequence[Text]], bool) -> ModelProto
@@ -40,48 +40,50 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
     if passes is None:
         passes = get_fuse_and_elimination_passes()
     if not isinstance(model, ModelProto):
-        raise ValueError(f"Optimizer only accepts ModelProto, incorrect type: {type(model)}")
+        raise TypeError(f"Optimizer only accepts ModelProto, incorrect type: {type(model)}")
     try:
         model_str = model.SerializeToString()
         if fixed_point:
-            optimized_model_str = C.optimize_fixedpoint(model_str, passes)
+            optimized_model_str = onnx_opt_cpp2py_export.optimize_fixedpoint(model_str, passes)
         else:
-            optimized_model_str = C.optimize(model_str, passes)
+            optimized_model_str = onnx_opt_cpp2py_export.optimize(model_str, passes)
 
         return onnx.load_from_string(optimized_model_str)
     except ValueError:
-        file_src = tempfile.NamedTemporaryFile(suffix=".onnx", delete=False)
-        file_dest = tempfile.NamedTemporaryFile(suffix=".onnx", delete=False)
-        data_file_src = tempfile.NamedTemporaryFile(delete=False)
-        data_file_dest = tempfile.NamedTemporaryFile(delete=False)
-        data_src_rel_filename = os.path.relpath(
-            data_file_src.name, os.path.dirname(file_src.name)
-        )
-        data_dest_rel_filename = os.path.relpath(
-            data_file_dest.name, os.path.dirname(file_dest.name)
-        )
-        try:
-            onnx.save(
-                model,
-                file_src.name,
-                save_as_external_data=True,
-                location=data_src_rel_filename,
-                convert_attribute=True,
+        with (
+            tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as file_src,
+            tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as file_dest,
+            tempfile.NamedTemporaryFile(delete=False) as data_file_src,
+            tempfile.NamedTemporaryFile(delete=False) as data_file_dest,
+        ):
+            data_src_rel_filename = os.path.relpath(
+                data_file_src.name, os.path.dirname(file_src.name)
             )
-            if fixed_point:
-                C.optimize_fixedpoint_from_path(
-                    file_src.name, file_dest.name, passes, data_dest_rel_filename
+            data_dest_rel_filename = os.path.relpath(
+                data_file_dest.name, os.path.dirname(file_dest.name)
+            )
+            try:
+                onnx.save(
+                    model,
+                    file_src.name,
+                    save_as_external_data=True,
+                    location=data_src_rel_filename,
+                    convert_attribute=True,
                 )
-            else:
-                C.optimize_from_path(
-                    file_src.name, file_dest.name, passes, data_dest_rel_filename
-                )
-            return onnx.load(file_dest, load_external_data=True)
-        finally:
-            os.remove(file_src.name)
-            os.remove(file_dest.name)
-            os.remove(data_file_src.name)
-            os.remove(data_file_dest.name)
+                if fixed_point:
+                    onnx_opt_cpp2py_export.optimize_fixedpoint_from_path(
+                        file_src.name, file_dest.name, passes, data_dest_rel_filename
+                    )
+                else:
+                    onnx_opt_cpp2py_export.optimize_from_path(
+                        file_src.name, file_dest.name, passes, data_dest_rel_filename
+                    )
+                return onnx.load(file_dest.name, load_external_data=True)
+            finally:
+                os.remove(file_src.name)
+                os.remove(file_dest.name)
+                os.remove(data_file_src.name)
+                os.remove(data_file_dest.name)
 
 
 __all__ = ["optimize", "get_available_passes", "get_fuse_and_elimination_passes", "main"]

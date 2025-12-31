@@ -100,6 +100,6 @@ def main():
         sys.exit(1)
     try:
         onnx.save(proto=model, f=output_file)
-    except:
+    except Exception:
         onnx.save(proto=model, f=output_file, save_as_external_data=True)
     onnx.checker.check_model(output_file)

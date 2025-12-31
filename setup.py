@@ -10,10 +10,10 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections import namedtuple
 from contextlib import contextmanager
 from distutils import log, sysconfig
 from textwrap import dedent
+from typing import ClassVar, NamedTuple
 
 import setuptools
 import setuptools.command.build_ext
@@ -59,10 +59,14 @@ try:
 except (OSError, subprocess.CalledProcessError):
     git_version = None
 
+
+class VersionInfo(NamedTuple):
+    version: str
+    git_version: str | None
+
+
 with open(os.path.join(TOP_DIR, "VERSION_NUMBER")) as version_file:
-    VersionInfo = namedtuple("VersionInfo", ["version", "git_version"])(
-        version=version_file.read().strip(), git_version=git_version
-    )
+    version_info = VersionInfo(version=version_file.read().strip(), git_version=git_version)
 
 ################################################################################
 # Pre Check
@@ -93,7 +97,7 @@ def cd(path):
 
 
 class ONNXCommand(setuptools.Command):
-    user_options = []
+    user_options: ClassVar[list] = []
 
     def initialize_options(self):
         pass
@@ -112,7 +116,7 @@ class create_version(ONNXCommand):
 
             version = '{version}'
             git_version = '{git_version}'
-            """.format(**dict(VersionInfo._asdict()))
+            """.format(**dict(version_info._asdict()))
                 )
             )
 
@@ -128,7 +132,9 @@ class cmake_build(setuptools.Command):
     to `setup.py build`.  By default all CPUs are used.
     """
 
-    user_options = [("jobs=", "j", "Specifies the number of jobs to use with make")]
+    user_options: ClassVar[list] = [
+        ("jobs=", "j", "Specifies the number of jobs to use with make")
+    ]
 
     built = False
 
@@ -287,7 +293,7 @@ cmdclass = {
 # Extensions
 ################################################################################
 
-py_limited_api = sys.version_info[0] >= 3 and sys.version_info[1] >= 12
+py_limited_api = sys.version_info >= (3, 12)
 if py_limited_api:
     setup_opts = {
         "bdist_wheel": {"py_limited_api": "cp312"},
@@ -313,7 +319,7 @@ packages = setuptools.find_packages()
 ################################################################################
 
 setuptools.setup(
-    version=VersionInfo.version,
+    version=version_info.version,
     ext_modules=ext_modules,
     cmdclass=cmdclass,
     packages=packages,
