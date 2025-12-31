@@ -21,6 +21,27 @@ static constexpr const char* impure_operators[] = {
     "Scan",
 };
 
+// Helper function to infer elem_type for a value if it's not set
+static int32_t inferElemType(const Value* v) {
+  if (v->elemType() != 0) {
+    return v->elemType();
+  }
+  
+  // If elem_type is UNDEFINED, try to infer it from the producing node
+  const Node* producer = v->node();
+  
+  // For many operators, output type matches input type
+  // Check if any input has a known elem_type
+  for (const Value* input : producer->inputs()) {
+    if (input->elemType() != 0) {
+      return input->elemType();
+    }
+  }
+  
+  // Couldn't infer - return UNDEFINED
+  return 0;
+}
+
 static bool is_pure_operator(Node* n) {
   for (auto x : impure_operators) {
     if (n->kind() == Symbol(x)) {
@@ -127,6 +148,13 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       if (v->node()->kind() == kUndefined) {
         continue;
       }
+      // Ensure the value has elem_type set before registering as output
+      if (v->elemType() == 0) {
+        int32_t elem_type = inferElemType(v);
+        if (elem_type != 0) {
+          v->setElemType(elem_type);
+        }
+      }
       graph.registerOutput(v);
     }
 
@@ -169,7 +197,22 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       if (v->node()->kind() == kUndefined) {
         v->replaceAllUsesWith(optionalInputDummyNode->outputs()[0]);
       } else {
-        Value* newv = graph.addInput()->copyMetadata(v);
+        Value* newv = graph.addInput();
+        // Copy sizes and name first
+        if (v->has_sizes()) {
+          newv->setSizes(v->sizes());
+        }
+        if (v->has_unique_name()) {
+          newv->setUniqueName(v->uniqueName());
+        }
+        // For elem_type, try to infer if not set
+        int32_t elem_type = inferElemType(v);
+        if (elem_type != 0) {
+          newv->setElemType(elem_type);
+        }
+        // Note: If elem_type is still UNDEFINED (0), the resulting model
+        // will be invalid. This indicates the input model lacks proper
+        // type information for intermediate values.
         v->replaceAllUsesWith(newv);
       }
     }
