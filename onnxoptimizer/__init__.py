@@ -10,14 +10,16 @@
 This enables users to optimize their models.
 """
 
-import onnx
-import onnxoptimizer.onnx_opt_cpp2py_export as C
-from .version import version as __version__  # noqa
-from onnx import ModelProto
-from typing import Text, Sequence, Optional
-from onnxoptimizer.onnxoptimizer_main import main
-import tempfile
 import os
+import tempfile
+
+import onnx
+from onnx import ModelProto
+
+import onnxoptimizer.onnx_opt_cpp2py_export as C
+from onnxoptimizer.onnxoptimizer_main import main
+
+from .version import version as __version__  # noqa
 
 get_available_passes = C.get_available_passes
 
@@ -38,8 +40,7 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
     if passes is None:
         passes = get_fuse_and_elimination_passes()
     if not isinstance(model, ModelProto):
-        raise ValueError(
-            'Optimizer only accepts ModelProto, incorrect type: {}'.format(type(model)))
+        raise ValueError(f"Optimizer only accepts ModelProto, incorrect type: {type(model)}")
     try:
         model_str = model.SerializeToString()
         if fixed_point:
@@ -53,14 +54,28 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
         file_dest = tempfile.NamedTemporaryFile(suffix=".onnx", delete=False)
         data_file_src = tempfile.NamedTemporaryFile(delete=False)
         data_file_dest = tempfile.NamedTemporaryFile(delete=False)
-        data_src_rel_filename = os.path.relpath(data_file_src.name, os.path.dirname(file_src.name))
-        data_dest_rel_filename = os.path.relpath(data_file_dest.name, os.path.dirname(file_dest.name))
+        data_src_rel_filename = os.path.relpath(
+            data_file_src.name, os.path.dirname(file_src.name)
+        )
+        data_dest_rel_filename = os.path.relpath(
+            data_file_dest.name, os.path.dirname(file_dest.name)
+        )
         try:
-            onnx.save(model, file_src.name, save_as_external_data=True, location=data_src_rel_filename, convert_attribute=True,)
+            onnx.save(
+                model,
+                file_src.name,
+                save_as_external_data=True,
+                location=data_src_rel_filename,
+                convert_attribute=True,
+            )
             if fixed_point:
-                C.optimize_fixedpoint_from_path(file_src.name, file_dest.name, passes, data_dest_rel_filename)
+                C.optimize_fixedpoint_from_path(
+                    file_src.name, file_dest.name, passes, data_dest_rel_filename
+                )
             else:
-                C.optimize_from_path(file_src.name, file_dest.name, passes, data_dest_rel_filename)
+                C.optimize_from_path(
+                    file_src.name, file_dest.name, passes, data_dest_rel_filename
+                )
             return onnx.load(file_dest, load_external_data=True)
         finally:
             os.remove(file_src.name)
@@ -69,4 +84,4 @@ def optimize(model, passes=None, fixed_point=False):  # type: (ModelProto, Optio
             os.remove(data_file_dest.name)
 
 
-__all__ = ['optimize', 'get_available_passes', 'get_fuse_and_elimination_passes', 'main']
+__all__ = ["optimize", "get_available_passes", "get_fuse_and_elimination_passes", "main"]
