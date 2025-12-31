@@ -22,13 +22,21 @@ static constexpr const char* impure_operators[] = {
 };
 
 // Helper function to infer elem_type for a value if it's not set
+// This is a simple heuristic that works for many common operators where
+// output type matches input type (e.g., Add, Sub, Mul, etc.).
+// For operators with different output types (e.g., Shape, Cast), this
+// may return an incorrect type, but that would have been present in the
+// original model's value_info if available.
 static int32_t inferElemType(const Value* v) {
   if (v->elemType() != 0) {
     return v->elemType();
   }
   
-  // If elem_type is UNDEFINED, try to infer it from the producing node
+  // Check if the value has a producing node
   const Node* producer = v->node();
+  if (!producer) {
+    return 0;
+  }
   
   // For many operators, output type matches input type
   // Check if any input has a known elem_type
