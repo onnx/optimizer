@@ -4717,8 +4717,9 @@ class TestOptimizer(unittest.TestCase):
         for input_val in optimized_model.graph.input:
             self.assertIsNotNone(input_val.type)
             self.assertTrue(input_val.type.HasField('tensor_type'))
-            # elem_type 0 is UNDEFINED, which is invalid for inputs
-            self.assertNotEqual(input_val.type.tensor_type.elem_type, 0,
+            # elem_type must be set (not TensorProto_DataType_UNDEFINED which is 0)
+            self.assertNotEqual(input_val.type.tensor_type.elem_type, 
+                              TensorProto.UNDEFINED,
                               f"Input {input_val.name} has UNDEFINED elem_type")
 
 

@@ -219,8 +219,9 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
           newv->setElemType(elem_type);
         }
         // Note: If elem_type is still UNDEFINED (0), the resulting model
-        // will be invalid. This indicates the input model lacks proper
-        // type information for intermediate values.
+        // may be invalid. This indicates the input model lacks proper
+        // type information for intermediate values. The model validation
+        // will catch this error during onnx.checker.check_model().
         v->replaceAllUsesWith(newv);
       }
     }
