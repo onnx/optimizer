@@ -119,9 +119,6 @@ ignore = [
     "E1", "E2", "E3", # Pycodestyle formatting rules that conflicts with the formatter
     "E501", # Line length. Not enforced because black will handle formatting
     "SIM103", # "Return the condition directly" obscures logic sometimes
-    "N802", # Nxx: ONNX Script function sometimes use upper case for names.
-    "N803",
-    "N806",
     "N999", # Invalid module name
     "NPY002", # We may not always need a generator
     "PERF203", # try-except in loops sometimes necessary
