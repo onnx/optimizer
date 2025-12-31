@@ -118,12 +118,18 @@ ignore = [
     "D401", # First line of docstring should be in imperative mood
     "E1", "E2", "E3", # Pycodestyle formatting rules that conflicts with the formatter
     "E501", # Line length. Not enforced because black will handle formatting
+    "E722", # Do not use bare except - used in setup.py for fallback logic
+    "N801", # Class name should use CapWords - setuptools commands must be lowercase
+    "N812", # Lowercase imported as non-lowercase - common pattern in this codebase
     "SIM103", # "Return the condition directly" obscures logic sometimes
+    "SIM115", # Use context manager for opening files - complex temp file handling
     "N999", # Invalid module name
     "NPY002", # We may not always need a generator
     "PERF203", # try-except in loops sometimes necessary
     "PERF401", # List comprehension is not always readable
+    "PYI024", # Use NamedTuple - namedtuple is simpler for this use case
     "PYI041", # int | float is more clear
+    "RUF012", # Mutable class attributes - setuptools commands define these
     "RUF022", # We don't need to sort __all__ for elements to be grouped
     "RUF031", # Parentheses for tuple in subscripts is more readable
     "RUF052", # Variables with `_` prefix may not be dummy variables in all cases
@@ -132,6 +138,8 @@ ignore = [
     "SIM114", # Don't always combine if branches for debugability
     "SIM116", # Don't use dict lookup to replace if-else
     "TRY003", # Messages can be constructed in the exception
+    "TRY004", # Prefer TypeError - ValueError is appropriate in some cases
+    "YTT203", # sys.version_info comparison - backward compat pattern
 ]
 
 [tool.ruff.lint.extend-per-file-ignores]
@@ -139,3 +147,4 @@ ignore = [
 "*_pb2.py" = ["ALL"]
 "build/*" = ["ALL"]
 ".setuptools-cmake-build*/*" = ["ALL"]
+"onnxoptimizer/test/*" = ["N806"]  # Test files use uppercase var names for ONNX conventions
