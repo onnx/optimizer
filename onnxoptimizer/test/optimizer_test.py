@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from collections import OrderedDict
-from typing import Sequence, Text, Any, Tuple, List, Callable, Optional, Dict, Union
+from typing import List, Optional, Dict
 import io
 import unittest
 import os
@@ -15,7 +15,7 @@ try:
     import torchvision as tv
 
     has_tv = True
-except:
+except ImportError:
     has_tv = False
 
 import onnx
@@ -25,8 +25,6 @@ from onnx import (
     helper,
     ModelProto,
     TensorProto,
-    GraphProto,
-    NodeProto,
     shape_inference,
     parser,
 )
@@ -37,7 +35,7 @@ try:
     import onnxruntime as rt
 
     has_ort = True
-except:
+except ImportError:
     has_ort = False
 
 import onnxoptimizer
@@ -4239,10 +4237,10 @@ class TestOptimizer(unittest.TestCase):
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_shufflenet_v2(self):  # type: () -> None
-        model = tv.models.shufflenet_v2_x1_0(pretrained=False)
+        model = tv.models.shufflenet_v2_x1_0(pretrained=False).eval()
         x = torch.rand(1, 3, 224, 224)
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, dynamo=False)
+            torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
@@ -4250,10 +4248,10 @@ class TestOptimizer(unittest.TestCase):
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_mnasnet(self):  # type: () -> None
-        model = tv.models.mnasnet1_0(pretrained=False)
+        model = tv.models.mnasnet1_0(pretrained=False).eval()
         x = torch.rand(1, 3, 224, 224)
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, dynamo=False)
+            torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
@@ -4261,10 +4259,10 @@ class TestOptimizer(unittest.TestCase):
 
     @unittest.skipUnless(has_tv, "This test needs torchvision")
     def test_torchvision_deeplabv3(self):  # type: () -> None
-        model = tv.models.segmentation.deeplabv3_resnet50(pretrained=False)
+        model = tv.models.segmentation.deeplabv3_resnet50(pretrained=False).eval()
         x = torch.rand(1, 3, 224, 224)
         with io.BytesIO() as f:
-            torch.onnx.export(model, x, f, dynamo=False)
+            torch.onnx.export(model, x, f)
             model = onnx.load_model_from_string(f.getvalue())
             self._optimized(
                 model, onnxoptimizer.get_fuse_and_elimination_passes(), fixed_point=True
