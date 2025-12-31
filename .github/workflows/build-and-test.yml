@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-name: Build and Test
+name: Build and Test, (Release)
 
 on: 
   push:
@@ -16,7 +16,7 @@ on:
 jobs:
   build_wheels:
     env:
-      CIBW_ARCHS_MACOS: x86_64 universal2
+      CIBW_ARCHS_MACOS: universal2
       MACOSX_DEPLOYMENT_TARGET: "10.15"
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
       CIBW_BEFORE_ALL_LINUX: WD=`pwd` && /opt/python/cp39-cp39/bin/python -m pip install --target tmp_cmake cmake && cp tmp_cmake/bin/cmake /usr/local/bin/cmake && rm -rf tmp_cmake && /opt/python/cp39-cp39/bin/python -m pip install cmake && cmake --version && whereis cmake
@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15]        
-        python: ["cp310", "cp311", "cp312", "cp313"]
+        python: ["cp313", "cp312", "cp311"]
     steps:
     - uses: actions/checkout@v5
       with:
