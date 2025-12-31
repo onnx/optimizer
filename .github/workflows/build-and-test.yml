@@ -48,15 +48,15 @@ jobs:
         submodules: recursive
     - name: Build wheels
       uses: pypa/cibuildwheel@v3.2.1
+    - uses: actions/upload-artifact@v6
+      with:
+        name: wheels-${{ matrix.os }}-${{ matrix.python }}
+        path: ./wheelhouse/*.whl
     - name: Check ABI3
       run: |
         pip install abi3audit
         abi3audit --strict -v --report ./wheelhouse/*.whl
       if: ${{ contains(fromJSON('["cp312", "cp313"]'), matrix.python) }}
-    - uses: actions/upload-artifact@v6
-      with:
-        name: wheels-${{ matrix.os }}-${{ matrix.python }}
-        path: ./wheelhouse/*.whl
 
   build_sdist:
     name: Build source distribution
@@ -113,12 +113,6 @@ jobs:
           pip install -U twine packaging
           twine check dist/*
 
-      - name: Upload merged dist
-        uses: actions/upload-artifact@v6
-        with:
-          name: dist
-          path: dist/*
-
   release:
     name: Release
     runs-on: ubuntu-latest
@@ -130,13 +124,19 @@ jobs:
   
     environment:
       name: release
-      url: https://pypi.org/p/onnxoptimizer
   
     steps:
-      - name: Download distributions
+      - name: Download wheels
         uses: actions/download-artifact@v7
         with:
-          name: dist
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+  
+      - name: Download sdist
+        uses: actions/download-artifact@v7
+        with:
+          name: sdist
           path: dist
   
       - name: Publish to PyPI
