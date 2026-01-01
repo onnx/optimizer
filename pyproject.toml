@@ -18,11 +18,12 @@ keywords = [
 dependencies = [
   "onnx",
 ]
+requires-python = ">= 3.10"
 
 [project.urls]
 Homepage = 'https://github.com/onnx/optimizer'
 
-[console_scripts]
+[project.scripts]
 onnxoptimizer = "onnxoptimizer:main"
 
 [build-system]
