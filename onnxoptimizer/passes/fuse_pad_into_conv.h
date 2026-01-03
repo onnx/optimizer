@@ -119,6 +119,14 @@ struct FusePadIntoConv final : public PredicateBasedPass {
       return false;
     }
 
+    // Clean the auto_pad if NOTSET
+    if (conv->hasAttribute(Symbol("auto_pad"))) {
+      if (conv->s(Symbol("auto_pad")) != "NOTSET") {
+        return false;
+      }
+      conv->removeAttribute(Symbol("auto_pad"));
+    }
+
     int conv_pads_size = pads_size - 4;
     std::vector<int64_t> conv_pads(conv_pads_size, 0);
     // Fuse into existing padding, if available
@@ -129,11 +137,6 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     for (int i = 2, j = 0; i < pads_size / 2; ++i, ++j) {
       conv_pads[j] += pads[i];
       conv_pads[conv_pads_size / 2 + j] += pads[pads_size / 2 + i];
-    }
-
-    // Clean the auto_pad
-    if (conv->hasAttribute(Symbol("auto_pad"))){
-      conv->removeAttribute(Symbol("auto_pad"));
     }
 
     conv->is_(kpads, std::move(conv_pads));
