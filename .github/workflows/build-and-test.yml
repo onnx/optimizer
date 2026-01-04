@@ -24,12 +24,12 @@ jobs:
       CIBW_BEFORE_BUILD_LINUX: pip install protobuf
       CIBW_BEFORE_BUILD_WINDOWS: python -m pip install protobuf
       CIBW_BEFORE_BUILD_MACOS: pip install protobuf
-      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist flake8-pyproject mypy onnxruntime
+      CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist ruff mypy onnxruntime
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
       CIBW_BEFORE_TEST_LINUX: pip install onnxscript torch==2.9.1 torchvision==0.24.1
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
-      CIBW_TEST_COMMAND_LINUX: cd {project} && flake8p && pytest
+      CIBW_TEST_COMMAND_LINUX: cd {project} && pytest
       CIBW_TEST_SKIP: " *_arm64"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5"
       CIBW_ENVIRONMENT_WINDOWS: USE_MSVC_STATIC_RUNTIME=0 CMAKE_ARGS="-DONNX_USE_PROTOBUF_SHARED_LIBS=OFF -DProtobuf_USE_STATIC_LIBS=ON -DONNX_USE_LITE_PROTO=ON"

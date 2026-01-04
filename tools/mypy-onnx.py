@@ -4,13 +4,15 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import subprocess
 import os
+import subprocess
 
 
 def main():  # type: () -> None
     try:
-        root_folder = os.path.realpath(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        root_folder = os.path.realpath(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
         os.chdir(root_folder)
 
         subprocess.check_call(["mypy", "."])
@@ -22,5 +24,5 @@ def main():  # type: () -> None
         exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
