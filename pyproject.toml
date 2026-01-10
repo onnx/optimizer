@@ -110,8 +110,6 @@ select = [
     "W", # pycodestyle
     "YTT", # flake8-2020
 ]
-# Select preview rules
-preview = true
 ignore = [
     "B9",  # Opinionated bugbear rules
     "C408", # Sometimes it is preferable when we construct kwargs
