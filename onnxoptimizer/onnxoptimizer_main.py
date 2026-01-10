@@ -10,14 +10,16 @@
 This enables users to optimize their models.
 """
 
+import argparse
+import pathlib
+import sys
+
 import onnx
 import onnx.checker
-import argparse
-import sys
-import onnxoptimizer
-import pathlib
 
-usage = 'python -m onnxoptimizer input_model.onnx output_model.onnx '
+import onnxoptimizer
+
+_USAGE = "python -m onnxoptimizer input_model.onnx output_model.onnx "
 
 
 def format_argv(argv):
@@ -27,19 +29,36 @@ def format_argv(argv):
     elif len(argv_) >= 2:
         return argv_[2:]
     else:
-        print('please check arguments!')
+        print("please check arguments!")
         sys.exit(1)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog='onnxoptimizer',
-        usage=usage,
-        description='onnxoptimizer command-line api')
-    parser.add_argument('--print_all_passes', action='store_true', default=False, help='print all available passes')
-    parser.add_argument('--print_fuse_elimination_passes', action='store_true', default=False, help='print all fuse and elimination passes')
-    parser.add_argument('-p', '--passes', nargs='*', default=None, help='list of optimization passes name, if no set, fuse_and_elimination_passes will be used')
-    parser.add_argument('--fixed_point', action='store_true', default=False, help='fixed point')
+        prog="onnxoptimizer", usage=_USAGE, description="onnxoptimizer command-line api"
+    )
+    parser.add_argument(
+        "--print_all_passes",
+        action="store_true",
+        default=False,
+        help="print all available passes",
+    )
+    parser.add_argument(
+        "--print_fuse_elimination_passes",
+        action="store_true",
+        default=False,
+        help="print all fuse and elimination passes",
+    )
+    parser.add_argument(
+        "-p",
+        "--passes",
+        nargs="*",
+        default=None,
+        help="list of optimization passes name, if no set, fuse_and_elimination_passes will be used",
+    )
+    parser.add_argument(
+        "--fixed_point", action="store_true", default=False, help="fixed point"
+    )
     argv = sys.argv.copy()
     args = parser.parse_args(format_argv(sys.argv))
 
@@ -59,15 +78,15 @@ def main():
         passes = fuse_and_elimination_passes
 
     if len(argv[1:]) < 2:
-        print('usage:{}'.format(usage))
-        print('please check arguments!')
+        print(f"usage:{_USAGE}")
+        print("please check arguments!")
         sys.exit(1)
 
     input_file = argv[1]
     output_file = argv[2]
 
     if not pathlib.Path(input_file).exists():
-        print("input file: {0} no exist!".format(input_file))
+        print(f"input file: {input_file} no exist!")
         sys.exit(1)
 
     model = onnx.load(input_file)
@@ -77,10 +96,10 @@ def main():
     onnx.checker.check_model(input_file)
     model = onnxoptimizer.optimize(model=model, passes=passes, fixed_point=args.fixed_point)
     if model is None:
-        print('onnxoptimizer failed')
+        print("onnxoptimizer failed")
         sys.exit(1)
     try:
         onnx.save(proto=model, f=output_file)
-    except:
+    except Exception:
         onnx.save(proto=model, f=output_file, save_as_external_data=True)
     onnx.checker.check_model(output_file)
