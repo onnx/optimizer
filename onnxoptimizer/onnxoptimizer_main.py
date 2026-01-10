@@ -19,7 +19,7 @@ import onnx.checker
 
 import onnxoptimizer
 
-usage = "python -m onnxoptimizer input_model.onnx output_model.onnx "
+_USAGE = "python -m onnxoptimizer input_model.onnx output_model.onnx "
 
 
 def format_argv(argv):
@@ -35,7 +35,7 @@ def format_argv(argv):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="onnxoptimizer", usage=usage, description="onnxoptimizer command-line api"
+        prog="onnxoptimizer", usage=_USAGE, description="onnxoptimizer command-line api"
     )
     parser.add_argument(
         "--print_all_passes",
@@ -78,7 +78,7 @@ def main():
         passes = fuse_and_elimination_passes
 
     if len(argv[1:]) < 2:
-        print(f"usage:{usage}")
+        print(f"usage:{_USAGE}")
         print("please check arguments!")
         sys.exit(1)
 
