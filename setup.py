@@ -293,19 +293,47 @@ cmdclass = {
 # Extensions
 ################################################################################
 
-py_limited_api = sys.version_info >= (3, 12)
-if py_limited_api:
-    setup_opts = {
-        "bdist_wheel": {"py_limited_api": "cp312"},
-    }
-else:
-    setup_opts = {}
+################################################################################
+# Extensions
+################################################################################
+
+# Enable limited ABI build
+# nanobind supports limited ABI for Python 3.12 and later.
+# https://blog.trailofbits.com/2022/11/15/python-wheels-abi-abi3audit/
+# 1. The Py_LIMITED_API macro is defined in the extension
+# 2. py_limited_api in Extension tags the extension as abi3
+# 3. bdist_wheel options tag the wheel as abi3
+NO_GIL = hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+PY_312_OR_NEWER = sys.version_info >= (3, 12)
+USE_LIMITED_API = not NO_GIL and PY_312_OR_NEWER and platform.system() != "FreeBSD"
+
+macros = []
+if USE_LIMITED_API:
+    macros.append(("Py_LIMITED_API", "0x030C0000"))
 
 ext_modules = [
     setuptools.Extension(
-        name="onnxoptimizer.onnx_opt_cpp2py_export", sources=[], py_limited_api=py_limited_api
+        name="onnxoptimizer.onnx_opt_cpp2py_export",
+        sources=[],
+        py_limited_api=USE_LIMITED_API,
+        define_macros=macros,
     )
 ]
+
+
+#py_limited_api = sys.version_info >= (3, 12)
+#if py_limited_api:
+#    setup_opts = {
+#        "bdist_wheel": {"py_limited_api": "cp312"},
+#    }
+#else:
+#    setup_opts = {}#
+#
+#ext_modules = [
+#    setuptools.Extension(
+#        name="onnxoptimizer.onnx_opt_cpp2py_export", sources=[], py_limited_api=py_limited_api
+#    )
+#]
 
 ################################################################################
 # Packages
@@ -317,6 +345,14 @@ packages = setuptools.find_packages()
 ################################################################################
 # Test
 ################################################################################
+
+bdist_wheel_options = {}
+if USE_LIMITED_API:
+    bdist_wheel_options["py_limited_api"] = "cp312"
+
+setup_opts = {}
+if bdist_wheel_options:
+    setup_opts["bdist_wheel"] = bdist_wheel_options
 
 setuptools.setup(
     version=version_info.version,
