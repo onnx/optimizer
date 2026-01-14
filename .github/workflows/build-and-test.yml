@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2022, macos-15]        
-        python: ["cp314t", "cp313t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
+        python: ["cp313t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
     steps:
     - uses: actions/checkout@v6.0.1
       with:
