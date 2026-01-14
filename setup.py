@@ -160,12 +160,10 @@ class cmake_build(setuptools.Command):
             cmake_args = [
                 CMAKE,
                 f"-DPython_INCLUDE_DIR={sysconfig.get_python_inc()}",
-                f"-DPYTHON_EXECUTABLE={sys.executable}",
+                f"-DPython_EXECUTABLE={sys.executable}",
                 "-DONNX_BUILD_PYTHON=ON",
-                "-DONNX_USE_LITE_PROTO={}".format("ON" if ONNX_USE_LITE_PROTO else "OFF"),
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                 f"-DONNX_NAMESPACE={ONNX_NAMESPACE}",
-                "-DPY_EXT_SUFFIX={}".format(sysconfig.get_config_var("EXT_SUFFIX") or ""),
                 "-DONNX_OPT_USE_SYSTEM_PROTOBUF={}".format(
                     "ON" if ONNX_OPT_USE_SYSTEM_PROTOBUF else "OFF"
                 ),
