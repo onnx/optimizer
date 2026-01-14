@@ -318,21 +318,6 @@ ext_modules = [
     )
 ]
 
-
-#py_limited_api = sys.version_info >= (3, 12)
-#if py_limited_api:
-#    setup_opts = {
-#        "bdist_wheel": {"py_limited_api": "cp312"},
-#    }
-#else:
-#    setup_opts = {}#
-#
-#ext_modules = [
-#    setuptools.Extension(
-#        name="onnxoptimizer.onnx_opt_cpp2py_export", sources=[], py_limited_api=py_limited_api
-#    )
-#]
-
 ################################################################################
 # Packages
 ################################################################################
