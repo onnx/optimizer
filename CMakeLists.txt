@@ -30,7 +30,8 @@ option(ONNX_OPT_USE_SYSTEM_PROTOBUF "" OFF)
 if(NOT ONNX_OPT_USE_SYSTEM_PROTOBUF)
   option(protobuf_BUILD_TESTS "" OFF)
   option(protobuf_MSVC_STATIC_RUNTIME "" ${ONNX_USE_MSVC_STATIC_RUNTIME})
-  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf libprotobuf)
+  set(protobuf_FORCE_FETCH_DEPENDENCIES ON)
+  set(ONNX_BUILD_CUSTOM_PROTOBUF ON)
 endif()
 
 
@@ -74,7 +75,6 @@ if(ONNX_BUILD_PYTHON)
     Python 3
     REQUIRED COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.SABIModule)
-  add_subdirectory(third_party/nanobind EXCLUDE_FROM_ALL)
   nanobind_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc" STABLE_ABI)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 endif()
