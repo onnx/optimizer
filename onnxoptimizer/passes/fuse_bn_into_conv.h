@@ -56,11 +56,11 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     auto bn_mean = *FetchConstantTensor(bn_inputs[3]);
     auto bn_var = *FetchConstantTensor(bn_inputs[4]);
     auto conv_W = *FetchConstantTensor(conv_inputs[1]);
-    bn_scale.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
-    bn_bais.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
-    bn_mean.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
-    bn_var.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
-    conv_W.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    bn_scale.setName(graph.getNextUniqueName());
+    bn_bais.setName(graph.getNextUniqueName());
+    bn_mean.setName(graph.getNextUniqueName());
+    bn_var.setName(graph.getNextUniqueName());
+    conv_W.setName(graph.getNextUniqueName());
 
     /// scale bais mean var must be the same shape (C)
     ONNX_ASSERT(bn_scale.sizes() == bn_bais.sizes());
@@ -82,7 +82,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
         return false;
       }
       auto bc_t = *FetchConstantTensor(conv_inputs[2]);
-      bc_t.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+      bc_t.setName(ONNX_NAMESPACE::toVarName(graph.getNextUnique()));
       ONNX_ASSERT(bc_t.sizes() == bn_scale.sizes());
       conv_bias = graph.addInitializerAndCreateValue(bc_t);
     } else {
