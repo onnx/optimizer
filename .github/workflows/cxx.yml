@@ -15,7 +15,7 @@ jobs:
   cxx:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v6.0.1
+    - uses: actions/checkout@v6
       with:
         submodules: recursive
         persist-credentials: false
