@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -87,6 +87,9 @@ struct FusePadIntoPool final : public PredicateBasedPass {
           break;
         }
         if (pad->inputs().size() >= 3) {
+          if (pad->input(2)->uniqueName().empty()) {
+            break;
+          }
           if (Define_GetConstantValueFromInput(i32) ||
               Define_GetConstantValueFromInput(i64) ||
               Define_GetConstantValueFromInput(f32) ||

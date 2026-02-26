@@ -1,4 +1,6 @@
 /*
+ * SPDX-FileCopyrightText: ONNX Project Contributors
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -25,7 +27,7 @@ enum PassType {
   Fuse = 0,
   // Class of optimizations that removes useless operations.
   Nop = 1,
-  // Class of optimizations that includes some form of seperation.
+  // Class of optimizations that includes some form of separation.
   Separate = 2,
   // Immutable pass, also sometimes referred to as an analysis pass.
   Immutable = 3,
@@ -74,8 +76,9 @@ enum NodeDestroyType {
   DestroyZero = 0,
   // Equivalent to calling it.destroyCurrent() once.
   DestroyOne = 1,
-  // Equivalent to calling it.destroyCurrent() twice.
-  DestroyTwo = 2
+  // Previously we have `DestroyTwo` (call destroyCurrent() twice),
+  // but it is actually not well-defined -- there are multiple possible
+  // topological orders. So we remove it.
 };
 
 // Base class for all optimizations within ONNX. A pass must contain the

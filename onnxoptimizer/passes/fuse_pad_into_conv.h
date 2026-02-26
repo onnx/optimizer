@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -83,6 +83,9 @@ struct FusePadIntoConv final : public PredicateBasedPass {
           break;
         }
         if (pad->inputs().size() >= 3) {
+          if (pad->input(2)->uniqueName().empty()) {
+            break;
+          }
           if (Define_GetConstantValueFromInput(i32) ||
               Define_GetConstantValueFromInput(i64) ||
               Define_GetConstantValueFromInput(f32) ||
@@ -116,6 +119,14 @@ struct FusePadIntoConv final : public PredicateBasedPass {
       return false;
     }
 
+    // Clean the auto_pad if NOTSET
+    if (conv->hasAttribute(Symbol("auto_pad"))) {
+      if (conv->s(Symbol("auto_pad")) != "NOTSET") {
+        return false;
+      }
+      conv->removeAttribute(Symbol("auto_pad"));
+    }
+
     int conv_pads_size = pads_size - 4;
     std::vector<int64_t> conv_pads(conv_pads_size, 0);
     // Fuse into existing padding, if available
@@ -138,3 +149,4 @@ struct FusePadIntoConv final : public PredicateBasedPass {
 
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
+

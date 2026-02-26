@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -45,7 +45,7 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
       return false;
     }
     log_node->removeAllInputs();
-    destroy_current = NodeDestroyType::DestroyTwo;
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

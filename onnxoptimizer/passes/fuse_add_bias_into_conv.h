@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -134,7 +134,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
         t.elem_type() = TensorProto_DataType_INT64;
         Symbol sym = Symbol("value");
         constant->t_(sym, t);
-        std::vector<Dimension> s = {1};
+        std::vector<Dimension> s{Dimension{1}};
         constant->output()->setSizes(s);
         constant->output()->setElemType(TensorProto_DataType_INT64);
         constant->insertBefore(orig_conv->node());

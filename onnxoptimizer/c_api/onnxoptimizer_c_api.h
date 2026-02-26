@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef ONNXOPTIMIZER_C_API_H
 #define ONNXOPTIMIZER_C_API_H
 

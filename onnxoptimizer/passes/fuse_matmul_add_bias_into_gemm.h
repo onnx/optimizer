@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -93,12 +93,13 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     gemm->f_(kbeta, 1.0);
     gemm->i_(ktransA, 0);
     gemm->i_(ktransB, 0);
-    gemm->insertBefore(orig_matmul->node());
+    gemm->insertBefore(n);
     const bool replacing_success = tryReplacingAllUsesWith(n, gemm);
     if (!replacing_success) {
       return false;
     }
-    destroy_current = NodeDestroyType::DestroyTwo;
+    // only destroy MatMul here and DCE will take care of the Add
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

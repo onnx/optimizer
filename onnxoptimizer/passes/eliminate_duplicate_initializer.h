@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -76,10 +76,10 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
         output_set.emplace(out->uniqueName());
       }
     }
-    std::unordered_map<Tensor *, std::string, CSETensorHash, CSETensorEqual>
+    std::unordered_map<const Tensor *, std::string, CSETensorHash, CSETensorEqual>
         initializer_map;
     std::vector<std::pair<std::string, std::string>> replaced_table;
-    for (auto initializer : initializers) {
+    for (const auto& initializer : initializers) {
       if (!initializer.hasName()) {
         continue;
       }
@@ -104,7 +104,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
     }
     // workaround to  fetch initializer_node_ pointer in graph
     Tensor dummy_tensor;
-    dummy_tensor.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    dummy_tensor.setName(graph.getNextUniqueName());
     Node *initializer_node =
         graph.addInitializerAndCreateValue(dummy_tensor)->node();
     VLOG(1) << Str("====== Graph: ", graph.name(), "=====");

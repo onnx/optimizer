@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// SPDX-FileCopyrightText: ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 #include "onnx/common/assertions.h"
 
@@ -67,10 +67,6 @@ unsigned int PredicateBasedPass::_runPassInternal(Graph& graph) {
       num_changes += this->runTransform(n, graph, destroy_type);
 
       if (destroy_type == NodeDestroyType::DestroyOne) {
-        it.destroyCurrent();
-      }
-      if (destroy_type == NodeDestroyType::DestroyTwo) {
-        it.destroyCurrent();
         it.destroyCurrent();
       }
     }

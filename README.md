@@ -1,4 +1,8 @@
-<!--- SPDX-License-Identifier: Apache-2.0 -->
+<!--
+SPDX-FileCopyrightText: ONNX Project Contributors
+
+SPDX-License-Identifier: Apache-2.0
+-->
 
 # ONNX Optimizer
 
@@ -70,8 +74,6 @@ optional arguments:
 ## Relevant tools
 
 * [onnx-simplifier](https://github.com/daquexian/onnx-simplifier): A handy and popular tool based on onnxoptimizer
-
-* [convertmodel.com](https://convertmodel.com/#outputFormat=onnx&inputFormat=onnx): onnx optimizer compiled as WebAssembly so that it can be used out-of-the-box
 
 ## Code of Conduct
 

@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -29,7 +29,7 @@ struct EliminateNopSplit final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
-    auto* input = node->input();
+    auto* input = node->inputs()[0];
     const auto& sizes = input->sizes();
     int64_t axis = GetValueFromAttrWithDefault(node, kaxis, int64_t{0});
     axis = AddYIfNegative(axis, static_cast<int64_t>(sizes.size()));

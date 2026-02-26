@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -27,7 +27,7 @@ struct SetUniqueNameForNodes final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
-    node->setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    node->setName(graph.getNextUniqueName());
     destroy_current = NodeDestroyType::DestroyZero;
     return true;
   }

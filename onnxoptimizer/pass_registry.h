@@ -1,4 +1,6 @@
 /*
+ * SPDX-FileCopyrightText: ONNX Project Contributors
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,13 +11,14 @@
 
 #include <unordered_set>
 #include <vector>
+#include <map>
 
 #include "onnx/common/ir.h"
 #include "onnx/common/ir_pb_converter.h"
-#include "onnx/common/stl_backports.h"
 #include "onnx/proto_utils.h"
 #include "onnxoptimizer/passes/adjust_add.h"
 #include "onnxoptimizer/passes/adjust_slice_and_matmul.h"
+#include "onnxoptimizer/passes/eliminate_consecutive_idempotent_ops.h"
 #include "onnxoptimizer/passes/eliminate_deadend.h"
 #include "onnxoptimizer/passes/eliminate_duplicate_initializer.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
@@ -57,6 +60,9 @@
 #include "onnxoptimizer/passes/eliminate_common_subexpression.h"
 #include "onnxoptimizer/passes/fuse_qkv.h"
 #include "onnxoptimizer/passes/fuse_consecutive_unsqueezes.h"
+#include "onnxoptimizer/passes/eliminate_nop_with_unit.h"
+#include "onnxoptimizer/passes/rewrite_input_dtype.h"
+#include "onnxoptimizer/passes/rewrite_where.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -76,6 +82,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateNopDropout>();
     registerPass<EliminateNopFlatten>();
     registerPass<ExtractConstantToInitializer>();
+    registerPass<EliminateConsecutiveIdempotentOps>();
     registerPass<EliminateIfWithConstCond>();
     registerPass<EliminateNopMonotoneArgmax>();
     registerPass<EliminateNopPad>();
@@ -102,6 +109,7 @@ struct GlobalPassRegistry {
     registerPass<SplitPredict>();
     registerPass<FuseConcatIntoReshape>();
     registerPass<EliminateNopReshape>();
+    registerPass<EliminateOpWithUnit>();
     registerPass<EliminateCommonSubexpression>();
     registerPass<FuseQKV>();
     registerPass<FuseConsecutiveUnsqueezes>();
@@ -112,6 +120,8 @@ struct GlobalPassRegistry {
     registerPass<EliminateUnusedInitializer>();
     registerPass<EliminateDuplicateInitializer>();
     registerPass<AdjustSliceAndMatmul>();
+    registerPass<RewriteInputDtype>();
+    registerPass<RewriteWhere>();
   }
 
   ~GlobalPassRegistry() {
