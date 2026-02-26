@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "onnxoptimizer/pass_manager.h"
+#include "onnxoptimizer/passes/logging.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -36,10 +37,16 @@ std::shared_ptr<PassManagerAnalysis> FixedPointPassManager::run(Graph& graph) {
       }
       std::shared_ptr<CountBasedPassAnalysis> count_analysis =
           std::static_pointer_cast<CountBasedPassAnalysis>(analysis);
+      if (count_analysis->num_positive_transforms != 0) {
+        VLOG(1) << "Pass " << pass->getPassName() << " transformed " << count_analysis->num_positive_transforms;
+      }
 
       while (count_analysis->fixedPointOptimizationNeeded()) {
         count_analysis = std::static_pointer_cast<CountBasedPassAnalysis>(
             pass->runPass(graph));
+        if (count_analysis->num_positive_transforms != 0) {
+          VLOG(1) << "Pass " << pass->getPassName() << " transformed " << count_analysis->num_positive_transforms;
+        }
         fixed_point_optimization_done = true;
       }
     }
