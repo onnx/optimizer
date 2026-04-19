@@ -62,7 +62,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     bn_var.setName(graph.getNextUniqueName());
     conv_W.setName(graph.getNextUniqueName());
 
-    /// scale bais mean var must be the same shape (C)
+    /// scale bias mean var must be the same shape (C)
     ONNX_ASSERT(bn_scale.sizes() == bn_bias.sizes());
     ONNX_ASSERT(bn_scale.sizes() == bn_mean.sizes());
     ONNX_ASSERT(bn_scale.sizes() == bn_var.sizes());
