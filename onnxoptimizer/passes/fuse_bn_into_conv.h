@@ -52,24 +52,24 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     const auto& conv_inputs = conv->inputs();
 
     auto bn_scale = *FetchConstantTensor(bn_inputs[1]);
-    auto bn_bais = *FetchConstantTensor(bn_inputs[2]);
+    auto bn_bias = *FetchConstantTensor(bn_inputs[2]);
     auto bn_mean = *FetchConstantTensor(bn_inputs[3]);
     auto bn_var = *FetchConstantTensor(bn_inputs[4]);
     auto conv_W = *FetchConstantTensor(conv_inputs[1]);
     bn_scale.setName(graph.getNextUniqueName());
-    bn_bais.setName(graph.getNextUniqueName());
+    bn_bias.setName(graph.getNextUniqueName());
     bn_mean.setName(graph.getNextUniqueName());
     bn_var.setName(graph.getNextUniqueName());
     conv_W.setName(graph.getNextUniqueName());
 
-    /// scale bais mean var must be the same shape (C)
-    ONNX_ASSERT(bn_scale.sizes() == bn_bais.sizes());
+    /// scale bias mean var must be the same shape (C)
+    ONNX_ASSERT(bn_scale.sizes() == bn_bias.sizes());
     ONNX_ASSERT(bn_scale.sizes() == bn_mean.sizes());
     ONNX_ASSERT(bn_scale.sizes() == bn_var.sizes());
     ONNX_ASSERT(bn_scale.sizes().size() == 1);
     int64_t C = bn_scale.sizes()[0];
     ONNX_ASSERT(conv_W.sizes().size() > 2 && conv_W.sizes()[0] == C);
-    if (bn_scale.elem_type() != bn_bais.elem_type() ||
+    if (bn_scale.elem_type() != bn_bias.elem_type() ||
         bn_scale.elem_type() != bn_mean.elem_type() ||
         bn_scale.elem_type() != bn_var.elem_type() ||
         bn_scale.elem_type() != conv_W.elem_type()) {
@@ -160,7 +160,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     Node* bias_add = graph.create(kAdd, 1);
     bias_add->insertAfter(mul);
     bias_add->addInput(mul->output());
-    bias_add->addInput(graph.addInitializerAndCreateValue(bn_bais));
+    bias_add->addInput(graph.addInitializerAndCreateValue(bn_bias));
 
     Value* old_w_value = conv_inputs[1];
     conv->replaceInput(1, mul_w->output());
