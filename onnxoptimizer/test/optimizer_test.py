@@ -2872,6 +2872,18 @@ class TestOptimizer(unittest.TestCase):
             if init.name == optimized_model.graph.node[2].input[1]:
                 assert list(to_array(init)) == [0, 1, 4, 5, 6]
 
+    def test_fuse_consecutive_squeezes_negative_axes(self):  # type: () -> None
+        graph = parser.parse_graph("""
+           agraph (float[5, 7, 1, 1] X) => (float[5, 7] Z)
+           {
+              Axes = Constant<value=int64[1]{-1}> ()
+              Y = Squeeze (X, Axes)
+              Z = Squeeze (Y, Axes)
+           }
+        """)
+        optimized_model = self._optimized(graph, ["fuse_consecutive_squeezes"])
+        assert len(optimized_model.graph.node) == 3
+
     @pytest.mark.xfail
     def test_fuse_consecutive_softmax_log_axis(self):  # type: () -> None
         for axis in range(3):
