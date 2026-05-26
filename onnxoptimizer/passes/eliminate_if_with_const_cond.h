@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -8,6 +8,7 @@
 #pragma once
 
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -35,7 +36,7 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
     if (node->kind() == kIf) {
       const auto cond_value = node->input();
       if ((cond_value->node()->kind() == kConstant ||
-           cond_value->node()->kind() == kParam)) {
+           cond_value->owningGraph()->is_constant_initializer(cond_value))) {
         return true;
       }
     }
@@ -50,13 +51,8 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
   bool runTransform(Node *if_node, Graph &graph,
                     NodeDestroyType &destroy_current) override {
     const auto cond_value = if_node->input();
-    Tensor cond_tensor;
-    if (cond_value->node()->kind() == kConstant) {
-      cond_tensor = cond_value->node()->t(kvalue);
-    } else {
-      cond_tensor = *graph.getInitializer(cond_value->uniqueName());
-    }
-    const bool cond = static_cast<bool>(cond_tensor.data<int32_t>()[0]);
+    const Tensor *cond_tensor = FetchConstantTensor(cond_value);
+    const bool cond = ParseTensorData<bool>(cond_tensor)[0];
     auto &parent_graph = graph;
     const auto subgraph = if_node->g(cond ? kthen_branch : kelse_branch);
 
@@ -76,15 +72,28 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
       for (const auto *input : node->inputs()) {
         const auto &unique_name = input->uniqueName();
         if (value_dict.find(unique_name) == value_dict.end()) {
-          ONNX_ASSERT(input->node()->kind() == kCaptured);
-          auto it = unique_name_to_value_in_parent.find(unique_name);
-          if (it == unique_name_to_value_in_parent.end()) {
-            // a value from the parent graph of parent_graph
-            auto *captured_node = parent_graph.create(kCaptured, 1);
-            captured_node->output()->setUniqueName(unique_name);
-            new_node->addInput(captured_node->output());
+          if (input->node()->kind() == kCaptured) {
+            auto it = unique_name_to_value_in_parent.find(unique_name);
+            if (it == unique_name_to_value_in_parent.end()) {
+              // a value from the parent graph of parent_graph
+              auto *captured_node = parent_graph.create(kCaptured, 1);
+              captured_node->output()->setUniqueName(unique_name);
+              new_node->addInput(captured_node->output());
+            } else {
+              new_node->addInput(it->second);
+            }
+          } else if (input->node()->kind() == kParam) {
+            ONNX_ASSERT(subgraph->is_constant_initializer(input));
+            const Tensor &initializer_subgraph =
+                *subgraph->getInitializer(input->uniqueName());
+            // copy a new tensor
+            Tensor initializer_parent_graph = initializer_subgraph;
+            new_node->addInput(parent_graph.addInitializerAndCreateValue(
+                initializer_parent_graph));
           } else {
-            new_node->addInput(it->second);
+            ONNX_ASSERTM(
+                false,
+                "input node not in value_dict can only be captured or param");
           }
         } else {
           new_node->addInput(value_dict[unique_name]);

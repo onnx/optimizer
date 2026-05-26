@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -21,6 +21,7 @@
 
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -33,8 +34,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     return "fuse_add_bias_into_conv";
   }
   bool patternMatchPredicate(Node *node) override {
-    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
-           node->inputs()[0]->node()->inputs().size() == 2;
+    return CheckKind(node, kAdd, 0, kConv) &&
+           GetInputsOfPreNode(node, 0).size() == 2;
   }
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                                       Value *input, Node *target_node,
@@ -62,7 +63,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       t.sizes().push_back(axes.size());
       t.int64s() = axes;
       t.elem_type() = TensorProto_DataType_INT64;
-      Value *tv = graph.addInitializerAndInput(t);
+      Value *tv = graph.addInitializerAndCreateValue(t);
       squeeze->addInput(tv);
     }
     if (is_input_qdq) {
@@ -149,7 +150,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
         t.elem_type() = TensorProto_DataType_INT64;
         Symbol sym = Symbol("value");
         constant->t_(sym, t);
-        std::vector<Dimension> s = {1};
+        std::vector<Dimension> s{Dimension{1}};
         constant->output()->setSizes(s);
         constant->output()->setElemType(TensorProto_DataType_INT64);
         constant->insertBefore(orig_conv->node());

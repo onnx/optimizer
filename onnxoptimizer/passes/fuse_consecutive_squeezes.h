@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -14,6 +14,8 @@
 // After:
 //   Z = Squeeze(X, axes=[0, 1, 4, 6])
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/logging.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -30,30 +32,7 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
     const int opset_version = getOpsetVersion(graph);
     return opset_version <= 12 && opset_version != 0;
   }
-  static bool getAxes(const Node *n, const Graph &graph,
-                      std::vector<int64_t> &axes) {
-    if (IsAxesAnAttr(graph)) {
-      axes = n->is(kaxes);
-    } else {
-      assert(n->inputs().size() == 2);
-      auto axes_value = n->inputs()[1];
-      if ((axes_value->node()->kind() != kConstant &&
-           axes_value->node()->kind() != kParam)) {
-        return false;
-      }
-      Tensor axes_t;
-      if (axes_value->node()->kind() == kConstant) {
-        axes_t = axes_value->node()->t(kvalue);
-      } else {
-        // this hack is due to `getInitializer` lacks a const version
-        Graph &mut_graph = const_cast<Graph &>(graph);
-        const auto axes_i = mut_graph.getInitializer(axes_value->uniqueName());
-        axes_t = *axes_i;
-      }
-      axes = ParseData<int64_t>(&axes_t);
-    }
-    return true;
-  }
+
   // modify the vector `composed_axes` such that squeeze by it is equivalent
   // to squeeze by `axes_1` and then by `axes_2`
   static bool compose_squeezes(const Node *input_n, const Node *n,
@@ -61,14 +40,15 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
                                std::vector<int64_t> &composed_axes) {
     std::vector<int64_t> axes_1;
     std::vector<int64_t> axes_2;
-    bool success = getAxes(input_n, graph, axes_1);
-    if (!success) {
+    if (!GetValueFromAttrOrInput(input_n, kaxes, 1, axes_1) ||
+        !GetValueFromAttrOrInput(n, kaxes, 1, axes_2)) {
       return false;
     }
-    success = getAxes(n, graph, axes_2);
-    if (!success) {
+    if (std::any_of(axes_1.begin(), axes_1.end(), [](int64_t v) { return v < 0; }) ||
+        std::any_of(axes_2.begin(), axes_2.end(), [](int64_t v) { return v < 0; })) {
       return false;
     }
+
     std::vector<int64_t> &ret = composed_axes;
     ret.clear();
     ret.reserve(axes_1.size() + axes_2.size());
@@ -122,7 +102,7 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
       t.int64s() = rs;
       t.elem_type() = TensorProto_DataType_INT64;
       auto axes_v = n->inputs()[1];
-      Value *tv = graph.addInitializerAndInput(t);
+      Value *tv = graph.addInitializerAndCreateValue(t);
       n->replaceInput(1, tv);
       if (axes_v->uses().size() == 0) {
         if (axes_v->node()->kind() == kConstant) {
