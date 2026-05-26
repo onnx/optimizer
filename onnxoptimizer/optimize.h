@@ -27,27 +27,30 @@ struct Optimizer {
   ~Optimizer();
 
   ModelProto optimize(const ModelProto &_mp_in) {
-    ModelProto mp_in = _mp_in;
-    if (mp_in.ir_version() == 3) {
+    const ModelProto* mp_in = &_mp_in;
+    std::unique_ptr<ModelProto> copy_in;
+    if (mp_in->ir_version() == 3) {
       // Upgrade ir_version to 4 so that initializer can be not in input
-      mp_in.set_ir_version(4);
+      copy_in = std::make_unique<ModelProto>(*mp_in);
+      copy_in->set_ir_version(4);
+      mp_in = copy_in.get();
     }
-    std::shared_ptr<Graph> g(ImportModelProto(mp_in));
+    std::shared_ptr<Graph> g(ImportModelProto(*mp_in));
 
     if (g.get() == nullptr) {
       std::cerr << "Warning: onnx optimizer is unable to parse input model. "
                 << "(The IR version of the ONNX model may be too old.)"
                 << std::endl;
       // If we can't parse the file, just return the input.
-      return mp_in;
+      return *mp_in;
     }
 
-    ModelProto mp_out = PrepareOutput(mp_in);
+    ModelProto mp_out = PrepareOutput(*mp_in);
     this->pass_manager->run(*g);
     ExportModelProto(&mp_out, g);
 
     // Maybe we can optimize these functions, now just copy
-    AddFunctionsToModel(mp_in, mp_out);
+    AddFunctionsToModel(*mp_in, mp_out);
     return mp_out;
   }
 
