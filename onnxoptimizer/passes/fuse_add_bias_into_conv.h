@@ -33,10 +33,21 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
   std::string getPassName() const override {
     return "fuse_add_bias_into_conv";
   }
-  bool patternMatchPredicate(Node *node) override {
-    return CheckKind(node, kAdd, 0, kConv) &&
-           GetInputsOfPreNode(node, 0).size() == 2;
+
+  inline bool matchConvAdd(Node *node) {
+    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConv &&
+           node->inputs()[0]->node()->inputs().size() == 2;
   }
+
+  inline bool matchConvTransposeAdd(Node *node) {
+    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kConvTranspose &&
+           node->inputs()[0]->node()->inputs().size() == 2;
+  }
+
+  bool patternMatchPredicate(Node *node) override {
+    return matchConvAdd(node) || matchConvTransposeAdd(node);
+  }
+
   static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
                                       Value *input, Node *target_node,
                                       BuiltinSymbol k) {
@@ -62,6 +73,7 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
                     NodeDestroyType &destroy_current) override {
     // due to current broadcasting's constraint, Conv has to be the first
     // operand
+    const bool is_conv = matchConvAdd(n);
     destroy_current = NodeDestroyType::DestroyZero;
     auto orig_conv = n->inputs()[0];
     auto orig_bias = n->inputs()[1];
@@ -86,8 +98,8 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     }
     // try to get feature M and rank from weight_shape
     if (weight_shape.size() > 0 && weight_shape[0].is_int) {
-      ONNX_ASSERT(M == -1 || M == weight_shape[0].dim);
-      M = weight_shape[0].dim;
+      ONNX_ASSERT(M == -1 || M == weight_shape[0].dim || M == weight_shape[1].dim);
+      M = is_conv ? weight_shape[0].dim : weight_shape[1].dim;
       ONNX_ASSERT(rank == -1 ||
                   rank == static_cast<int64_t>(weight_shape.size()));
       rank = weight_shape.size();
