@@ -5,7 +5,7 @@
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
-#include <algorithm>
+#include <numeric>
 
 #include "onnx/common/platform_helpers.h"
 #include "onnxoptimizer/passes/tensor_util.h"
