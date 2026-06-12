@@ -187,10 +187,6 @@ class cmake_build(setuptools.Command):
                 )
                 if USE_MSVC_STATIC_RUNTIME:
                     cmake_args.append("-DONNX_USE_MSVC_STATIC_RUNTIME=ON")
-                if platform.architecture()[0] == "64bit":
-                    cmake_args.extend(["-A", "x64", "-T", "host=x64"])
-                else:
-                    cmake_args.extend(["-A", "Win32", "-T", "host=x86"])
             if MACOS:
                 # Cross-compile support for macOS - respect ARCHFLAGS if set
                 archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
