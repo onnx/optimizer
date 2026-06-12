@@ -79,30 +79,32 @@ if(ONNX_BUILD_PYTHON)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 endif()
 
-include(GNUInstallDirs)
+if(ONNX_INSTALL)
+  include(GNUInstallDirs)
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnxoptimizer
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING
-        PATTERN "*.h")
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnxoptimizer
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+          FILES_MATCHING
+          PATTERN "*.h")
 
-configure_file(
-  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfigVersion.cmake.in
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
-  @ONLY)
-configure_file(
-  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfig.cmake.in
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
-  @ONLY)
-install(FILES
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer
-  COMPONENT dev)
-install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
-install(TARGETS
-  onnx_optimizer onnx_optimizer_c_api
-  EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfigVersion.cmake.in
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+    @ONLY)
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfig.cmake.in
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+    @ONLY)
+  install(FILES
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer
+    COMPONENT dev)
+  install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
+  install(TARGETS
+    onnx_optimizer onnx_optimizer_c_api
+    EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 if(ONNX_BUILD_TESTS)
   enable_testing()
