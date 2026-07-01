@@ -47,7 +47,7 @@ jobs:
       with:
         submodules: recursive
     - name: Build wheels
-      uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084
+      uses: pypa/cibuildwheel@294735312765b09d24a2fbec22660ce817587d55
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: wheels-${{ matrix.os }}-${{ matrix.python }}
