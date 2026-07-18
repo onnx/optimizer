@@ -31,7 +31,13 @@ jobs:
       CIBW_BEFORE_TEST_LINUX: pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
       CIBW_TEST_COMMAND: pytest {project}/onnxoptimizer/test
       CIBW_TEST_COMMAND_LINUX: cd {project} && pytest
-      CIBW_TEST_SKIP: " *_arm64"
+      # Skip testing the free-threaded macOS wheel. It builds fine, but the
+      # test step installs it and pulls numpy (via onnx); numpy has no
+      # free-threaded macOS wheel yet, so pip builds it from source and its
+      # meson build aborts because the universal2 ARCHFLAGS ('-arch arm64
+      # -arch x86_64') request a multi-architecture build. Re-enable once
+      # free-threaded macOS numpy wheels are published.
+      CIBW_TEST_SKIP: " *_arm64 cp313t-macosx_*"
       CIBW_ENVIRONMENT: CMAKE_ARGS="-DONNX_USE_LITE_PROTO=ON"
       CIBW_BUILD: "${{ matrix.python }}-*"      
       CIBW_SKIP: "*-win32 *-manylinux_i686 *-musllinux_*"
