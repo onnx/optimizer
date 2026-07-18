@@ -182,6 +182,21 @@ class cmake_build(setuptools.Command):
                         # passing python version to window in order to
                         # find python in cmake
                         "-DPY_VERSION={}".format("{}.{}".format(*sys.version_info[:2])),
+                        # Pin CMake's FindPython/FindPython3 to the interpreter
+                        # that is actually building this wheel. setup.py already
+                        # hints the `Python` namespace above, but the bundled
+                        # onnx build uses the `Python3` namespace, so without
+                        # these hints its find_package(Python3) resolves whatever
+                        # interpreter is first on PATH. On the windows-11-arm
+                        # runner that is the host Python (3.13), not
+                        # cibuildwheel's target venv, which makes the ARM64 build
+                        # pick up the wrong headers/library and fail.
+                        f"-DPython3_EXECUTABLE={sys.executable}",
+                        f"-DPython3_INCLUDE_DIR={sysconfig.get_python_inc()}",
+                        f"-DPython_ROOT_DIR={sys.prefix}",
+                        f"-DPython3_ROOT_DIR={sys.prefix}",
+                        "-DPython_FIND_VIRTUALENV=ONLY",
+                        "-DPython3_FIND_VIRTUALENV=ONLY",
                     ]
                 )
                 if USE_MSVC_STATIC_RUNTIME:
