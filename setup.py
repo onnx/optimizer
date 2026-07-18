@@ -206,8 +206,6 @@ class cmake_build(setuptools.Command):
                         f"-DPython3_INCLUDE_DIR={sysconfig.get_python_inc()}",
                         f"-DPython_ROOT_DIR={sys.prefix}",
                         f"-DPython3_ROOT_DIR={sys.prefix}",
-                        "-DPython_FIND_VIRTUALENV=ONLY",
-                        "-DPython3_FIND_VIRTUALENV=ONLY",
                     ]
                 )
                 if USE_MSVC_STATIC_RUNTIME:
