@@ -24,7 +24,6 @@ jobs:
       CIBW_BEFORE_BUILD_LINUX: pip install protobuf
       CIBW_BEFORE_BUILD_WINDOWS: python -m pip install protobuf
       CIBW_BEFORE_BUILD_MACOS: pip install protobuf
-      CIBW_ENABLE: "cpython-freethreading"
       CIBW_TEST_REQUIRES_LINUX: pytest pytest-xdist ruff mypy onnxruntime onnxscript
       CIBW_TEST_REQUIRES_MACOS: pytest pytest-xdist
       CIBW_TEST_REQUIRES_WINDOWS: pytest pytest-xdist
@@ -47,13 +46,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, windows-11-arm, macos-15]        
-        python: ["cp313t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
+        python: ["cp314t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7.0.0
       with:
         submodules: recursive
     - name: Build wheels
-      uses: pypa/cibuildwheel@8d2b08b68458a16aeb24b64e68a09ab1c8e82084
+      uses: pypa/cibuildwheel@294735312765b09d24a2fbec22660ce817587d55
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
       with:
         name: wheels-${{ matrix.os }}-${{ matrix.python }}
@@ -68,7 +67,7 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
       with:
         submodules: recursive
 

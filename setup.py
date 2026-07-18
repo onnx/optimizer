@@ -167,6 +167,7 @@ class cmake_build(setuptools.Command):
                 f"-DPython_EXECUTABLE={sys.executable}",
                 "-DONNX_BUILD_PYTHON=ON",
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-DONNX_INSTALL=OFF",
                 f"-DONNX_NAMESPACE={ONNX_NAMESPACE}",
                 "-DONNX_OPT_USE_SYSTEM_PROTOBUF={}".format(
                     "ON" if ONNX_OPT_USE_SYSTEM_PROTOBUF else "OFF"
