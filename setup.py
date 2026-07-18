@@ -29,6 +29,10 @@ CMAKE_BUILD_DIR = os.path.join(
 WINDOWS = os.name == "nt"
 MACOS = sys.platform.startswith("darwin")
 
+# Free-threaded (no-GIL) CPython builds expose the "t" ABI (e.g. python3.13t)
+# and set Py_GIL_DISABLED in their build configuration.
+IS_FREE_THREADED = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
+
 CMAKE = shutil.which("cmake")
 
 ################################################################################
@@ -168,6 +172,12 @@ class cmake_build(setuptools.Command):
                     "ON" if ONNX_OPT_USE_SYSTEM_PROTOBUF else "OFF"
                 ),
             ]
+            if IS_FREE_THREADED:
+                # CMake's FindPython3 defaults to the standard ABI and cannot
+                # locate the free-threaded interpreter/library, so the configure
+                # step fails on cp313t. Accept any ABI variant so the
+                # free-threaded ("t") build is found.
+                cmake_args.append("-DPython3_FIND_ABI=ANY;ANY;ANY;ANY")
             if COVERAGE:
                 cmake_args.append("-DONNX_COVERAGE=ON")
             if COVERAGE or DEBUG:
@@ -312,7 +322,7 @@ cmdclass = {
 # 1. The Py_LIMITED_API macro is defined in the extension
 # 2. py_limited_api in Extension tags the extension as abi3
 # 3. bdist_wheel options tag the wheel as abi3
-NO_GIL = hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+NO_GIL = IS_FREE_THREADED
 PY_312_OR_NEWER = sys.version_info >= (3, 12)
 USE_LIMITED_API = not NO_GIL and PY_312_OR_NEWER and platform.system() != "FreeBSD"
 
