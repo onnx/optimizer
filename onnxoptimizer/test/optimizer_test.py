@@ -494,6 +494,57 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[1].op_type == "Sin"
         assert optimized_model.graph.node[2].op_type == "Add"
 
+    def test_eliminate_if_with_const_cond_with_subgraph_output_initializer(
+        self,
+    ):  # type: () -> None
+        # Regression test for onnxsim/onnxsim#452. When constant folding (here
+        # emulated with extract_constant_to_initializer) turns the taken
+        # branch's Constant into a subgraph initializer, the branch output is
+        # forwarded straight from that initializer with no producing node.
+        # eliminate_if_with_const_cond used to look this output up in value_dict,
+        # default-insert a null Value, and segfault when replaceAllUsesWith
+        # dereferenced it.
+        true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
+
+        subgraph_output_info = helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))
+
+        # The taken branch's output "C" is produced directly by a Constant node,
+        # which extract_constant_to_initializer will turn into a forwarded
+        # subgraph initializer.
+        const = helper.make_node(
+            "Constant",
+            [],
+            ["C"],
+            value=numpy_helper.from_array(np.ones((5,), dtype=np.float32)),
+        )
+        true_graph = helper.make_graph([const], "true_graph", [], [subgraph_output_info])
+
+        identity = helper.make_node("Identity", ["A"], ["C"])
+        false_graph = helper.make_graph([identity], "false_graph", [], [subgraph_output_info])
+
+        graph = helper.make_graph(
+            [
+                helper.make_node("Constant", [], ["condition"], value=true),
+                helper.make_node(
+                    "If",
+                    ["condition"],
+                    ["result"],
+                    then_branch=true_graph,
+                    else_branch=false_graph,
+                ),
+            ],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["extract_constant_to_initializer", "eliminate_if_with_const_cond"],
+        )
+        # The If node must be inlined away without crashing, leaving the
+        # forwarded initializer as the source of the graph output.
+        assert all(node.op_type != "If" for node in optimized_model.graph.node)
+
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         identity = helper.make_node("Identity", ["A"], ["B"])

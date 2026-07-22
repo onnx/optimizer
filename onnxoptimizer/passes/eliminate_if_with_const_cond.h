@@ -120,6 +120,7 @@ struct EliminateIfWithConstCond final : public PredicateBasedPass {
         if (parent_it == unique_name_to_value_in_parent.end()) {
           // a value from the parent graph of parent_graph
           auto *captured_node = parent_graph.create(kCaptured, 1);
+          captured_node->insertBefore(if_node);
           captured_node->output()->setUniqueName(unique_name);
           new_output = captured_node->output();
         } else {
