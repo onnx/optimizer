@@ -31,6 +31,8 @@
 // $$ W' = W\frac{s}{\sqrt{\sigma + \epsilon}}$$
 // $$ b' = (b_{conv} - m)\frac{s}{\sqrt{\sigma + \epsilon}} + b_{bn}$$
 
+#include <numeric>
+
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/pass_util.h"
@@ -47,7 +49,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     return "fuse_bn_into_conv";
   }
 
-  bool modify_conv(Node* conv, Node* bn, Graph& graph) {
+  bool modify_conv(Node* conv, Node* bn, Graph& graph, const bool is_conv) {
     const auto& bn_inputs = bn->inputs();
     const auto& conv_inputs = conv->inputs();
 
@@ -68,7 +70,20 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     ONNX_ASSERT(bn_scale.sizes() == bn_var.sizes());
     ONNX_ASSERT(bn_scale.sizes().size() == 1);
     int64_t C = bn_scale.sizes()[0];
-    ONNX_ASSERT(conv_W.sizes().size() > 2 && conv_W.sizes()[0] == C);
+    ONNX_ASSERT(conv_W.sizes().size() > 2);
+    // The BatchNormalization channel count C corresponds to the convolution's
+    // output channels. Conv weight layout is (out_channels, in_channels/group,
+    // kH, kW), so the output channels live on axis 0. ConvTranspose weight
+    // layout is (in_channels, out_channels/group, kH, kW), so they live on
+    // axis 1 instead. Picking the wrong axis here is what caused the reported
+    // `conv_W.sizes()[0] == C` assertion failure for ConvTranspose whenever
+    // in_channels != out_channels. For grouped ConvTranspose the axis-1 size is
+    // out_channels/group != C, so skip the fusion rather than miscompiling.
+    const int64_t conv_W_out_channels =
+        is_conv ? conv_W.sizes()[0] : conv_W.sizes()[1];
+    if (conv_W_out_channels != C) {
+      return false;
+    }
     if (bn_scale.elem_type() != bn_bias.elem_type() ||
         bn_scale.elem_type() != bn_mean.elem_type() ||
         bn_scale.elem_type() != bn_var.elem_type() ||
@@ -123,10 +138,11 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     Node* unsqueeze = graph.create(kUnsqueeze, 1);
     unsqueeze->insertAfter(scale);
     unsqueeze->addInput(scale->output());
-    std::vector<int64_t> insert_dims;
-    for (int i = 1; i < conv_W.sizes().size(); ++i) {
-      insert_dims.push_back(i);
-    }
+    // Broadcast the per-output-channel scale so it lines up with the weight's
+    // output-channel axis: axis 0 for Conv, axis 1 for ConvTranspose.
+    std::vector<int64_t> insert_dims(conv_W.sizes().size());
+    std::iota(insert_dims.begin(), insert_dims.end(), 0);
+    insert_dims.erase(insert_dims.begin() + (is_conv ? 0 : 1));
     if (getOpsetVersion(graph) >= 13) {
       Tensor shape_s_t;
       shape_s_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
@@ -181,7 +197,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* n) override {
-    return CheckKind(n, kBatchNormalization, 0, kConv) &&
+    return (CheckKind(n, kBatchNormalization, 0, kConv) ||
+            CheckKind(n, kBatchNormalization, 0, kConvTranspose)) &&
            GetValueFromAttrWithDefault(n, "training_mode", (int64_t)0) == 0 &&
            n->input(0)->uses().size() == 1 && n->outputs().size() == 1 &&
            IsConstantTensor(n, 1) && IsConstantTensor(n, 2) &&
@@ -190,10 +207,12 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
+    const bool is_conv = CheckKind(n, kBatchNormalization, 0, kConv);
+
     Node* bn = n;
     Node* conv = PrevNode(n, 0);
     auto origInput = bn->inputs()[0];
-    if (!modify_conv(conv, bn, graph)) {
+    if (!modify_conv(conv, bn, graph, is_conv)) {
       destroy_current = NodeDestroyType::DestroyZero;
       return false;
     }
