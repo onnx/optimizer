@@ -29,6 +29,10 @@ CMAKE_BUILD_DIR = os.path.join(
 WINDOWS = os.name == "nt"
 MACOS = sys.platform.startswith("darwin")
 
+# Free-threaded (no-GIL) CPython builds expose the "t" ABI (e.g. python3.13t)
+# and set Py_GIL_DISABLED in their build configuration.
+IS_FREE_THREADED = bool(sysconfig.get_config_var("Py_GIL_DISABLED"))
+
 CMAKE = shutil.which("cmake")
 
 ################################################################################
@@ -163,11 +167,18 @@ class cmake_build(setuptools.Command):
                 f"-DPython_EXECUTABLE={sys.executable}",
                 "-DONNX_BUILD_PYTHON=ON",
                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+                "-DONNX_INSTALL=OFF",
                 f"-DONNX_NAMESPACE={ONNX_NAMESPACE}",
                 "-DONNX_OPT_USE_SYSTEM_PROTOBUF={}".format(
                     "ON" if ONNX_OPT_USE_SYSTEM_PROTOBUF else "OFF"
                 ),
             ]
+            if IS_FREE_THREADED:
+                # CMake's FindPython3 defaults to the standard ABI and cannot
+                # locate the free-threaded interpreter/library, so the configure
+                # step fails on cp313t. Accept any ABI variant so the
+                # free-threaded ("t") build is found.
+                cmake_args.append("-DPython3_FIND_ABI=ANY;ANY;ANY;ANY")
             if COVERAGE:
                 cmake_args.append("-DONNX_COVERAGE=ON")
             if COVERAGE or DEBUG:
@@ -182,14 +193,23 @@ class cmake_build(setuptools.Command):
                         # passing python version to window in order to
                         # find python in cmake
                         "-DPY_VERSION={}".format("{}.{}".format(*sys.version_info[:2])),
+                        # Pin CMake's FindPython/FindPython3 to the interpreter
+                        # that is actually building this wheel. setup.py already
+                        # hints the `Python` namespace above, but the bundled
+                        # onnx build uses the `Python3` namespace, so without
+                        # these hints its find_package(Python3) resolves whatever
+                        # interpreter is first on PATH. On the windows-11-arm
+                        # runner that is the host Python (3.13), not
+                        # cibuildwheel's target venv, which makes the ARM64 build
+                        # pick up the wrong headers/library and fail.
+                        f"-DPython3_EXECUTABLE={sys.executable}",
+                        f"-DPython3_INCLUDE_DIR={sysconfig.get_python_inc()}",
+                        f"-DPython_ROOT_DIR={sys.prefix}",
+                        f"-DPython3_ROOT_DIR={sys.prefix}",
                     ]
                 )
                 if USE_MSVC_STATIC_RUNTIME:
                     cmake_args.append("-DONNX_USE_MSVC_STATIC_RUNTIME=ON")
-                if platform.architecture()[0] == "64bit":
-                    cmake_args.extend(["-A", "x64", "-T", "host=x64"])
-                else:
-                    cmake_args.extend(["-A", "Win32", "-T", "host=x86"])
             if MACOS:
                 # Cross-compile support for macOS - respect ARCHFLAGS if set
                 archs = re.findall(r"-arch (\S+)", os.environ.get("ARCHFLAGS", ""))
@@ -301,7 +321,7 @@ cmdclass = {
 # 1. The Py_LIMITED_API macro is defined in the extension
 # 2. py_limited_api in Extension tags the extension as abi3
 # 3. bdist_wheel options tag the wheel as abi3
-NO_GIL = hasattr(sys, "_is_gil_enabled") and not sys._is_gil_enabled()
+NO_GIL = IS_FREE_THREADED
 PY_312_OR_NEWER = sys.version_info >= (3, 12)
 USE_LIMITED_API = not NO_GIL and PY_312_OR_NEWER and platform.system() != "FreeBSD"
 

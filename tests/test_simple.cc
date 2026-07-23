@@ -20,7 +20,7 @@ TEST(OptimizerTest, NopReshape) {
         }
     )";
     onnx::ModelProto model;
-    const onnx::Status status = onnx::OnnxParser::Parse(model, graph_str);
+    const auto status = onnx::OnnxParser::Parse(model, graph_str);
     EXPECT_TRUE(status.IsOK());
     auto optimized_model = onnx::optimization::Optimize(model, {"eliminate_nop_reshape", "eliminate_deadend"});
 

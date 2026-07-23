@@ -2884,6 +2884,108 @@ class TestOptimizer(unittest.TestCase):
         optimized_model = self._optimized(graph, ["fuse_consecutive_squeezes"])
         assert len(optimized_model.graph.node) == 3
 
+    def test_fuse_consecutive_squeeze_unsqueeze(self):  # type: () -> None
+        # Squeeze followed by an inverse Unsqueeze cancels out, leaving only the
+        # trailing consumer (Relu) fed directly by the input.
+        nodes = [
+            helper.make_node("Squeeze", ["X", "axes"], ["Y"]),
+            helper.make_node("Unsqueeze", ["Y", "axes"], ["Z"]),
+            helper.make_node("Relu", ["Z"], ["W"]),
+        ]
+        initializers = [
+            helper.make_tensor(
+                "axes", TensorProto.INT64, (2,),
+                np.array([1, 3], dtype=np.int64).tobytes(), raw=True,
+            )
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 1, 3, 1))],
+            [helper.make_tensor_value_info("W", TensorProto.FLOAT, (2, 1, 3, 1))],
+            initializer=initializers,
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_consecutive_squeeze_unsqueeze", "eliminate_deadend"]
+        )
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Relu"
+        assert optimized_model.graph.node[0].input[0] == "X"
+
+    def test_fuse_consecutive_unsqueeze_squeeze(self):  # type: () -> None
+        # Unsqueeze followed by an inverse Squeeze cancels out.
+        nodes = [
+            helper.make_node("Unsqueeze", ["X", "axes"], ["Y"]),
+            helper.make_node("Squeeze", ["Y", "axes"], ["Z"]),
+            helper.make_node("Relu", ["Z"], ["W"]),
+        ]
+        initializers = [
+            helper.make_tensor(
+                "axes", TensorProto.INT64, (2,),
+                np.array([1, 3], dtype=np.int64).tobytes(), raw=True,
+            )
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 3))],
+            [helper.make_tensor_value_info("W", TensorProto.FLOAT, (2, 3))],
+            initializer=initializers,
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_consecutive_squeeze_unsqueeze", "eliminate_deadend"]
+        )
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Relu"
+        assert optimized_model.graph.node[0].input[0] == "X"
+
+    def test_fuse_consecutive_squeeze_unsqueeze_no_fuse(self):  # type: () -> None
+        # Different axes must NOT be eliminated.
+        nodes = [
+            helper.make_node("Squeeze", ["X", "sq_axes"], ["Y"]),
+            helper.make_node("Unsqueeze", ["Y", "un_axes"], ["Z"]),
+        ]
+        initializers = [
+            helper.make_tensor(
+                "sq_axes", TensorProto.INT64, (1,),
+                np.array([1], dtype=np.int64).tobytes(), raw=True,
+            ),
+            helper.make_tensor(
+                "un_axes", TensorProto.INT64, (1,),
+                np.array([0], dtype=np.int64).tobytes(), raw=True,
+            ),
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 1, 3))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 2, 3))],
+            initializer=initializers,
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_consecutive_squeeze_unsqueeze", "eliminate_deadend"]
+        )
+        assert len(optimized_model.graph.node) == 2
+
+    def test_fuse_consecutive_squeeze_unsqueeze_negative_axes(self):  # type: () -> None
+        # Negative axes that resolve to the same positions still cancel out.
+        graph = parser.parse_graph("""
+           agraph (float[2, 1, 3, 1] X) => (float[2, 1, 3, 1] W)
+           {
+              Axes = Constant<value=int64[2]{1, -1}> ()
+              Y = Squeeze (X, Axes)
+              Z = Unsqueeze (Y, Axes)
+              W = Relu (Z)
+           }
+        """)
+        optimized_model = self._optimized(
+            graph, ["fuse_consecutive_squeeze_unsqueeze", "eliminate_deadend"]
+        )
+        assert all(
+            n.op_type not in ("Squeeze", "Unsqueeze")
+            for n in optimized_model.graph.node
+        )
+
     @pytest.mark.xfail
     def test_fuse_consecutive_softmax_log_axis(self):  # type: () -> None
         for axis in range(3):
