@@ -2081,8 +2081,38 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
 
     def test_fuse_pad_into_maxpool_no_optional_value_opset10(self):
+        # A Pad with the default constant value (0) must NOT be folded into a
+        # MaxPool: MaxPool pads with -inf, so zero-padding changes the result.
+        # See https://github.com/onnxsim/onnxsim/issues/290
         pad = helper.make_node(
             "Pad", ["X"], ["P"], mode="constant", pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3, 3])
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_pad_into_pool"],
+            False,
+            opset_imports=[helper.make_opsetid("", 10)],
+        )
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_neg_inf_value_opset10(self):
+        # A Pad with constant value -inf is the correct fill value for MaxPool
+        # and can be folded into it.
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1],
+            value=float("-inf"),
         )
         max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3, 3])
         graph = helper.make_graph(
@@ -2133,6 +2163,9 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
 
     def test_fuse_pad_into_maxpool_no_optional_value(self):
+        # No constant_value input => Pad defaults to 0, which must NOT be folded
+        # into MaxPool (MaxPool pads with -inf).
+        # See https://github.com/onnxsim/onnxsim/issues/290
         pad = helper.make_node("Pad", ["X", "Pads"], ["P"], mode="constant")
         max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3, 3])
         graph = helper.make_graph(
@@ -2154,10 +2187,7 @@ class TestOptimizer(unittest.TestCase):
         )
         optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
 
-        assert len(list(optimized_model.graph.node)) == 1
-        assert optimized_model.graph.node[0].op_type == "MaxPool"
-        assert optimized_model.graph.node[0].attribute[1].name == "pads"
-        assert list(optimized_model.graph.node[0].attribute[1].ints) == [0, 0, 1, 1]
+        assert optimized_model.graph == graph
 
     def test_fuse_pad_into_avgpool_with_optional_value(self):
         pad = helper.make_node("Pad", ["X", "Pads", "Constant_value"], ["P"], mode="constant")
@@ -2196,7 +2226,10 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].attribute[2].name == "pads"
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [0, 0, 1, 1]
 
-    def test_fuse_pad_into_maxpool_with_optional_value(self):
+    def test_fuse_pad_into_maxpool_with_zero_optional_value(self):
+        # This is the exact case reported in
+        # https://github.com/onnxsim/onnxsim/issues/290 : a Pad with an explicit
+        # constant value of 0 must NOT be folded into a MaxPool.
         pad = helper.make_node("Pad", ["X", "Pads", "Constant_value"], ["P"], mode="constant")
         max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3, 3])
         graph = helper.make_graph(
@@ -2219,6 +2252,39 @@ class TestOptimizer(unittest.TestCase):
                     TensorProto.FLOAT,
                     dims=(),
                     vals=np.array([0]).astype(np.float32).tobytes(),
+                    raw=True,
+                ),
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_with_neg_inf_optional_value(self):
+        # A Pad with constant value -inf is the correct fill value for MaxPool
+        # and can be folded into it.
+        pad = helper.make_node("Pad", ["X", "Pads", "Constant_value"], ["P"], mode="constant")
+        max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3, 3])
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [
+                helper.make_tensor(
+                    "Pads",
+                    TensorProto.INT64,
+                    dims=(8,),
+                    vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(np.int64).tobytes(),
+                    raw=True,
+                ),
+                helper.make_tensor(
+                    "Constant_value",
+                    TensorProto.FLOAT,
+                    dims=(),
+                    vals=np.array([float("-inf")]).astype(np.float32).tobytes(),
                     raw=True,
                 ),
             ],
@@ -2317,7 +2383,29 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1]
 
     def test_fuse_pad_into_maxpool_1d_opset10(self):
+        # Default constant value (0) => must NOT fold into MaxPool.
         pad = helper.make_node("Pad", ["X"], ["P"], mode="constant", pads=[0, 0, 1, 0, 0, 1])
+        max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3])
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_pad_into_pool"],
+            False,
+            opset_imports=[helper.make_opsetid("", 10)],
+        )
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_1d_neg_inf_opset10(self):
+        pad = helper.make_node(
+            "Pad", ["X"], ["P"], mode="constant", pads=[0, 0, 1, 0, 0, 1],
+            value=float("-inf"),
+        )
         max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3])
         graph = helper.make_graph(
             [pad, max_pool],
@@ -2367,6 +2455,7 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1]
 
     def test_fuse_pad_into_maxpool_1d(self):
+        # No constant_value input => Pad defaults to 0 => must NOT fold.
         pad = helper.make_node("Pad", ["X", "Pads"], ["P"], mode="constant")
         max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3])
         graph = helper.make_graph(
@@ -2384,6 +2473,39 @@ class TestOptimizer(unittest.TestCase):
                     vals=np.array([0, 0, 1, 0, 0, 1]).astype(np.int64).tobytes(),
                     raw=True,
                 )
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_1d_neg_inf(self):
+        pad = helper.make_node(
+            "Pad", ["X", "Pads", "Constant_value"], ["P"], mode="constant"
+        )
+        max_pool = helper.make_node("MaxPool", ["P"], ["Z"], kernel_shape=[3])
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1))],
+            [
+                helper.make_tensor(
+                    "Pads",
+                    TensorProto.INT64,
+                    dims=(6,),
+                    vals=np.array([0, 0, 1, 0, 0, 1]).astype(np.int64).tobytes(),
+                    raw=True,
+                ),
+                helper.make_tensor(
+                    "Constant_value",
+                    TensorProto.FLOAT,
+                    dims=(),
+                    vals=np.array([float("-inf")]).astype(np.float32).tobytes(),
+                    raw=True,
+                ),
             ],
         )
         optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
@@ -2424,8 +2546,32 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1, 1, 1]
 
     def test_fuse_pad_into_maxpool_existing_maxpool_pad_opset10(self):
+        # Default constant value (0) => must NOT fold into MaxPool.
         pad = helper.make_node(
             "Pad", ["X"], ["P"], mode="constant", pads=[0, 0, 0, 0, 0, 0, 1, 1]
+        )
+        max_pool = helper.make_node(
+            "MaxPool", ["P"], ["Z"], kernel_shape=[3, 3], pads=[1, 1, 0, 0]
+        )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_pad_into_pool"],
+            False,
+            opset_imports=[helper.make_opsetid("", 10)],
+        )
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_existing_maxpool_pad_neg_inf_opset10(self):
+        pad = helper.make_node(
+            "Pad", ["X"], ["P"], mode="constant", pads=[0, 0, 0, 0, 0, 0, 1, 1],
+            value=float("-inf"),
         )
         max_pool = helper.make_node(
             "MaxPool", ["P"], ["Z"], kernel_shape=[3, 3], pads=[1, 1, 0, 0]
@@ -2483,6 +2629,7 @@ class TestOptimizer(unittest.TestCase):
         assert list(optimized_model.graph.node[0].attribute[2].ints) == [1, 1, 1, 1]
 
     def test_fuse_pad_into_maxpool_existing_maxpool_pad(self):
+        # No constant_value input => Pad defaults to 0 => must NOT fold.
         pad = helper.make_node("Pad", ["X", "Pads"], ["P"], mode="constant")
         max_pool = helper.make_node(
             "MaxPool", ["P"], ["Z"], kernel_shape=[3, 3], pads=[1, 1, 0, 0]
@@ -2502,6 +2649,41 @@ class TestOptimizer(unittest.TestCase):
                     vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(np.int64).tobytes(),
                     raw=True,
                 )
+            ],
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert optimized_model.graph == graph
+
+    def test_fuse_pad_into_maxpool_existing_maxpool_pad_neg_inf(self):
+        pad = helper.make_node(
+            "Pad", ["X", "Pads", "Constant_value"], ["P"], mode="constant"
+        )
+        max_pool = helper.make_node(
+            "MaxPool", ["P"], ["Z"], kernel_shape=[3, 3], pads=[1, 1, 0, 0]
+        )
+        graph = helper.make_graph(
+            [pad, max_pool],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 1, 1)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 5, 1, 1))],
+            [
+                helper.make_tensor(
+                    "Pads",
+                    TensorProto.INT64,
+                    dims=(8,),
+                    vals=np.array([0, 0, 0, 0, 0, 0, 1, 1]).astype(np.int64).tobytes(),
+                    raw=True,
+                ),
+                helper.make_tensor(
+                    "Constant_value",
+                    TensorProto.FLOAT,
+                    dims=(),
+                    vals=np.array([float("-inf")]).astype(np.float32).tobytes(),
+                    raw=True,
+                ),
             ],
         )
         optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
