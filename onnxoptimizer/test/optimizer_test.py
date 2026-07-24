@@ -5046,6 +5046,106 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].input == ["A", "Y", "X"]
         assert optimized_model.graph.node[3].input == ["M", "X", "Y"]
 
+    @staticmethod
+    def _make_function_model():
+        # Build a model that contains a model-local function directly with
+        # onnx.helper (no torch dependency). The main graph has a redundant
+        # Identity node so the optimizer has something to do, while the
+        # function itself should be carried over untouched.
+        func = helper.make_function(
+            domain="custom",
+            fname="CustomRelu",
+            inputs=["x"],
+            outputs=["y"],
+            nodes=[
+                helper.make_node("Relu", ["x"], ["t"]),
+                helper.make_node("Add", ["t", "t"], ["y"]),
+            ],
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+        )
+
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [4])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [4])
+        graph = helper.make_graph(
+            [
+                helper.make_node("Identity", ["X"], ["X_id"]),
+                helper.make_node("CustomRelu", ["X_id"], ["Y"], domain="custom"),
+            ],
+            "function_graph",
+            [X],
+            [Y],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            functions=[func],
+            opset_imports=[
+                helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION),
+                helper.make_opsetid("custom", 1),
+            ],
+            ir_version=10,
+        )
+        checker.check_model(model)
+        return model
+
+    def test_preserve_functions(self):  # type: () -> None
+        model = self._make_function_model()
+        assert len(model.functions) == 1
+
+        optimized_model = self._optimized(
+            model, ["eliminate_identity", "eliminate_deadend"], True
+        )
+
+        # The optimizer must not drop model-local functions.
+        assert len(optimized_model.functions) == len(model.functions)
+        opt_func = optimized_model.functions[0]
+        assert opt_func.name == "CustomRelu"
+        assert opt_func.domain == "custom"
+        # The function body is left as-is.
+        assert [n.op_type for n in opt_func.node] == ["Relu", "Add"]
+        # The redundant Identity in the main graph is eliminated, and the call
+        # to the function is preserved.
+        assert [n.op_type for n in optimized_model.graph.node] == ["CustomRelu"]
+        assert optimized_model.graph.node[0].domain == "custom"
+
+    def test_preserve_multiple_functions_from_parser(self):  # type: () -> None
+        # The onnx text parser is an equally valid way to spell out functions.
+        model = parser.parse_model("""
+                <
+                    ir_version: 10,
+                    opset_import: ["": 13, "custom": 1]
+                >
+                agraph (float[4] X) => (float[4] Y)
+                {
+                    T = custom.FnA(X)
+                    Y = custom.FnB(T)
+                }
+                <
+                    domain: "custom",
+                    opset_import: ["": 13]
+                >
+                FnA (x) => (y)
+                {
+                    y = Relu(x)
+                }
+                <
+                    domain: "custom",
+                    opset_import: ["": 13]
+                >
+                FnB (x) => (y)
+                {
+                    y = Neg(x)
+                }
+            """)
+        assert len(model.functions) == 2
+
+        optimized_model = self._optimized(
+            model, ["eliminate_deadend"], True, compare_result=False
+        )
+
+        assert len(optimized_model.functions) == 2
+        assert {f.name for f in optimized_model.functions} == {"FnA", "FnB"}
+
 
 if __name__ == "__main__":
     unittest.main()
