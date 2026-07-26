@@ -370,6 +370,66 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node[3].attribute[0].g.output) == 2
         assert optimized_model.graph.node[3].attribute[0].g.output[1].name == "_B2"
 
+    def test_optimize_return_report(self):  # type: () -> None
+        # `return_report=True` should return a (model, report) tuple, where the
+        # report maps each pass name to how many times it modified the graph.
+        nodes = [
+            helper.make_node("Add", ["X", "Y"], ["A"]),
+            helper.make_node("Identity", ["A"], ["B"]),
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (5,))],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+
+        result = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        assert isinstance(result, tuple)
+        optimized_model, report = result
+        assert isinstance(optimized_model, ModelProto)
+        assert isinstance(report, dict)
+        # The single Identity node should have been eliminated exactly once.
+        assert report.get("eliminate_identity", 0) == 1
+
+        # Without return_report the return value stays a bare model (backward compat).
+        optimized_only = onnxoptimizer.optimize(model, ["eliminate_identity"])
+        assert isinstance(optimized_only, ModelProto)
+
+    def test_optimize_return_report_no_change(self):  # type: () -> None
+        # A pass that matches nothing should still be reportable and count 0.
+        node = helper.make_node("Add", ["X", "Y"], ["Z"])
+        graph = helper.make_graph(
+            [node],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (5,))],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+        _, report = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        assert report.get("eliminate_identity", 0) == 0
+
     # type: () -> None
     def test_eliminate_identity_both_graph_input_and_output(self):
         # We should not eliminate an op when its input is also graph input,

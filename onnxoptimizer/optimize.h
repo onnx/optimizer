@@ -26,7 +26,10 @@ struct Optimizer {
   Optimizer(const std::vector<std::string> &names, const bool fixed_point);
   ~Optimizer();
 
-  ModelProto optimize(const ModelProto &_mp_in) {
+  // If `report` is non-null it is filled with a map from pass name to the
+  // total number of positive transforms that pass applied to the graph.
+  ModelProto optimize(const ModelProto &_mp_in,
+                      std::map<std::string, unsigned int> *report = nullptr) {
     const ModelProto* mp_in = &_mp_in;
     std::unique_ptr<ModelProto> copy_in;
     if (mp_in->ir_version() == 3) {
@@ -46,7 +49,10 @@ struct Optimizer {
     }
 
     ModelProto mp_out = PrepareOutput(*mp_in);
-    this->pass_manager->run(*g);
+    auto analysis = this->pass_manager->run(*g);
+    if (report != nullptr && analysis != nullptr) {
+      *report = analysis->transform_counts;
+    }
     ExportModelProto(&mp_out, g);
 
     // Maybe we can optimize these functions, now just copy
@@ -95,9 +101,11 @@ const std::vector<std::string> GetAvailablePasses();
 const std::vector<std::string> GetFuseAndEliminationPass();
 
 ModelProto Optimize(const ModelProto &mp_in,
-                    const std::vector<std::string> &names);
+                    const std::vector<std::string> &names,
+                    std::map<std::string, unsigned int> *report = nullptr);
 
 ModelProto OptimizeFixed(const ModelProto &mp_in,
-                         const std::vector<std::string> &names);
+                         const std::vector<std::string> &names,
+                         std::map<std::string, unsigned int> *report = nullptr);
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE
