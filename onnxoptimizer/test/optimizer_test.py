@@ -4038,6 +4038,40 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 3
 
+    def _shape_gather_graph(self, index):  # type: (int) -> GraphProto
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [1])
+        X2 = helper.make_tensor_value_info("X2", TensorProto.FLOAT, [3, 2])
+        indices = helper.make_tensor(
+            "indices", TensorProto.INT64, [1], np.array([index], dtype=np.int64)
+        )
+        nodes = [
+            helper.make_node("Relu", ["X"], ["X2"]),
+            helper.make_node("Shape", ["X2"], ["X3"]),
+            helper.make_node("Gather", ["X3", "indices"], ["X4"]),
+            helper.make_node("Identity", ["X4"], ["Y"]),
+        ]
+        return helper.make_graph(
+            nodes, "test", [X], [Y], [indices], value_info=[X2]
+        )
+
+    def test_eliminate_shape_gather_index_out_of_range(self):  # type: () -> None
+        # A Gather index >= the rank of the shaped tensor must not abort the
+        # pass (this used to fail an ONNX_ASSERT and crash the process). The
+        # index cannot be statically resolved to an axis, so the pass should
+        # decline to rewrite and leave all four nodes untouched.
+        graph = self._shape_gather_graph(5)
+        optimized_model = self._optimized(graph, ["eliminate_shape_gather"], False)
+        assert len(optimized_model.graph.node) == 4
+
+    def test_eliminate_shape_gather_negative_index_out_of_range(self):  # type: () -> None
+        # A negative index that stays negative after normalization (here -5 on
+        # a rank-2 shape) likewise must not crash. dims.size() is unsigned, so
+        # the guard has to reject the negative value before the comparison.
+        graph = self._shape_gather_graph(-5)
+        optimized_model = self._optimized(graph, ["eliminate_shape_gather"], False)
+        assert len(optimized_model.graph.node) == 4
+
     def test_eliminate_nop_reshape(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4, 5])
