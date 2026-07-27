@@ -4061,7 +4061,12 @@ class TestOptimizer(unittest.TestCase):
         # index cannot be statically resolved to an axis, so the pass should
         # decline to rewrite and leave all four nodes untouched.
         graph = self._shape_gather_graph(5)
-        optimized_model = self._optimized(graph, ["eliminate_shape_gather"], False)
+        # compare_result=False: the model keeps a deliberately out-of-bounds
+        # Gather index, so it cannot be executed by onnxruntime for output
+        # comparison. We only assert the pass declines to rewrite.
+        optimized_model = self._optimized(
+            graph, ["eliminate_shape_gather"], compare_result=False
+        )
         assert len(optimized_model.graph.node) == 4
 
     def test_eliminate_shape_gather_negative_index_out_of_range(self):  # type: () -> None
@@ -4069,7 +4074,11 @@ class TestOptimizer(unittest.TestCase):
         # a rank-2 shape) likewise must not crash. dims.size() is unsigned, so
         # the guard has to reject the negative value before the comparison.
         graph = self._shape_gather_graph(-5)
-        optimized_model = self._optimized(graph, ["eliminate_shape_gather"], False)
+        # compare_result=False for the same reason as above: an out-of-bounds
+        # index makes the graph non-executable under onnxruntime.
+        optimized_model = self._optimized(
+            graph, ["eliminate_shape_gather"], compare_result=False
+        )
         assert len(optimized_model.graph.node) == 4
 
     def test_eliminate_nop_reshape(self):  # type: () -> None
