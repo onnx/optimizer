@@ -45,12 +45,9 @@ jobs:
 
       - name: Install test dependencies
         # onnxruntime is intentionally omitted: it is only used by the tests for
-        # optional numerical comparison (guarded by `has_ort`), and its
-        # uninstrumented C++ throws exceptions that trip ASan's __cxa_throw
-        # interceptor (CHECK failed: real___cxa_throw != 0) when the runtime is
-        # preloaded, aborting the interpreter before any real issue is found.
-        # Skipping it keeps ASan focused on onnxoptimizer's own C++ while still
-        # running every optimize() call and model check.
+        # optional numerical comparison (guarded by `has_ort`), so skipping it
+        # keeps ASan focused on onnxoptimizer's own C++ while still running every
+        # optimize() call and model check.
         run: python -m pip install pytest pytest-xdist numpy
 
       - name: Run pytest under AddressSanitizer
@@ -63,6 +60,15 @@ jobs:
           # errors (heap-buffer-overflow, use-after-free, ...) in onnxoptimizer.
           ASAN_OPTIONS: "detect_leaks=0:halt_on_error=1:symbolize=1"
         run: |
-          export LD_PRELOAD="$(gcc -print-file-name=libasan.so)"
+          # libasan must come first in the preload list (ASan requirement), but
+          # libstdc++ must be preloaded alongside it: the `onnx` Python wheel is
+          # an uninstrumented C++ extension that throws C++ exceptions (e.g. from
+          # checker.check_model / shape_inference, which the tests exercise
+          # constantly). Without libstdc++ loaded at ASan init, the __cxa_throw
+          # interceptor can't resolve the real symbol and aborts the process with
+          # "CHECK failed: ... real___cxa_throw != 0" on the first raised
+          # exception. Preloading libstdc++ lets the interceptor find __cxa_throw
+          # so exceptions unwind normally and only genuine memory errors fail CI.
+          export LD_PRELOAD="$(gcc -print-file-name=libasan.so):$(gcc -print-file-name=libstdc++.so.6)"
           # Limit worker count to keep ASan's larger memory footprint in check.
           python -m pytest onnxoptimizer/test/ -n 2 -v
