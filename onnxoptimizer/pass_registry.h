@@ -22,6 +22,7 @@
 #include "onnxoptimizer/passes/eliminate_deadend.h"
 #include "onnxoptimizer/passes/eliminate_duplicate_initializer.h"
 #include "onnxoptimizer/passes/eliminate_identity.h"
+#include "onnxoptimizer/passes/eliminate_initializer_from_input.h"
 #include "onnxoptimizer/passes/eliminate_if_with_const_cond.h"
 #include "onnxoptimizer/passes/eliminate_nop_cast.h"
 #include "onnxoptimizer/passes/eliminate_nop_concat.h"
@@ -79,6 +80,7 @@ struct GlobalPassRegistry {
     registerPass<RenameInputOutput>();
     registerPass<SetUniqueNameForNodes>();
     registerPass<NopEmptyPass>();
+    registerPass<EliminateInitializerFromInput>();
     registerPass<EliminateNopCast>();
     registerPass<EliminateNopDropout>();
     registerPass<EliminateNopFlatten>();
