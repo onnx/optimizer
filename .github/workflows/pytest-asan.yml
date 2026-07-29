@@ -42,6 +42,14 @@ jobs:
         run: |
           export CXXFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address
           python -m pip install --no-build-isolation -v .
+          # The test step runs `pytest onnxoptimizer/test/` from the repo root, so
+          # `import onnxoptimizer` binds to the in-tree source package instead of the
+          # installed one -- and the source tree has no compiled extension. Build it
+          # in place as well (reusing the cmake build pip just produced) so the
+          # onnx_opt_cpp2py_export module sits next to that source; without this the
+          # tests fail at collection with "ModuleNotFoundError: No module named
+          # 'onnxoptimizer.onnx_opt_cpp2py_export'".
+          python setup.py build_ext --inplace
 
       - name: Install test dependencies
         # onnxruntime is intentionally omitted: it is only used by the tests for
