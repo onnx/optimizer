@@ -40,7 +40,7 @@ jobs:
           # DT_NEEDED of the shared objects.
           ASAN_FLAGS: "-fsanitize=address -fno-omit-frame-pointer -g"
         run: |
-          export CMAKE_ARGS="-DCMAKE_CXX_FLAGS='${ASAN_FLAGS}' -DCMAKE_C_FLAGS='${ASAN_FLAGS}' -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address -DCMAKE_MODULE_LINKER_FLAGS=-fsanitize=address"
+          export CXXFLAGS=-fsanitize=address LDFLAGS=-fsanitize=address
           python -m pip install --no-build-isolation -v .
 
       - name: Install test dependencies
