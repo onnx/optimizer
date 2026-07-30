@@ -1269,6 +1269,65 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node[3].attribute[0].g.node) == 1
         assert optimized_model.graph.node[3].attribute[0].g.node[0].op_type == "Gemm"
 
+    def _conv_mul_graph(self, scale_shape, with_bias):
+        # Conv(X, W[, B]) -> Mul(., S), with constant W/B/S.
+        C_out, C_in, k = 4, 3, 3
+        W = np.random.rand(C_out, C_in, k, k).astype(np.float32)
+        S = np.random.rand(*scale_shape).astype(np.float32)
+        inits = [
+            numpy_helper.from_array(W, "W"),
+            numpy_helper.from_array(S, "S"),
+        ]
+        conv_inputs = ["X", "W"]
+        if with_bias:
+            B = np.random.rand(C_out).astype(np.float32)
+            inits.append(numpy_helper.from_array(B, "B"))
+            conv_inputs.append("B")
+        nodes = [
+            helper.make_node("Conv", conv_inputs, ["Z"], pads=[1, 1, 1, 1]),
+            helper.make_node("Mul", ["Z", "S"], ["Y"]),
+        ]
+        return helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, C_in, 8, 8))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (1, C_out, 8, 8))],
+            initializer=inits,
+        )
+
+    def _conv_output_feeds_mul(self, model):
+        conv_outputs = {
+            o for n in model.graph.node if n.op_type == "Conv" for o in n.output
+        }
+        return any(
+            n.op_type == "Mul" and any(i in conv_outputs for i in n.input)
+            for n in model.graph.node
+        )
+
+    def test_fuse_mul_into_conv_per_channel(self):  # type: () -> None
+        # A per-output-channel scale (shape [1, C, 1, 1]) is folded into the Conv
+        # weights, so no Mul consumes the Conv output any more. _optimized also
+        # checks numerical equivalence via onnxruntime.
+        for with_bias in (True, False):
+            graph = self._conv_mul_graph((1, 4, 1, 1), with_bias)
+            optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+            assert (
+                sum(n.op_type == "Conv" for n in optimized_model.graph.node) == 1
+            )
+            assert not self._conv_output_feeds_mul(optimized_model)
+
+    def test_fuse_mul_into_conv_scalar(self):  # type: () -> None
+        graph = self._conv_mul_graph((1,), True)
+        optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+        assert not self._conv_output_feeds_mul(optimized_model)
+
+    def test_fuse_mul_into_conv_no_fuse_non_channel_scale(self):  # type: () -> None
+        # A per-pixel scale ([1, 1, H, W]) is not a per-channel scale and must not
+        # be folded into the weights.
+        graph = self._conv_mul_graph((1, 1, 8, 8), False)
+        optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+        assert self._conv_output_feeds_mul(optimized_model)
+
     def test_fuse_add_bias_into_conv_with_scalar_bias(self):  # type: () -> None
         nodes = [
             helper.make_node("Conv", ["X", "Y"], ["Z"]),
