@@ -48,9 +48,10 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, windows-11-arm, macos-15]        
         python: ["cp314t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
     steps:
-    - uses: actions/checkout@v7.0.0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
+        persist-credentials: false
     - name: Build wheels
       uses: pypa/cibuildwheel@4726cd35bb13f7bde50cf2761f2499ac7b3aa32c
     - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -67,9 +68,10 @@ jobs:
     name: Build source distribution
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
+        persist-credentials: false
 
     - name: Build sdist
       run: pipx run build --sdist
