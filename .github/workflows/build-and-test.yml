@@ -48,7 +48,7 @@ jobs:
         os: [ubuntu-24.04, ubuntu-24.04-arm, windows-2022, windows-11-arm, macos-15]        
         python: ["cp314t", "cp312", "cp311", "cp310"] # because of abi3 we don't need to build separate whls for python 3.13, 3.14
     steps:
-    - uses: actions/checkout@v7.0.1
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         submodules: recursive
     - name: Build wheels
