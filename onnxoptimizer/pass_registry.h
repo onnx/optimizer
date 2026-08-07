@@ -39,6 +39,7 @@
 #include "onnxoptimizer/passes/eliminate_unused_initializer.h"
 #include "onnxoptimizer/passes/extract_constant_to_initializer.h"
 #include "onnxoptimizer/passes/fuse_add_bias_into_conv.h"
+#include "onnxoptimizer/passes/fuse_attention.h"
 #include "onnxoptimizer/passes/fuse_bn_into_conv.h"
 #include "onnxoptimizer/passes/fuse_concat_into_reshape.h"
 #include "onnxoptimizer/passes/fuse_consecutive_concats.h"
@@ -95,6 +96,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateSliceAfterShape>();
     registerPass<EliminateNopTranspose>();
     registerPass<FuseAddBiasIntoConv>();
+    registerPass<FuseAttention>();
     registerPass<FuseBNIntoConv>();
     registerPass<FuseConsecutiveConcats>();
     registerPass<FuseConsecutiveLogSoftmax>();
