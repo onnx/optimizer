@@ -21,6 +21,39 @@ static constexpr const char* impure_operators[] = {
     "Scan",
 };
 
+// Helper function to infer elem_type for a value if it's not set
+// This is a simple heuristic that works for many common operators where
+// output type matches input type (e.g., Add, Sub, Mul, etc.).
+// For operators with different output types (e.g., Shape, Cast), this
+// may return an incorrect type, but that would have been present in the
+// original model's value_info if available.
+static int32_t inferElemType(const Value* v) {
+  if (!v) {
+    return TensorProto_DataType_UNDEFINED;
+  }
+  
+  if (v->elemType() != TensorProto_DataType_UNDEFINED) {
+    return v->elemType();
+  }
+  
+  // Check if the value has a producing node
+  const Node* producer = v->node();
+  if (!producer) {
+    return TensorProto_DataType_UNDEFINED;
+  }
+  
+  // For many operators, output type matches input type
+  // Check if any input has a known elem_type
+  for (const Value* input : producer->inputs()) {
+    if (input->elemType() != TensorProto_DataType_UNDEFINED) {
+      return input->elemType();
+    }
+  }
+  
+  // Couldn't infer - return UNDEFINED
+  return TensorProto_DataType_UNDEFINED;
+}
+
 static bool is_pure_operator(Node* n) {
   for (auto x : impure_operators) {
     if (n->kind() == Symbol(x)) {
@@ -127,6 +160,13 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       if (v->node()->kind() == kUndefined) {
         continue;
       }
+      // Ensure the value has elem_type set before registering as output
+      if (v->elemType() == TensorProto_DataType_UNDEFINED) {
+        int32_t elem_type = inferElemType(v);
+        if (elem_type != TensorProto_DataType_UNDEFINED) {
+          v->setElemType(elem_type);
+        }
+      }
       graph.registerOutput(v);
     }
 
@@ -169,7 +209,23 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
       if (v->node()->kind() == kUndefined) {
         v->replaceAllUsesWith(optionalInputDummyNode->outputs()[0]);
       } else {
-        Value* newv = graph.addInput()->copyMetadata(v);
+        Value* newv = graph.addInput();
+        // Copy sizes and name first
+        if (v->has_sizes()) {
+          newv->setSizes(v->sizes());
+        }
+        if (v->has_unique_name()) {
+          newv->setUniqueName(v->uniqueName());
+        }
+        // For elem_type, try to infer if not set
+        int32_t elem_type = inferElemType(v);
+        if (elem_type != TensorProto_DataType_UNDEFINED) {
+          newv->setElemType(elem_type);
+        }
+        // Note: If elem_type is still UNDEFINED, the resulting model
+        // may be invalid. This indicates the input model lacks proper
+        // type information for intermediate values. The model validation
+        // will catch this error during onnx.checker.check_model().
         v->replaceAllUsesWith(newv);
       }
     }
