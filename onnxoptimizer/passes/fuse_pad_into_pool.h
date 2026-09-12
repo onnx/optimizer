@@ -13,9 +13,15 @@
 // After:
 //   Z = pool(X, Y) with "pads" attribute set
 //
-// the pass handles the case when Pad is zero-padding the input
-// (i.e. mode=constant and constant_value=0)
+// The pass only fires when Pad uses mode=constant and the constant value
+// matches the value the pool implicitly uses for its own padding:
+//   - AveragePool (with count_include_pad=1): constant_value = 0
+//   - MaxPool:                                constant_value = -inf
+// MaxPool ignores its padded elements, which is equivalent to padding with
+// -inf. Folding a zero-padding Pad into a MaxPool is therefore incorrect
+// (see https://github.com/onnxsim/onnxsim/issues/290).
 
+#include <limits>
 #include <numeric>
 
 #include "onnx/defs/tensor_util.h"
@@ -67,6 +73,17 @@ struct FusePadIntoPool final : public PredicateBasedPass {
     }
 
     // Process 'Constant_value'
+    //
+    // The Pad can only be fused when it fills the padded region with the same
+    // value the pool implicitly uses for its own padding:
+    //   - AveragePool (with count_include_pad=1): 0
+    //   - MaxPool: -inf (MaxPool ignores padded elements, which is equivalent
+    //     to padding with -inf). Folding a zero-padding Pad into a MaxPool
+    //     would change the result whenever a window's real values are all
+    //     negative -- see https://github.com/onnxsim/onnxsim/issues/290.
+    const bool is_maxpool = pool->kind() == Symbol("MaxPool");
+    const double required_pad_value =
+        is_maxpool ? -std::numeric_limits<double>::infinity() : double(0);
     {
       union ConstantValueType {
         int32_t i32;
@@ -79,32 +96,35 @@ struct FusePadIntoPool final : public PredicateBasedPass {
         int16_t i16;
       } cv;
 
-#define Define_GetConstantValueFromInput(token) \
-  (GetValueFromInput(pad, 2, cv.token) && cv.token == decltype(cv.token)(0))
+#define Match_ConstantValueFromInput(token) \
+  (GetValueFromInput(pad, 2, cv.token) &&   \
+   static_cast<double>(cv.token) == required_pad_value)
 
-      do {
-        if (GetValueFromAttr(pad, kvalue, cv.f64) && cv.f64 == double(0)) {
-          break;
-        }
-        if (pad->inputs().size() >= 3) {
-          if (pad->input(2)->uniqueName().empty()) {
-            break;
-          }
-          if (Define_GetConstantValueFromInput(i32) ||
-              Define_GetConstantValueFromInput(i64) ||
-              Define_GetConstantValueFromInput(f32) ||
-              Define_GetConstantValueFromInput(f64) ||
-              Define_GetConstantValueFromInput(ui8) ||
-              Define_GetConstantValueFromInput(i8) ||
-              Define_GetConstantValueFromInput(ui16) ||
-              Define_GetConstantValueFromInput(i16)) {
-            break;
-          }
-          return false;
-        }
-      } while (0);
+      bool pad_value_matches;
+      if (GetValueFromAttr(pad, kvalue, cv.f64)) {
+        // Explicit 'value' attribute (opset 10 and below).
+        pad_value_matches = (cv.f64 == required_pad_value);
+      } else if (pad->inputs().size() >= 3 &&
+                 !pad->input(2)->uniqueName().empty()) {
+        // Explicit 'constant_value' input (opset 11 and above).
+        pad_value_matches = Match_ConstantValueFromInput(i32) ||
+                            Match_ConstantValueFromInput(i64) ||
+                            Match_ConstantValueFromInput(f32) ||
+                            Match_ConstantValueFromInput(f64) ||
+                            Match_ConstantValueFromInput(ui8) ||
+                            Match_ConstantValueFromInput(i8) ||
+                            Match_ConstantValueFromInput(ui16) ||
+                            Match_ConstantValueFromInput(i16);
+      } else {
+        // No constant value specified: Pad defaults to 0.
+        pad_value_matches = (required_pad_value == double(0));
+      }
 
-#undef Define_GetConstantValueFromInput
+#undef Match_ConstantValueFromInput
+
+      if (!pad_value_matches) {
+        return false;
+      }
     }
 
     // check if some values in 'pads' prevents us from fusing it into 'Conv'
