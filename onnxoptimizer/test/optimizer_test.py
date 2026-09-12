@@ -18,6 +18,13 @@ try:
 except ImportError:
     has_tv = False
 
+try:
+    import torch
+
+    has_torch = True
+except ImportError:
+    has_torch = False
+
 import onnx
 import pytest
 from onnx import (
@@ -5039,6 +5046,100 @@ class TestOptimizer(unittest.TestCase):
         for opset_version in [11, 15]:
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
+
+    def _make_gelu_graph(self, half_last=True):  # type: (bool) -> onnx.GraphProto
+        # Builds the erf-based (exact) GELU decomposition:
+        #   out = 0.5 * x * (1 + erf(x / sqrt(2)))
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 4, 8])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 4, 8])
+
+        sqrt2 = helper.make_tensor("sqrt2", TensorProto.FLOAT, [], [np.sqrt(2.0)])
+        one = helper.make_tensor("one", TensorProto.FLOAT, [], [1.0])
+        half = helper.make_tensor("half", TensorProto.FLOAT, [], [0.5])
+
+        nodes = [
+            helper.make_node("Div", ["X", "sqrt2"], ["div"]),
+            helper.make_node("Erf", ["div"], ["erf"]),
+            helper.make_node("Add", ["erf", "one"], ["add"]),
+            helper.make_node("Mul", ["X", "add"], ["mul"]),
+        ]
+        if half_last:
+            nodes.append(helper.make_node("Mul", ["mul", "half"], ["Y"]))
+        else:
+            nodes.append(helper.make_node("Mul", ["half", "mul"], ["Y"]))
+
+        return helper.make_graph(
+            nodes,
+            "test_gelu",
+            [X],
+            [Y],
+            [sqrt2, one, half],
+        )
+
+    def test_fuse_gelu(self):  # type: () -> None
+        for half_last in [True, False]:
+            graph = self._make_gelu_graph(half_last=half_last)
+            optimized_model = self._optimized(
+                graph,
+                ["fuse_gelu", "eliminate_deadend"],
+                opset_imports=[helper.make_opsetid("", 20)],
+            )
+            assert len(optimized_model.graph.node) == 1
+            assert optimized_model.graph.node[0].op_type == "Gelu"
+
+    def test_fuse_gelu_low_opset_is_noop(self):  # type: () -> None
+        # Gelu is only a standard-domain op from opset 20, so a lower opset must
+        # be left untouched.
+        graph = self._make_gelu_graph()
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_gelu", "eliminate_deadend"],
+            opset_imports=[helper.make_opsetid("", 17)],
+        )
+        assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
+
+    @unittest.skipUnless(has_torch, "This test needs torch")
+    def test_fuse_gelu_torch_exported(self):  # type: () -> None
+        # Exercise the pass against a real graph produced by torch.onnx. With
+        # approximate="none", torch decomposes GELU into
+        # Div -> Erf -> Add -> Mul -> Mul (with the sqrt(2)/1/0.5 constants
+        # materialized as Constant *nodes* rather than initializers). torch only
+        # emits this decomposition below opset 20; at opset >= 20 it exports a
+        # Gelu op directly, so we export at opset 17 and version-convert to 20.
+        class Net(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(8, 8)
+                self.act = torch.nn.GELU(approximate="none")
+
+            def forward(self, x):
+                return self.act(self.linear(x))
+
+        net = Net().eval()
+        dummy = torch.randn(2, 4, 8)
+        buffer = io.BytesIO()
+        try:
+            torch.onnx.export(net, (dummy,), buffer, opset_version=17, dynamo=False)
+        except Exception as e:  # pragma: no cover - depends on torch version
+            self.skipTest(f"torch.onnx.export (TorchScript) unavailable: {e}")
+        model = onnx.load_from_string(buffer.getvalue())
+
+        # Confirm torch produced the erf decomposition we intend to fuse; if a
+        # future exporter emits a different structure, there is nothing to test.
+        op_types = {node.op_type for node in model.graph.node}
+        if not ({"Div", "Erf", "Add", "Mul"} <= op_types) or "Gelu" in op_types:
+            self.skipTest(f"torch did not emit the erf GELU decomposition: {op_types}")
+
+        model = onnx.version_converter.convert_version(model, 20)
+        optimized_model = self._optimized(
+            model, ["fuse_gelu", "eliminate_deadend"]
+        )
+
+        gelu_nodes = [n for n in optimized_model.graph.node if n.op_type == "Gelu"]
+        assert len(gelu_nodes) == 1
+        assert all(
+            n.op_type not in ("Erf", "Div") for n in optimized_model.graph.node
+        )
 
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
