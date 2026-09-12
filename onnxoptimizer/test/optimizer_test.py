@@ -18,6 +18,13 @@ try:
 except ImportError:
     has_tv = False
 
+try:
+    import torch
+
+    has_torch = True
+except ImportError:
+    has_torch = False
+
 import onnx
 import pytest
 from onnx import (
@@ -5039,6 +5046,222 @@ class TestOptimizer(unittest.TestCase):
         for opset_version in [11, 15]:
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
+
+    # ---- fuse_attention -------------------------------------------------
+    # The graphs built here mirror what `torch.onnx.export` (the TorchScript
+    # exporter) produces for `scaled_dot_product_attention`: Q and the
+    # transposed K are each scaled by `sqrt(scale)`, multiplied together,
+    # optionally biased by an attention mask, passed through Softmax and
+    # finally multiplied by V.
+    ATTENTION_OPSET_VERSION = 23
+
+    def _make_sdpa_model(self, mask="none", scale=None, opset=None):
+        # type: (str, Optional[float], Optional[int]) -> onnx.ModelProto
+        if opset is None:
+            opset = self.ATTENTION_OPSET_VERSION
+        B, H, S, D = 2, 4, 8, 16
+        INT64_MAX = 9223372036854775807
+
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        nodes = []
+        inits = []
+        inputs = [vi("q", [B, H, S, D]), vi("k", [B, H, S, D]), vi("v", [B, H, S, D])]
+
+        if scale is None:
+            # Default scale 1/sqrt(head_size), derived from Shape(q) exactly as
+            # torch emits it.
+            inits += [
+                numpy_helper.from_array(np.array([-1], np.int64), "neg1"),
+                numpy_helper.from_array(np.array([INT64_MAX], np.int64), "imax"),
+                numpy_helper.from_array(np.array(1.0, np.float32), "one"),
+            ]
+            nodes += [
+                helper.make_node("Shape", ["q"], ["shp"]),
+                helper.make_node("Slice", ["shp", "neg1", "imax"], ["lastdim"]),
+                helper.make_node("Cast", ["lastdim"], ["lastf"], to=TensorProto.FLOAT),
+                helper.make_node("Sqrt", ["lastf"], ["sqrt_hs"]),
+                helper.make_node("Div", ["one", "sqrt_hs"], ["scale_val"]),
+                helper.make_node("Cast", ["scale_val"], ["scale_c"], to=TensorProto.FLOAT),
+                helper.make_node("Sqrt", ["scale_c"], ["sqrt_q"]),
+                helper.make_node("Sqrt", ["scale_c"], ["sqrt_k"]),
+            ]
+            sq, sk = "sqrt_q", "sqrt_k"
+        else:
+            sf = float(np.sqrt(scale))
+            inits += [
+                numpy_helper.from_array(np.array(sf, np.float32), "sqf_q"),
+                numpy_helper.from_array(np.array(sf, np.float32), "sqf_k"),
+            ]
+            sq, sk = "sqf_q", "sqf_k"
+
+        nodes += [
+            helper.make_node("Transpose", ["k"], ["kt"], perm=[0, 1, 3, 2]),
+            helper.make_node("Mul", ["q", sq], ["mq"]),
+            helper.make_node("Mul", ["kt", sk], ["mk"]),
+            helper.make_node("MatMul", ["mq", "mk"], ["qk"]),
+        ]
+
+        if mask == "none":
+            score = "qk"
+        elif mask == "additive":
+            inputs.append(vi("mask", [B, H, S, S]))
+            nodes.append(helper.make_node("Add", ["qk", "mask"], ["score"]))
+            score = "score"
+        elif mask == "causal":
+            causal = np.triu(np.full((S, S), -np.inf, np.float32), 1)
+            inits.append(numpy_helper.from_array(causal, "causal"))
+            nodes.append(helper.make_node("Add", ["qk", "causal"], ["score"]))
+            score = "score"
+        else:
+            raise ValueError(mask)
+
+        nodes += [
+            helper.make_node("Softmax", [score], ["weights"], axis=-1),
+            helper.make_node("MatMul", ["weights", "v"], ["out"]),
+        ]
+        graph = helper.make_graph(
+            nodes, "sdpa", inputs, [vi("out", [B, H, S, D])], inits
+        )
+        return helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", opset)],
+            ir_version=10,
+        )
+
+    def test_fuse_attention_default_scale(self):  # type: () -> None
+        model = self._make_sdpa_model(mask="none", scale=None)
+        optimized_model = self._optimized(
+            model, ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"]
+        )
+        assert len(optimized_model.graph.node) == 1
+        node = optimized_model.graph.node[0]
+        assert node.op_type == "Attention"
+        assert list(node.input) == ["q", "k", "v"]
+        # Default scale must be left implicit.
+        assert all(a.name != "scale" for a in node.attribute)
+
+    def test_fuse_attention_explicit_scale(self):  # type: () -> None
+        model = self._make_sdpa_model(mask="none", scale=0.125)
+        optimized_model = self._optimized(
+            model, ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"]
+        )
+        assert len(optimized_model.graph.node) == 1
+        node = optimized_model.graph.node[0]
+        assert node.op_type == "Attention"
+        scale_attr = [a for a in node.attribute if a.name == "scale"]
+        assert len(scale_attr) == 1
+        np.testing.assert_allclose(scale_attr[0].f, 0.125, rtol=1e-6)
+
+    def test_fuse_attention_additive_mask(self):  # type: () -> None
+        model = self._make_sdpa_model(mask="additive", scale=None)
+        optimized_model = self._optimized(
+            model, ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"]
+        )
+        assert len(optimized_model.graph.node) == 1
+        node = optimized_model.graph.node[0]
+        assert node.op_type == "Attention"
+        assert list(node.input) == ["q", "k", "v", "mask"]
+
+    def test_fuse_attention_causal_mask(self):  # type: () -> None
+        model = self._make_sdpa_model(mask="causal", scale=None)
+        optimized_model = self._optimized(
+            model, ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"]
+        )
+        # The (constant) causal mask is folded into a single initializer that
+        # feeds the fused Attention node as attn_mask.
+        attention_nodes = [n for n in optimized_model.graph.node if n.op_type == "Attention"]
+        assert len(attention_nodes) == 1
+        assert len(attention_nodes[0].input) == 4
+
+    def test_fuse_attention_opset_too_low_no_fuse(self):  # type: () -> None
+        # Attention requires opset >= 23; the pass must be a no-op otherwise.
+        model = self._make_sdpa_model(mask="none", scale=0.125, opset=17)
+        optimized_model = self._optimized(model, ["fuse_attention"])
+        assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
+
+    def test_fuse_attention_plain_softmax_no_fuse(self):  # type: () -> None
+        # A bare Softmax -> MatMul (no scaled Q/K MatMul) must not be fused.
+        B, H, S, D = 2, 4, 8, 16
+
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        graph = helper.make_graph(
+            [
+                helper.make_node("Softmax", ["q"], ["s"], axis=-1),
+                helper.make_node("MatMul", ["s", "v"], ["out"]),
+            ],
+            "plain",
+            [vi("q", [B, H, S, D]), vi("v", [B, H, D, S])],
+            [vi("out", [B, H, S, S])],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", self.ATTENTION_OPSET_VERSION)],
+            ir_version=10,
+        )
+        optimized_model = self._optimized(model, ["fuse_attention"])
+        assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
+
+    @unittest.skipUnless(has_torch, "onnx test needs torch")
+    def test_fuse_attention_torch_sdpa_export(self):  # type: () -> None
+        # Fuse graphs produced by the real torch.onnx exporter.
+        import torch.onnx._constants as _onnx_constants
+        from torch.nn.functional import scaled_dot_product_attention
+
+        if _onnx_constants.ONNX_MAX_OPSET < self.ATTENTION_OPSET_VERSION:
+            self.skipTest("installed torch cannot export opset 23")
+
+        B, H, S, D = 2, 4, 8, 16
+
+        class SDPA(torch.nn.Module):
+            def __init__(self, **kwargs):
+                super().__init__()
+                self._kwargs = kwargs
+
+            def forward(self, *args):
+                if len(args) == 4:
+                    return scaled_dot_product_attention(
+                        args[0], args[1], args[2], attn_mask=args[3], **self._kwargs
+                    )
+                return scaled_dot_product_attention(
+                    args[0], args[1], args[2], **self._kwargs
+                )
+
+        q = torch.randn(B, H, S, D)
+        k = torch.randn(B, H, S, D)
+        v = torch.randn(B, H, S, D)
+        mask = torch.randn(B, H, S, S)
+
+        cases = [
+            (SDPA(), (q, k, v), ["q", "k", "v"]),
+            (SDPA(scale=0.125), (q, k, v), ["q", "k", "v"]),
+            (SDPA(is_causal=True), (q, k, v), ["q", "k", "v"]),
+            (SDPA(), (q, k, v, mask), ["q", "k", "v", "mask"]),
+        ]
+        for module, args, names in cases:
+            buffer = io.BytesIO()
+            torch.onnx.export(
+                module,
+                args,
+                buffer,
+                opset_version=self.ATTENTION_OPSET_VERSION,
+                dynamo=False,
+                input_names=names,
+            )
+            model = onnx.load_from_string(buffer.getvalue())
+            optimized_model = self._optimized(
+                model,
+                ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"],
+            )
+            attention_nodes = [
+                n for n in optimized_model.graph.node if n.op_type == "Attention"
+            ]
+            assert len(attention_nodes) == 1, [n.op_type for n in optimized_model.graph.node]
 
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
