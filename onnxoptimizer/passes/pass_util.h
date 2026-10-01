@@ -320,11 +320,15 @@ inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
     const Node* shape, const int64_t rank) {
   ONNX_ASSERT(CheckKind(shape, "Shape"));
 
-  const int64_t start = AddYIfNegative<int64_t>(
-      GetValueFromAttrWithDefault(shape, "start", 0), rank);
-  const int64_t end = AddYIfNegative<int64_t>(
-      GetValueFromAttrWithDefault(shape, "end", rank), rank);
-  return {start, end};
+  const int64_t start = std::clamp<int64_t>(
+      AddYIfNegative<int64_t>(GetValueFromAttrWithDefault(shape, "start", 0),
+                              rank),
+      0, rank);
+  const int64_t end = std::clamp<int64_t>(
+      AddYIfNegative<int64_t>(GetValueFromAttrWithDefault(shape, "end", rank),
+                              rank),
+      0, rank);
+  return {start, std::max(start, end)};
 }
 
 inline std::pair<int64_t, int64_t> FetchStartAndEndAttrOfShape(
