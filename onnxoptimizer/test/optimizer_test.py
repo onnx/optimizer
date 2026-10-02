@@ -3652,6 +3652,31 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Relu"
 
+    def test_eliminate_shape_op_clamps_start_beyond_rank(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
+        X2 = helper.make_tensor_value_info("X2", TensorProto.INT64, [0])
+        Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [0])
+        graph = helper.make_graph(
+            [
+                helper.make_node("Shape", ["X"], ["X2"], start=5),
+                helper.make_node("Identity", ["X2"], ["Y"]),
+            ],
+            "test",
+            [X],
+            [Y],
+            value_info=[X2],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["eliminate_shape_op"],
+            False,
+            opset_imports=[helper.make_opsetid("", 15)],
+        )
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+        assert numpy_helper.to_array(optimized_model.graph.initializer[0]).tolist() == []
+
     # Some exporters use negative dim to represent dynamic shapes.
     def test_not_eliminate_shape_op_with_negative_dim(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, -1])
