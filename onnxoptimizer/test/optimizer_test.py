@@ -4122,6 +4122,37 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 3
 
+    def test_eliminate_shape_gather_preserves_indices_shape(self):  # type: () -> None
+        for rank in range(5):
+            indices_shape = [1] * rank
+            X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
+            Y = helper.make_tensor_value_info("Y", TensorProto.INT64, indices_shape)
+            indices = helper.make_tensor("indices", TensorProto.INT64, indices_shape, [0])
+            graph = helper.make_graph(
+                [
+                    helper.make_node("Shape", ["X"], ["shape"]),
+                    helper.make_node("Gather", ["shape", "indices"], ["Y"]),
+                ],
+                "test",
+                [X],
+                [Y],
+                [indices],
+            )
+            for passes in (["eliminate_shape_gather"], None):
+                optimized_model = self._optimized(graph, passes, compare_result=False)
+                checker.check_model(optimized_model, full_check=True)
+                assert all(node.op_type != "Gather" for node in optimized_model.graph.node)
+                result = next(
+                    tensor
+                    for tensor in optimized_model.graph.initializer
+                    if tensor.name == optimized_model.graph.output[0].name
+                )
+                assert list(result.dims) == indices_shape
+                assert result.data_type == TensorProto.INT64
+                np.testing.assert_array_equal(
+                    to_array(result), np.full(indices_shape, 2, dtype=np.int64)
+                )
+
     def _shape_gather_graph(self, index):  # type: (int) -> GraphProto
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
         Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [1])

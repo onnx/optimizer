@@ -61,9 +61,7 @@ struct EliminateShapeGather final : public PredicateBasedPass {
     }
 
     Tensor tensor;
-    if (indices->sizes().size() == 1) {
-      tensor.sizes().push_back(1);
-    }
+    tensor.sizes() = FetchConstantTensor(indices)->sizes();
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
     tensor.int64s().push_back(dims[indices_val].dim);
     Value *value = graph.addInitializerAndCreateValue(tensor);
