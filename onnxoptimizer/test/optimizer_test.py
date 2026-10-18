@@ -494,6 +494,57 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[1].op_type == "Sin"
         assert optimized_model.graph.node[2].op_type == "Add"
 
+    def test_eliminate_if_with_const_cond_with_subgraph_output_initializer(
+        self,
+    ):  # type: () -> None
+        # Regression test for onnxsim/onnxsim#452. When constant folding (here
+        # emulated with extract_constant_to_initializer) turns the taken
+        # branch's Constant into a subgraph initializer, the branch output is
+        # forwarded straight from that initializer with no producing node.
+        # eliminate_if_with_const_cond used to look this output up in value_dict,
+        # default-insert a null Value, and segfault when replaceAllUsesWith
+        # dereferenced it.
+        true = helper.make_tensor("condition", TensorProto.BOOL, (), [True])
+
+        subgraph_output_info = helper.make_tensor_value_info("C", TensorProto.FLOAT, (5,))
+
+        # The taken branch's output "C" is produced directly by a Constant node,
+        # which extract_constant_to_initializer will turn into a forwarded
+        # subgraph initializer.
+        const = helper.make_node(
+            "Constant",
+            [],
+            ["C"],
+            value=numpy_helper.from_array(np.ones((5,), dtype=np.float32)),
+        )
+        true_graph = helper.make_graph([const], "true_graph", [], [subgraph_output_info])
+
+        identity = helper.make_node("Identity", ["A"], ["C"])
+        false_graph = helper.make_graph([identity], "false_graph", [], [subgraph_output_info])
+
+        graph = helper.make_graph(
+            [
+                helper.make_node("Constant", [], ["condition"], value=true),
+                helper.make_node(
+                    "If",
+                    ["condition"],
+                    ["result"],
+                    then_branch=true_graph,
+                    else_branch=false_graph,
+                ),
+            ],
+            "test",
+            [helper.make_tensor_value_info("A", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("result", TensorProto.FLOAT, (5,))],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["extract_constant_to_initializer", "eliminate_if_with_const_cond"],
+        )
+        # The If node must be inlined away without crashing, leaving the
+        # forwarded initializer as the source of the graph output.
+        assert all(node.op_type != "If" for node in optimized_model.graph.node)
+
     def test_eliminate_identity_graph_output(self):  # type: () -> None
         add = helper.make_node("Add", ["X", "Y"], ["A"])
         identity = helper.make_node("Identity", ["A"], ["B"])
@@ -1217,6 +1268,65 @@ class TestOptimizer(unittest.TestCase):
         # Gemm
         assert len(optimized_model.graph.node[3].attribute[0].g.node) == 1
         assert optimized_model.graph.node[3].attribute[0].g.node[0].op_type == "Gemm"
+
+    def _conv_mul_graph(self, scale_shape, with_bias):
+        # Conv(X, W[, B]) -> Mul(., S), with constant W/B/S.
+        C_out, C_in, k = 4, 3, 3
+        W = np.random.rand(C_out, C_in, k, k).astype(np.float32)
+        S = np.random.rand(*scale_shape).astype(np.float32)
+        inits = [
+            numpy_helper.from_array(W, "W"),
+            numpy_helper.from_array(S, "S"),
+        ]
+        conv_inputs = ["X", "W"]
+        if with_bias:
+            B = np.random.rand(C_out).astype(np.float32)
+            inits.append(numpy_helper.from_array(B, "B"))
+            conv_inputs.append("B")
+        nodes = [
+            helper.make_node("Conv", conv_inputs, ["Z"], pads=[1, 1, 1, 1]),
+            helper.make_node("Mul", ["Z", "S"], ["Y"]),
+        ]
+        return helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, C_in, 8, 8))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (1, C_out, 8, 8))],
+            initializer=inits,
+        )
+
+    def _conv_output_feeds_mul(self, model):
+        conv_outputs = {
+            o for n in model.graph.node if n.op_type == "Conv" for o in n.output
+        }
+        return any(
+            n.op_type == "Mul" and any(i in conv_outputs for i in n.input)
+            for n in model.graph.node
+        )
+
+    def test_fuse_mul_into_conv_per_channel(self):  # type: () -> None
+        # A per-output-channel scale (shape [1, C, 1, 1]) is folded into the Conv
+        # weights, so no Mul consumes the Conv output any more. _optimized also
+        # checks numerical equivalence via onnxruntime.
+        for with_bias in (True, False):
+            graph = self._conv_mul_graph((1, 4, 1, 1), with_bias)
+            optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+            assert (
+                sum(n.op_type == "Conv" for n in optimized_model.graph.node) == 1
+            )
+            assert not self._conv_output_feeds_mul(optimized_model)
+
+    def test_fuse_mul_into_conv_scalar(self):  # type: () -> None
+        graph = self._conv_mul_graph((1,), True)
+        optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+        assert not self._conv_output_feeds_mul(optimized_model)
+
+    def test_fuse_mul_into_conv_no_fuse_non_channel_scale(self):  # type: () -> None
+        # A per-pixel scale ([1, 1, H, W]) is not a per-channel scale and must not
+        # be folded into the weights.
+        graph = self._conv_mul_graph((1, 1, 8, 8), False)
+        optimized_model = self._optimized(graph, ["fuse_mul_into_conv"])
+        assert self._conv_output_feeds_mul(optimized_model)
 
     def test_fuse_add_bias_into_conv_with_scalar_bias(self):  # type: () -> None
         nodes = [
@@ -3622,6 +3732,31 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 1
         assert optimized_model.graph.node[0].op_type == "Relu"
 
+    def test_eliminate_shape_op_clamps_start_beyond_rank(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
+        X2 = helper.make_tensor_value_info("X2", TensorProto.INT64, [0])
+        Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [0])
+        graph = helper.make_graph(
+            [
+                helper.make_node("Shape", ["X"], ["X2"], start=5),
+                helper.make_node("Identity", ["X2"], ["Y"]),
+            ],
+            "test",
+            [X],
+            [Y],
+            value_info=[X2],
+        )
+        optimized_model = self._optimized(
+            graph,
+            ["eliminate_shape_op"],
+            False,
+            opset_imports=[helper.make_opsetid("", 15)],
+        )
+
+        assert len(optimized_model.graph.node) == 1
+        assert optimized_model.graph.node[0].op_type == "Identity"
+        assert numpy_helper.to_array(optimized_model.graph.initializer[0]).tolist() == []
+
     # Some exporters use negative dim to represent dynamic shapes.
     def test_not_eliminate_shape_op_with_negative_dim(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, -1])
@@ -4066,6 +4201,80 @@ class TestOptimizer(unittest.TestCase):
         optimized_model = self._optimized(graph, ["eliminate_shape_gather"], False)
 
         assert len(optimized_model.graph.node) == 3
+
+    def test_eliminate_shape_gather_preserves_indices_shape(self):  # type: () -> None
+        for rank in range(5):
+            indices_shape = [1] * rank
+            X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
+            Y = helper.make_tensor_value_info("Y", TensorProto.INT64, indices_shape)
+            indices = helper.make_tensor("indices", TensorProto.INT64, indices_shape, [0])
+            graph = helper.make_graph(
+                [
+                    helper.make_node("Shape", ["X"], ["shape"]),
+                    helper.make_node("Gather", ["shape", "indices"], ["Y"]),
+                ],
+                "test",
+                [X],
+                [Y],
+                [indices],
+            )
+            for passes in (["eliminate_shape_gather"], None):
+                optimized_model = self._optimized(graph, passes, compare_result=False)
+                checker.check_model(optimized_model, full_check=True)
+                assert all(node.op_type != "Gather" for node in optimized_model.graph.node)
+                result = next(
+                    tensor
+                    for tensor in optimized_model.graph.initializer
+                    if tensor.name == optimized_model.graph.output[0].name
+                )
+                assert list(result.dims) == indices_shape
+                assert result.data_type == TensorProto.INT64
+                np.testing.assert_array_equal(
+                    to_array(result), np.full(indices_shape, 2, dtype=np.int64)
+                )
+
+    def _shape_gather_graph(self, index):  # type: (int) -> GraphProto
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 2])
+        Y = helper.make_tensor_value_info("Y", TensorProto.INT64, [1])
+        X2 = helper.make_tensor_value_info("X2", TensorProto.FLOAT, [3, 2])
+        indices = helper.make_tensor(
+            "indices", TensorProto.INT64, [1], np.array([index], dtype=np.int64)
+        )
+        nodes = [
+            helper.make_node("Relu", ["X"], ["X2"]),
+            helper.make_node("Shape", ["X2"], ["X3"]),
+            helper.make_node("Gather", ["X3", "indices"], ["X4"]),
+            helper.make_node("Identity", ["X4"], ["Y"]),
+        ]
+        return helper.make_graph(
+            nodes, "test", [X], [Y], [indices], value_info=[X2]
+        )
+
+    def test_eliminate_shape_gather_index_out_of_range(self):  # type: () -> None
+        # A Gather index >= the rank of the shaped tensor must not abort the
+        # pass (this used to fail an ONNX_ASSERT and crash the process). The
+        # index cannot be statically resolved to an axis, so the pass should
+        # decline to rewrite and leave all four nodes untouched.
+        graph = self._shape_gather_graph(5)
+        # compare_result=False: the model keeps a deliberately out-of-bounds
+        # Gather index, so it cannot be executed by onnxruntime for output
+        # comparison. We only assert the pass declines to rewrite.
+        optimized_model = self._optimized(
+            graph, ["eliminate_shape_gather"], compare_result=False
+        )
+        assert len(optimized_model.graph.node) == 4
+
+    def test_eliminate_shape_gather_negative_index_out_of_range(self):  # type: () -> None
+        # A negative index that stays negative after normalization (here -5 on
+        # a rank-2 shape) likewise must not crash. dims.size() is unsigned, so
+        # the guard has to reject the negative value before the comparison.
+        graph = self._shape_gather_graph(-5)
+        # compare_result=False for the same reason as above: an out-of-bounds
+        # index makes the graph non-executable under onnxruntime.
+        optimized_model = self._optimized(
+            graph, ["eliminate_shape_gather"], compare_result=False
+        )
+        assert len(optimized_model.graph.node) == 4
 
     def test_eliminate_nop_reshape(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5])
