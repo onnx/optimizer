@@ -10,6 +10,7 @@
 #pragma once
 
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -147,6 +148,19 @@ static void split_init_and_predict(Graph& graph, bool init, bool predict) {
   for (Value* v : graph.outputs()) {
     if (!value_belongs_to_predict_net(v)) {
       new_interface.insert(v);
+    }
+  }
+
+  // Constant tensor dimensions distinguish a scalar from an unknown rank.
+  for (Value* v : new_interface) {
+    if (const Tensor* tensor = FetchConstantTensor(v)) {
+      if (!v->has_sizes()) {
+        v->setSizes(std::vector<Dimension>(tensor->sizes().begin(),
+                                           tensor->sizes().end()));
+      }
+      if (v->elemType() == TensorProto_DataType_UNDEFINED) {
+        v->setElemType(tensor->elem_type());
+      }
     }
   }
 
