@@ -28,6 +28,17 @@
 // passes see the weights as the constants they are. It should run early, before
 // the constant-dependent fusions.
 //
+// Uses of the input (in this graph, in graph outputs, and in captured subgraph
+// references) are moved onto an initializer-backed value with the same name,
+// shape and element type before the input is removed.
+//
+// Behavior change: after this pass the weight is no longer an overridable input
+// of the model. The pass is registered as PassType::Other, so it is NOT part of
+// the default fuse/elimination set used by `optimize(model)`. Request it
+// explicitly, placed before the constant-dependent fusions, e.g.
+//   onnxoptimizer.optimize(model, ["eliminate_initializer_from_input",
+//                                  "fuse_bn_into_conv", ...])
+//
 // this pass can handle the case satisfy all following conditions:
 //   condition 1: the value is a graph input
 //   condition 2: the value also has a graph initializer of the same name
@@ -69,9 +80,14 @@ struct EliminateInitializerFromInput final : public FullGraphBasedPass {
       const std::string name = input->uniqueName();
       Tensor tensor = *graph.getInitializer(name);
       graph.eraseInitializer(name);
+      // Subgraphs find captured uses by name, so the new value must not share
+      // the input's name while uses are moved. Rename it back afterwards.
+      const std::string tmp_name = graph.getNextUniqueName();
+      tensor.setName(tmp_name);
       Value* init_value = graph.addInitializerAndCreateValue(tensor);
       input->replaceAllUsesWith(init_value);
       graph.eraseInput(i);
+      init_value->setUniqueName(name);
     }
 
     // Subgraphs (If/Loop/Scan bodies) can carry the same legacy encoding.
