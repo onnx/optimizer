@@ -56,6 +56,12 @@ struct FusePadIntoPool final : public PredicateBasedPass {
     Node* pool = n;
     Node* pad = n->inputs()[0]->node();
 
+    // MaxPool indices address the explicitly padded input before fusion.
+    if (pool->kind() == Symbol("MaxPool") && pool->outputs().size() > 1 &&
+        !pool->outputs()[1]->uses().empty()) {
+      return false;
+    }
+
     // Process 'pads' data
     std::vector<int64_t> pads;
     if (!GetValueFromAttrOrInput(pad, kpads, 1, pads)) {

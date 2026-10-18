@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import io
 import os
 import unittest
@@ -52,7 +54,7 @@ class TestOptimizer(unittest.TestCase):
         model_opt: onnx.ModelProto,
         model_ori: onnx.ModelProto,
         n_times: int = 5,
-        input_shapes: Optional[TensorShapes] = None,
+        input_shapes: TensorShapes | None = None,
         verbose=True,
     ) -> bool:
         """
@@ -65,7 +67,7 @@ class TestOptimizer(unittest.TestCase):
         def get_shape_from_value_info_proto(v: onnx.ValueInfoProto) -> list[int]:
             return [dim.dim_value for dim in v.type.tensor_type.shape.dim]
 
-        def get_value_info_all(m: onnx.ModelProto, name: str) -> Optional[onnx.ValueInfoProto]:
+        def get_value_info_all(m: onnx.ModelProto, name: str) -> onnx.ValueInfoProto | None:
             for v in m.graph.value_info:
                 if v.name == name:
                     return v
@@ -89,7 +91,7 @@ class TestOptimizer(unittest.TestCase):
                 return get_shape_from_value_info_proto(v)
             raise RuntimeError(f'Cannot get shape of "{name}"')
 
-        def get_elem_type(m: onnx.ModelProto, name: str) -> Optional[int]:
+        def get_elem_type(m: onnx.ModelProto, name: str) -> int | None:
             v = get_value_info_all(m, name)
             if v is not None:
                 return v.type.tensor_type.elem_type
@@ -127,7 +129,7 @@ class TestOptimizer(unittest.TestCase):
             )
             return input_names
 
-        def generate_rand_input(model, input_shapes: Optional[TensorShapes] = None):
+        def generate_rand_input(model, input_shapes: TensorShapes | None = None):
             if input_shapes is None:
                 input_shapes = {}
             input_names = get_input_names(model)
@@ -151,7 +153,7 @@ class TestOptimizer(unittest.TestCase):
             return inputs
 
         def forward(
-            model, inputs=None, input_shapes: Optional[TensorShapes] = None
+            model, inputs=None, input_shapes: TensorShapes | None = None
         ) -> dict[str, np.ndarray]:
             if input_shapes is None:
                 input_shapes = {}
@@ -2054,6 +2056,41 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Conv"
         assert optimized_model.graph.node[0].attribute[0].name == "pads"
         assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
+
+    def test_fuse_pad_into_maxpool_indices(self) -> None:
+        for indices_use in ["graph_output", "consumer", "unused"]:
+            with self.subTest(indices_use=indices_use):
+                nodes = [
+                    helper.make_node("Pad", ["X", "pads", "fill"], ["P"]),
+                    helper.make_node("MaxPool", ["P"], ["Y", "indices"], kernel_shape=[3, 3]),
+                ]
+                outputs = [helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 1, 2, 2])]
+                if indices_use == "consumer":
+                    nodes.append(helper.make_node("Identity", ["indices"], ["I"]))
+                if indices_use != "unused":
+                    outputs.append(
+                        helper.make_tensor_value_info(
+                            "I" if indices_use == "consumer" else "indices",
+                            TensorProto.INT64,
+                            [1, 1, 2, 2],
+                        )
+                    )
+                graph = helper.make_graph(
+                    nodes,
+                    "maxpool_indices",
+                    [helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 1, 2, 2])],
+                    outputs,
+                    [
+                        numpy_helper.from_array(
+                            np.array([0, 0, 1, 1, 0, 0, 1, 1], np.int64), "pads"
+                        ),
+                        numpy_helper.from_array(np.array(-np.inf, np.float32), "fill"),
+                    ],
+                )
+                optimized = self._optimized(graph, ["fuse_pad_into_pool"])
+                assert any(n.op_type == "Pad" for n in optimized.graph.node) == (
+                    indices_use != "unused"
+                )
 
     def test_fuse_pad_into_avgpool_no_optional_value_opset10(self):
         pad = helper.make_node(
