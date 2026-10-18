@@ -10,7 +10,7 @@
 // After:
 //   B = Constant (Constant with new shape)
 
-#include <numeric>
+#include <limits>
 
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
@@ -27,7 +27,8 @@ struct FuseConstantReshape final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kReshape && node->inputs()[0]->node()->kind() == kConstant;
+    return node->kind() == kReshape && !node->inputs().empty() &&
+           node->inputs()[0]->node()->kind() == kConstant;
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
@@ -40,78 +41,99 @@ struct FuseConstantReshape final : public PredicateBasedPass {
 
     Node* reshape = n;
     Node* constant = n->inputs()[0]->node();
+    if (!constant->hasAttribute(kvalue)) {
+      return false;
+    }
 
     // Process 'reshape' data
     std::vector<int64_t> shape;
     if (reshape->hasAttribute(kshape)) {
-      // opset 5 and below
+      // Before opset 5.
       shape = reshape->is(kshape);
     } else {
-      // opset 6 and above - first check if 'reshape' has 'shape' input
-      // constant
-      if (reshape->inputs()[1]->node()->kind() != kConstant) {
+      if (reshape->inputs().size() < 2 ||
+          reshape->inputs()[1]->node()->kind() != kConstant) {
         return false;
       }
       if (reshape->inputs()[1]->uses().size() > 1) {
         return false;
       }
       Node* shape_const = reshape->inputs()[1]->node();
+      if (!shape_const->hasAttribute(kvalue)) {
+        return false;
+      }
       Tensor t = shape_const->t(kvalue);
+      if (t.elem_type() != TensorProto_DataType_INT64 ||
+          t.sizes().size() != 1) {
+        return false;
+      }
       shape = ParseData<int64_t>(&t);
     }
 
-    int allow_zero = 0;
+    int64_t allow_zero = 0;
     Symbol sym = Symbol("allowzero");
     if (reshape->hasAttribute(sym)) {
       allow_zero = reshape->i(sym);
+    }
+    if (allow_zero != 0 && allow_zero != 1) {
+      return false;
     }
 
     Tensor t = constant->t(kvalue);
     const auto& ori_size = t.sizes();
 
-    // process 0 in shape
-    if (allow_zero != 0) {
-      for (size_t i = 0; i < shape.size(); ++i) {
-        if(shape[i] == 0) {
-          // illegal situation
-          if (ori_size.size() <= i) {
-            return false;
-          }
-          shape[i] = ori_size[i];
-        }
+    const auto multiply = [](int64_t& product, int64_t dimension) {
+      if (dimension < 0 ||
+          (dimension != 0 &&
+           product > std::numeric_limits<int64_t>::max() / dimension)) {
+        return false;
+      }
+      product *= dimension;
+      return true;
+    };
+    int64_t numel = 1;
+    for (int64_t dimension : ori_size) {
+      if (!multiply(numel, dimension)) {
+        return false;
       }
     }
 
-    // process -1 in shape
-    int count_of_unkown = 0;
-    int index_of_unkown = -1;
+    size_t unknown_index = shape.size();
+    int64_t known_product = 1;
     for (size_t i = 0; i < shape.size(); ++i) {
+      if (shape[i] == 0 && allow_zero == 0) {
+        if (i >= ori_size.size()) {
+          return false;
+        }
+        shape[i] = ori_size[i];
+      }
       if (shape[i] == -1) {
-        count_of_unkown += 1;
-        index_of_unkown = i;
+        if (unknown_index != shape.size()) {
+          return false;
+        }
+        unknown_index = i;
+      } else if (!multiply(known_product, shape[i])) {
+        return false;
       }
     }
-    // illegal situtaion
-    if (count_of_unkown > 1) {
+    if (unknown_index != shape.size()) {
+      if (known_product == 0 || numel % known_product != 0) {
+        return false;
+      }
+      shape[unknown_index] = numel / known_product;
+    } else if (known_product != numel) {
       return false;
     }
-    int64_t numel = std::accumulate(ori_size.begin(), ori_size.end(), 1, std::multiplies<int>());
-    if (index_of_unkown >= 0) {
-      int64_t value_of_unkown = -1 * numel / std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int>());
-      shape[index_of_unkown] = value_of_unkown;
-    }
-    
-    t.sizes().clear();
-    t.sizes().insert(t.sizes().begin(), shape.begin(), shape.begin() + shape.size());
-    constant->t_(kvalue, std::move(t));
 
-    // update constant node
-    constant->output()->setSizes(reshape->output()->sizes());
-    constant->output()->setElemType(reshape->output()->elemType());
     const bool replacing_success = tryReplacingAllUsesWith(reshape->output(), reshape->inputs()[0]);
     if (!replacing_success) {
       return false;
     }
+    t.sizes() = shape;
+    constant->output()->setSizes(
+        std::vector<Dimension>(shape.begin(), shape.end()));
+    constant->output()->setElemType(t.elem_type());
+    constant->t_(kvalue, std::move(t));
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
 
