@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -22,6 +22,7 @@
 
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -34,7 +35,7 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     return "fuse_matmul_add_bias_into_gemm";
   }
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kAdd && node->inputs()[0]->node()->kind() == kMatMul;
+    return CheckKind(node, kAdd, 0, kMatMul);
   }
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
@@ -43,11 +44,7 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     destroy_current = NodeDestroyType::DestroyZero;
     auto orig_matmul = n->inputs()[0];
     auto orig_bias = n->inputs()[1];
-    // check if bias is Const or in graph's initializers
-    if (orig_bias->node()->kind() != kConstant &&
-        orig_bias->node()->kind() != kParam) {
-      return false;
-    }
+
     // check if MatMul is only used by Add
     if (orig_matmul->uses().size() > 1) {
       return false;
@@ -96,12 +93,13 @@ struct FuseMatMulAddBiasIntoGemm final : public PredicateBasedPass {
     gemm->f_(kbeta, 1.0);
     gemm->i_(ktransA, 0);
     gemm->i_(ktransB, 0);
-    gemm->insertBefore(orig_matmul->node());
+    gemm->insertBefore(n);
     const bool replacing_success = tryReplacingAllUsesWith(n, gemm);
     if (!replacing_success) {
       return false;
     }
-    destroy_current = NodeDestroyType::DestroyTwo;
+    // only destroy MatMul here and DCE will take care of the Add
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

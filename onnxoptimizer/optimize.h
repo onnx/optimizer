@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -9,7 +9,6 @@
 
 #include "onnx/common/ir.h"
 #include "onnx/common/ir_pb_converter.h"
-#include "onnx/common/stl_backports.h"
 #include "onnx/proto_utils.h"
 
 #include "onnxoptimizer/pass_manager.h"
@@ -27,37 +26,44 @@ struct Optimizer {
   Optimizer(const std::vector<std::string> &names, const bool fixed_point);
   ~Optimizer();
 
-  ModelProto optimize(const ModelProto &mp_in) {
-    ModelProto mp_compatible = AddInitializerToInput(mp_in);
-    bool has_initializer_not_in_input =
-        (mp_in.graph().input_size() != mp_compatible.graph().input_size());
-    std::shared_ptr<Graph> g(ImportModelProto(mp_compatible));
+  ModelProto optimize(const ModelProto &_mp_in) {
+    const ModelProto* mp_in = &_mp_in;
+    std::unique_ptr<ModelProto> copy_in;
+    if (mp_in->ir_version() == 3) {
+      // Upgrade ir_version to 4 so that initializer can be not in input
+      copy_in = std::make_unique<ModelProto>(*mp_in);
+      copy_in->set_ir_version(4);
+      mp_in = copy_in.get();
+    }
+    std::shared_ptr<Graph> g(ImportModelProto(*mp_in));
 
     if (g.get() == nullptr) {
       std::cerr << "Warning: onnx optimizer is unable to parse input model. "
                 << "(The IR version of the ONNX model may be too old.)"
                 << std::endl;
       // If we can't parse the file, just return the input.
-      return mp_in;
+      return *mp_in;
     }
 
-    ModelProto mp_out = PrepareOutput(mp_in);
+    ModelProto mp_out = PrepareOutput(*mp_in);
     this->pass_manager->run(*g);
     ExportModelProto(&mp_out, g);
-    // `has_initializer_not_in_input` means the original model prefer
-    // initializer to be not in input, so the new initializer introduced by
-    // both `AddInitializerToInput` and optimization passes will be remove from
-    // input
-    if (has_initializer_not_in_input) {
-      mp_out.mutable_graph()->mutable_input()->DeleteSubrange(
-          mp_in.graph().input_size(),
-          mp_out.graph().input_size() - mp_in.graph().input_size());
-    }
+
+    // Maybe we can optimize these functions, now just copy
+    AddFunctionsToModel(*mp_in, mp_out);
     return mp_out;
   }
 
  private:
   std::shared_ptr<PassManager> pass_manager;
+
+  void AddFunctionsToModel(const ModelProto &original_model,
+                           ModelProto &output_model) {
+    for (const auto& function_proto : original_model.functions()) {
+      auto* p_f = output_model.add_functions();
+      p_f->CopyFrom(function_proto);
+    }
+  }
 
   ModelProto AddInitializerToInput(const ModelProto &original_model) {
     ModelProto model = original_model;

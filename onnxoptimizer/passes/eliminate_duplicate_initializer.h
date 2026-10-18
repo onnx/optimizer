@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -27,8 +27,12 @@
 // we eliminate all duplicated initializers instead. That
 // may cause unexpected behavior in some rare cases.
 
+#include <unordered_map>
+#include <unordered_set>
+
 #include "onnx/defs/tensor_util.h"
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/cse_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -43,105 +47,81 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
   PassAnalysisType getPassAnalysisType() const override {
     return PassAnalysisType::CountBased;
   }
+
+  Value *findInitializerValueByName(Node *initializer_node,
+                                    const std::string &name) {
+    for (size_t i = 0; i < initializer_node->outputs().size(); i++) {
+      if (initializer_node->outputs()[i]->uniqueName() == name) {
+        return initializer_node->outputs()[i];
+      }
+    }
+    return nullptr;
+  }
+
   unsigned int EliminateInitializer(Graph &graph) {
     unsigned int initializers_removed = 0;
     const std::vector<Tensor> &initializers = graph.initializers();
-    std::map<std::vector<int64_t>, std::vector<std::string>> init_dict_by_shape;
 
     // Make {name : Value} map
-    std::map<std::string, Value *> input_map;
+    std::unordered_set<std::string> input_set;
     for (auto inp : graph.inputs()) {
       if (inp->has_unique_name()) {
-        input_map[inp->uniqueName()] = inp;
+        input_set.emplace(inp->uniqueName());
       }
     }
 
-    std::map<std::string, Value *> output_map;
+    std::unordered_set<std::string> output_set;
     for (auto out : graph.outputs()) {
       if (out->has_unique_name()) {
-        output_map[out->uniqueName()] = out;
+        output_set.emplace(out->uniqueName());
       }
     }
-
-    // Cluster initializers by shape
-    for (auto initializer : initializers) {
+    std::unordered_map<const Tensor *, std::string, CSETensorHash, CSETensorEqual>
+        initializer_map;
+    std::vector<std::pair<std::string, std::string>> replaced_table;
+    for (const auto& initializer : initializers) {
       if (!initializer.hasName()) {
         continue;
       }
-      // Ignore initializer which is not an input
-      if (input_map.find(initializer.name()) == input_map.end()) {
+      const auto &name = initializer.name();
+      // Ignore initializer which is an input
+      if (input_set.find(name) != input_set.end()) {
         continue;
       }
       // Ignore initializer which is output
-      if (output_map.find(initializer.name()) != output_map.end()) {
+      if (output_set.find(name) != output_set.end()) {
         continue;
       }
-      auto initializers_iter = init_dict_by_shape.find(initializer.sizes());
-      if (initializers_iter != init_dict_by_shape.end()) {
-        initializers_iter->second.emplace_back(initializer.name());
+      if (initializer_map.count(&initializer) == 0) {
+        initializer_map[&initializer] = name;
       } else {
-        std::vector<std::string> vec{initializer.name()};
-        init_dict_by_shape.insert(
-            std::make_pair(std::move(initializer.sizes()), vec));
+        replaced_table.emplace_back(
+            std::make_pair(name, initializer_map.at(&initializer)));
       }
     }
-
-    for (auto pair : init_dict_by_shape) {
-      std::set<std::string> visited;
-
-      // pair.second --> vector initializers with same shape
-      // Use iter_i, iter_j to loop it
-      for (auto iter_i = pair.second.begin(); iter_i != pair.second.end();
-           ++iter_i) {
-        if (visited.find(*iter_i) != visited.end()) {
-          continue;
-        }
-        const auto iter_i_initializer = graph.getInitializer(*iter_i);
-        if (iter_i_initializer == graph.initializers().end()) {
-          continue;
-        }
-        Tensor i_tensor = *iter_i_initializer;
-        Value *i_value = input_map.find(i_tensor.name())->second;
-
-#define DO_COMPARISON(data_type)                                             \
-  const std::vector<data_type> i_data = ParseData<data_type>(&i_tensor);     \
-  for (auto iter_j = iter_i + 1; iter_j != pair.second.end(); ++iter_j) {    \
-    const auto iter_j_initializer = graph.getInitializer(*iter_j);           \
-    if (iter_j_initializer == graph.initializers().end()) {                  \
-      visited.insert(*iter_j);                                               \
-      continue;                                                              \
-    }                                                                        \
-    Tensor j_tensor = *iter_j_initializer;                                   \
-    if (i_tensor.elem_type() != j_tensor.elem_type()) {                      \
-      continue;                                                              \
-    } else {                                                                 \
-      const std::vector<data_type> j_data = ParseData<data_type>(&j_tensor); \
-      if (std::equal(i_data.begin(), i_data.end(), j_data.begin())) {        \
-        visited.insert(*iter_j);                                             \
-        Value *j_value = input_map.find(j_tensor.name())->second;            \
-        j_value->replaceAllUsesWith(i_value);                                \
-        graph.eraseInitializerAndInput(j_value);                             \
-        initializers_removed++;                                              \
-      }                                                                      \
-    }                                                                        \
-  }
-#define CASE_DO_COMPARISON(ONNX_DTYPE_SUFFIX, CPP_DTYPE)           \
-  case ONNX_NAMESPACE::TensorProto_DataType_##ONNX_DTYPE_SUFFIX: { \
-    DO_COMPARISON(CPP_DTYPE)                                       \
-    break;                                                         \
-  }
-        switch (i_tensor.elem_type()) {
-          CASE_DO_COMPARISON(FLOAT, float)
-          CASE_DO_COMPARISON(DOUBLE, double)
-          CASE_DO_COMPARISON(INT32, int32_t)
-          CASE_DO_COMPARISON(INT64, int64_t)
-          default:
-            break;
-        }
-#undef CASE_DO_COMPARISON
-#undef DO_COMPARISON
-      }
+    if (replaced_table.empty()) {
+      return initializers_removed;
     }
+    // workaround to  fetch initializer_node_ pointer in graph
+    Tensor dummy_tensor;
+    dummy_tensor.setName(graph.getNextUniqueName());
+    Node *initializer_node =
+        graph.addInitializerAndCreateValue(dummy_tensor)->node();
+    VLOG(1) << Str("====== Graph: ", graph.name(), "=====");
+    for (const auto &p : replaced_table) {
+      VLOG(1) << Str("<", p.first, ",", p.second, ">");
+      Value *old_value = findInitializerValueByName(initializer_node, p.first);
+      Value *new_value = findInitializerValueByName(initializer_node, p.second);
+      if (!old_value || !new_value) {
+        continue;
+      }
+      old_value->replaceAllUsesWith(new_value);
+      graph.eraseInitializerAndInput(old_value);
+      initializers_removed++;
+    }
+    VLOG(1) << Str("====== Graph: ", graph.name(),
+                   "=====, removed: ", initializers_removed);
+    graph.eraseInitializer(dummy_tensor.name());
     return initializers_removed;
   }
   std::shared_ptr<PostPassAnalysis> runPass(Graph &graph) override {

@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -30,7 +30,7 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kConstant;
+    return node->kind() == kConstant && node->hasAttribute(kvalue);
   }
 
   bool runTransform(Node* node, Graph& graph,
@@ -40,13 +40,11 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
     if (node->output()->has_unique_name() &&
         std::find(graph.outputs().rbegin(), graph.outputs().rend(),
                   node->output()) == graph.outputs().rend()) {
-      new_init = graph.addInitializerAndInput(t, node->output()->uniqueName());
-      node->output()->setUniqueName(
-          ONNX_NAMESPACE::to_string(graph.getNextUnique()), false);
+      t.setName(node->output()->uniqueName());
+      new_init = graph.addInitializerAndCreateValue(t);
+      node->output()->setUniqueName(graph.getNextUniqueName(), false);
     } else {
-      // the unique_name will be set in `replaceAllUsesWith` if
-      // node->output() is in graph output
-      new_init = graph.addInitializerAndInput(t);
+      new_init = graph.addInitializerAndCreateValue(t);
     }
     const bool replacing_success =
         tryReplacingAllUsesWith(node->output(), new_init);

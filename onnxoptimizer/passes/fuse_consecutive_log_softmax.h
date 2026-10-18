@@ -1,6 +1,6 @@
-/*
- * SPDX-License-Identifier: Apache-2.0
- */
+// Copyright (c) ONNX Project Contributors
+//
+// SPDX-License-Identifier: Apache-2.0
 
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
@@ -8,6 +8,7 @@
 #pragma once
 
 #include "onnxoptimizer/pass.h"
+#include "onnxoptimizer/passes/pass_util.h"
 
 namespace ONNX_NAMESPACE {
 namespace optimization {
@@ -22,13 +23,13 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    return node->kind() == kLog && node->input()->node()->kind() == kSoftmax &&
+    return CheckKind(node, kLog, 0, kSoftmax) &&
            node->input()->uses().size() == 1;
   }
   bool runTransform(Node* log_node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     Value* log_node_output = log_node->output();
-    Node* softmax_node = log_node->inputs()[0]->node();
+    Node* softmax_node = PrevNode(log_node, 0);
     Node* log_softmax_node = graph.create(kLogSoftmax, 1);
 
     // log_softmax_node construction
@@ -44,7 +45,7 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
       return false;
     }
     log_node->removeAllInputs();
-    destroy_current = NodeDestroyType::DestroyTwo;
+    destroy_current = NodeDestroyType::DestroyOne;
     return true;
   }
 };

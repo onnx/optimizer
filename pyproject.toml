@@ -1,0 +1,142 @@
+# SPDX-FileCopyrightText: ONNX Project Contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[project]
+dynamic = ["version"]
+name = "onnxoptimizer"
+description = "ONNX Optimizer"
+license = "Apache-2.0"
+authors = [
+  {name = 'ONNX Optimizer Authors', email = "onnx-technical-discuss@lists.lfai.foundation"},
+]
+readme = "README.md"
+keywords = [
+  "deep-learning",
+  "ONNX",
+]
+dependencies = [
+  "onnx",
+]
+requires-python = ">= 3.10"
+
+[project.urls]
+Homepage = 'https://github.com/onnx/optimizer'
+
+[project.scripts]
+onnxoptimizer = "onnxoptimizer:main"
+
+[build-system]
+requires = [
+  "setuptools>=68",
+  "wheel",
+  "cmake>=3.22",
+  "protobuf>=4.25.1"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+addopts = "-n auto"
+testpaths = [
+  "onnxoptimizer/test/"
+]
+
+[tool.mypy]
+# follow-imports = silent  # TODO remove this
+mypy_path = "stubs:third_party/onnx/third_party/pybind11"
+strict_optional = true
+warn_return_any = true
+warn_no_return = true
+# TODO warn_unused_ignores = true
+warn_redundant_casts = true
+warn_incomplete_stub = true
+# TODO disallow_untyped_calls = true
+check_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+# TODO disallow_incomplete_defs = true
+# TODO disallow_subclassing_any = true
+disallow_untyped_decorators = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+module = "onnxoptimizer.*"
+disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = "onnx_opt_cpp2py_export"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnx.*"
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tools.*"
+disallow_untyped_defs = true
+
+# Ignore errors in setup.py
+[[tool.mypy.overrides]]
+module = "setup"
+ignore_errors = true
+
+[tool.ruff]
+line-length = 95
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "B", # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "E", # pycodestyle
+    "F", # Pyflakes
+    "G", # flake8-logging-format
+    "I", # isort
+    "ISC", # flake8-implicit-str-concat
+    "LOG", # flake8-logging
+    "N", # pep8-naming
+    "NPY", # modern numpy
+    "PERF", # Perflint
+    "PIE", # flake8-pie
+    "PYI", # flake8-pyi
+    "RUF", # Ruff-specific rules
+    "SIM", # flake8-simplify
+    "SLOT", # flake8-slot
+    "T10", # flake8-debugger
+    "TID", # Disallow relative imports
+    "TRY", # flake8-try-except-raise
+    "UP", # pyupgrade
+    "W", # pycodestyle
+    "YTT", # flake8-2020
+]
+ignore = [
+    "B9",  # Opinionated bugbear rules
+    "C408", # Sometimes it is preferable when we construct kwargs
+    "D1", # D1 is for missing docstrings, which is not yet enforced.
+    "D401", # First line of docstring should be in imperative mood
+    "E1", "E2", "E3", # Pycodestyle formatting rules that conflicts with the formatter
+    "E501", # Line length. Not enforced because black will handle formatting
+    "SIM103", # "Return the condition directly" obscures logic sometimes
+    "N999", # Invalid module name
+    "NPY002", # We may not always need a generator
+    "PERF203", # try-except in loops sometimes necessary
+    "PERF401", # List comprehension is not always readable
+    "PYI041", # int | float is more clear
+    "RUF022", # We don't need to sort __all__ for elements to be grouped
+    "RUF031", # Parentheses for tuple in subscripts is more readable
+    "RUF052", # Variables with `_` prefix may not be dummy variables in all cases
+    "SIM102", # Collapsible if statements are not always more readable
+    "SIM108", # We don't always encourage ternary operators
+    "SIM114", # Don't always combine if branches for debuggability
+    "SIM116", # Don't use dict lookup to replace if-else
+    "TRY003", # Messages can be constructed in the exception
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"third_party/*" = ["ALL"]
+"*_pb2.py" = ["ALL"]
+"build/*" = ["ALL"]
+".setuptools-cmake-build*/*" = ["ALL"]
+"setup.py" = ["N801"]  # setuptools command classes must be lowercase
+"onnxoptimizer/test/*" = ["N806"]  # Test files use uppercase var names for ONNX conventions
