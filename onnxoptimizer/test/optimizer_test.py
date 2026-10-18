@@ -5109,7 +5109,7 @@ class TestOptimizer(unittest.TestCase):
         # Shape(q, end=3) followed by Slice(-1) reads dim 2, not head_size, so
         # the default scale must not be assumed.
         model = self._make_sdpa_model(mask="none", scale=None)
-        shape_node = [n for n in model.graph.node if n.op_type == "Shape"][0]
+        shape_node = next(n for n in model.graph.node if n.op_type == "Shape")
         shape_node.attribute.append(helper.make_attribute("end", 3))
         optimized_model = self._optimized(model, ["fuse_attention"])
         assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
