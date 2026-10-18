@@ -275,8 +275,11 @@ struct FuseAttention final : public PredicateBasedPass {
       // Explicit scale: torch emits sqrt(scale) constants on both branches.
       // Only scalars are accepted: a higher-rank scale would broadcast Q or K^T
       // to a larger rank than the fused Attention output.
+      // Constant nodes do not carry sizes on their output value, so read the
+      // rank from the constant tensor itself.
       auto is_scalar = [](const Value* v) {
-        return v->has_sizes() && v->sizes().empty();
+        const Tensor* t = FetchConstantTensor(v);
+        return t != nullptr && t->sizes().empty();
       };
       if (!is_scalar(scale_q) || !is_scalar(scale_k)) {
         return false;

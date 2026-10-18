@@ -5139,11 +5139,7 @@ class TestOptimizer(unittest.TestCase):
     @unittest.skipUnless(has_torch, "onnx test needs torch")
     def test_fuse_attention_torch_sdpa_export(self):  # type: () -> None
         # Fuse graphs produced by the real torch.onnx exporter.
-        import torch.onnx._constants as _onnx_constants
         from torch.nn.functional import scaled_dot_product_attention
-
-        if _onnx_constants.ONNX_MAX_OPSET < self.ATTENTION_OPSET_VERSION:
-            self.skipTest("installed torch cannot export opset 23")
 
         B, H, S, D = 2, 4, 8, 16
 
@@ -5183,6 +5179,12 @@ class TestOptimizer(unittest.TestCase):
                 input_names=names,
             )
             model = onnx.load_from_string(buffer.getvalue())
+            # The exporter falls back to an older opset when it cannot emit the
+            # requested one (e.g. torch built with max opset 20); skip then.
+            if model.opset_import[0].version < self.ATTENTION_OPSET_VERSION:
+                self.skipTest(
+                    f"torch exported opset {model.opset_import[0].version}, need 23"
+                )
             optimized_model = self._optimized(
                 model,
                 ["fuse_attention", "eliminate_deadend", "eliminate_unused_initializer"],
