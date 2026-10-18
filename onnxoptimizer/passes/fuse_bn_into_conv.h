@@ -21,6 +21,7 @@
 //     condition 2: Inputs 1 - 4 of bn are all initializer_size
 //     condition 3: Output of initial conv has no other uses
 //     condition 3: Currently works for only DOUBLE, FLOAT32 tensor types
+//     ConvTranspose is supported only with group=1.
 //
 // Formula for transformation
 // $$ X_{bn} = \frac{s(X - m)}{\sqrt{\sigma + \epsilon}} + b_{bn}$$
@@ -30,6 +31,8 @@
 // m)}{\sqrt{\sigma + \epsilon}} + b_{bn}$$ or
 // $$ W' = W\frac{s}{\sqrt{\sigma + \epsilon}}$$
 // $$ b' = (b_{conv} - m)\frac{s}{\sqrt{\sigma + \epsilon}} + b_{bn}$$
+
+#include <numeric>
 
 #include "onnx/common/assertions.h"
 #include "onnxoptimizer/pass.h"
@@ -48,6 +51,10 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
   }
 
   bool modify_conv(Node* conv, Node* bn, Graph& graph, const bool is_conv) {
+    if (!is_conv &&
+        GetValueFromAttrWithDefault(conv, kgroup, (int64_t)1) != 1) {
+      return false;
+    }
     const auto& bn_inputs = bn->inputs();
     const auto& conv_inputs = conv->inputs();
 
@@ -68,7 +75,8 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     ONNX_ASSERT(bn_scale.sizes() == bn_var.sizes());
     ONNX_ASSERT(bn_scale.sizes().size() == 1);
     int64_t C = bn_scale.sizes()[0];
-    ONNX_ASSERT(conv_W.sizes().size() > 2 && conv_W.sizes()[0] == C);
+    ONNX_ASSERT(conv_W.sizes().size() > 2 &&
+                conv_W.sizes()[is_conv ? 0 : 1] == C);
     if (bn_scale.elem_type() != bn_bias.elem_type() ||
         bn_scale.elem_type() != bn_mean.elem_type() ||
         bn_scale.elem_type() != bn_var.elem_type() ||
@@ -126,7 +134,7 @@ struct FuseBNIntoConv final : public PredicateBasedPass {
     std::vector<int64_t> insert_dims(conv_W.sizes().size());
     std::iota(insert_dims.begin(), insert_dims.end(), 0);
     insert_dims.erase(insert_dims.begin() + (is_conv ? 0 : 1));
-    if (getOpsetVersion(graph) > 11) {
+    if (getOpsetVersion(graph) >= 13) {
       Tensor shape_s_t;
       shape_s_t.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
       shape_s_t.sizes().push_back(insert_dims.size());
