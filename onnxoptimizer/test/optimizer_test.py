@@ -5096,6 +5096,85 @@ class TestOptimizer(unittest.TestCase):
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
+    def test_eliminate_initializer_from_input_redirects_uses(self):  # type: () -> None
+        # IR<4 models list the weight as a graph input too. The weight feeds a
+        # MatMul and is also a graph output, so both uses must move onto the
+        # initializer-backed value instead of a removed input.
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        weight = numpy_helper.from_array(np.ones((2, 2), np.float32), "W")
+        graph = helper.make_graph(
+            [helper.make_node("MatMul", ["X", "W"], ["Y"])],
+            "legacy",
+            [vi("X", (2, 2)), vi("W", (2, 2))],
+            [vi("Y", (2, 2)), vi("W", (2, 2))],
+            [weight],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=3,
+        )
+        optimized_model = self._optimized(
+            model, ["eliminate_initializer_from_input"], compare_result=False
+        )
+        assert [i.name for i in optimized_model.graph.input] == ["X"]
+        assert [i.name for i in optimized_model.graph.initializer] == ["W"]
+        assert list(optimized_model.graph.node[0].input) == ["X", "W"]
+        assert [o.name for o in optimized_model.graph.output] == ["Y", "W"]
+
+    def test_eliminate_initializer_from_input_captured_weight(self):  # type: () -> None
+        # A subgraph reads the legacy weight from the outer scope, and the weight
+        # is not a graph output. The captured use must be redirected too.
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        weight = numpy_helper.from_array(np.ones((2, 2), np.float32), "W")
+        then_graph = helper.make_graph(
+            [helper.make_node("MatMul", ["X", "W"], ["T"])],
+            "then",
+            [],
+            [vi("T", (2, 2))],
+        )
+        else_graph = helper.make_graph(
+            [helper.make_node("Identity", ["X"], ["E"])],
+            "else",
+            [],
+            [vi("E", (2, 2))],
+        )
+        cond = helper.make_node(
+            "Constant",
+            [],
+            ["C"],
+            value=helper.make_tensor("C", TensorProto.BOOL, [], [True]),
+        )
+        if_node = helper.make_node(
+            "If", ["C"], ["Y"], then_branch=then_graph, else_branch=else_graph
+        )
+        graph = helper.make_graph(
+            [cond, if_node],
+            "legacy_if",
+            [vi("X", (2, 2)), vi("W", (2, 2))],
+            [vi("Y", (2, 2))],
+            [weight],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=3,
+        )
+        optimized_model = self._optimized(
+            model, ["eliminate_initializer_from_input"], compare_result=False
+        )
+        assert [i.name for i in optimized_model.graph.input] == ["X"]
+        assert [i.name for i in optimized_model.graph.initializer] == ["W"]
+        if_out = next(n for n in optimized_model.graph.node if n.op_type == "If")
+        then_branch = next(a.g for a in if_out.attribute if a.name == "then_branch")
+        assert list(then_branch.node[0].input) == ["X", "W"]
+
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
                agraph (float[4, 64, 160, 160] X) => (float[1, 1, 1, 4, 64, 1, 160, 160, 1, 1, 1] Z)
