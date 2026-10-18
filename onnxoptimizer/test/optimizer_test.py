@@ -428,7 +428,8 @@ class TestOptimizer(unittest.TestCase):
         _, report = onnxoptimizer.optimize(
             model, ["eliminate_identity"], return_report=True
         )
-        assert report.get("eliminate_identity", 0) == 0
+        # Direct indexing: a missing entry must fail rather than default to 0.
+        assert report["eliminate_identity"] == 0
 
     # type: () -> None
     def test_eliminate_identity_both_graph_input_and_output(self):

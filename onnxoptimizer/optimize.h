@@ -30,6 +30,10 @@ struct Optimizer {
   // total number of positive transforms that pass applied to the graph.
   ModelProto optimize(const ModelProto &_mp_in,
                       std::map<std::string, unsigned int> *report = nullptr) {
+    // Clear first so an early return never leaves counts from a previous run.
+    if (report != nullptr) {
+      report->clear();
+    }
     const ModelProto* mp_in = &_mp_in;
     std::unique_ptr<ModelProto> copy_in;
     if (mp_in->ir_version() == 3) {
