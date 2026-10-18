@@ -5280,7 +5280,7 @@ class TestOptimizer(unittest.TestCase):
         """
         Test that split_predict pass preserves elem_type information
         when creating new inputs/outputs.
-        
+
         This reproduces the bug where intermediate values without explicit
         value_info cause split_predict to generate invalid models with
         missing elem_type.
@@ -5297,28 +5297,28 @@ class TestOptimizer(unittest.TestCase):
                 # Pure operation that can go to init net
                 one = Constant<value: tensor = float[2] {1.0, 1.0}>()
                 added = Add(X, one)
-                
+
                 # Impure operation that must stay in predict net
                 # This uses 'added', making it a boundary value
                 random = RandomUniform<dtype: int = 1, shape: ints = [2]>()
                 Y = Add(random, added)
             }
         """)
-        
+
         # Optimize with split_predict
         optimized_model = self._optimized(
             model, ['split_predict'], False, compare_result=False, check=True)
-        
+
         # Verify the optimized model is valid
-        # The key check is that checker.check_model() passes, 
+        # The key check is that checker.check_model() passes,
         # which is done by _optimized when check=True
-        
+
         # Additionally verify all inputs have valid elem_type
         for input_val in optimized_model.graph.input:
             self.assertIsNotNone(input_val.type)
             self.assertTrue(input_val.type.HasField('tensor_type'))
             # elem_type must not be UNDEFINED (TensorProto.UNDEFINED = 0)
-            self.assertNotEqual(input_val.type.tensor_type.elem_type, 
+            self.assertNotEqual(input_val.type.tensor_type.elem_type,
                               TensorProto.UNDEFINED,
                               f"Input {input_val.name} has UNDEFINED elem_type")
 
