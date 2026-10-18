@@ -8,6 +8,9 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15 CACHE STRING "Minimum OS X deployment vers
 
 project(onnx_optimizer C CXX)
 
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
+
 set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,7 +30,8 @@ option(ONNX_OPT_USE_SYSTEM_PROTOBUF "" OFF)
 if(NOT ONNX_OPT_USE_SYSTEM_PROTOBUF)
   option(protobuf_BUILD_TESTS "" OFF)
   option(protobuf_MSVC_STATIC_RUNTIME "" ${ONNX_USE_MSVC_STATIC_RUNTIME})
-  add_subdirectory_if_no_target(${PROJECT_SOURCE_DIR}/third_party/protobuf libprotobuf)
+  set(protobuf_FORCE_FETCH_DEPENDENCIES ON)
+  set(ONNX_BUILD_CUSTOM_PROTOBUF ON)
 endif()
 
 
@@ -71,35 +75,36 @@ if(ONNX_BUILD_PYTHON)
     Python 3
     REQUIRED COMPONENTS Interpreter Development.Module
     OPTIONAL_COMPONENTS Development.SABIModule)
-  add_subdirectory(third_party/nanobind EXCLUDE_FROM_ALL)
   nanobind_add_module(onnx_opt_cpp2py_export "onnxoptimizer/cpp2py_export.cc" STABLE_ABI)
   target_link_libraries(onnx_opt_cpp2py_export PRIVATE onnx_optimizer)
 endif()
 
-include(GNUInstallDirs)
+if(ONNX_INSTALL)
+  include(GNUInstallDirs)
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnxoptimizer
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-        FILES_MATCHING
-        PATTERN "*.h")
+  install(DIRECTORY ${PROJECT_SOURCE_DIR}/onnxoptimizer
+          DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+          FILES_MATCHING
+          PATTERN "*.h")
 
-configure_file(
-  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfigVersion.cmake.in
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
-  @ONLY)
-configure_file(
-  ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfig.cmake.in
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
-  @ONLY)
-install(FILES
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
-  ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer
-  COMPONENT dev)
-install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
-install(TARGETS
-  onnx_optimizer onnx_optimizer_c_api
-  EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfigVersion.cmake.in
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+    @ONLY)
+  configure_file(
+    ${PROJECT_SOURCE_DIR}/cmake/ONNXOptimizerConfig.cmake.in
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+    @ONLY)
+  install(FILES
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfigVersion.cmake
+    ${PROJECT_BINARY_DIR}/ONNXOptimizerConfig.cmake
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer
+    COMPONENT dev)
+  install(EXPORT ONNXOptimizerTargets DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/ONNXOptimizer")
+  install(TARGETS
+    onnx_optimizer onnx_optimizer_c_api
+    EXPORT ONNXOptimizerTargets DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 if(ONNX_BUILD_TESTS)
   enable_testing()

@@ -42,8 +42,7 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
                   node->output()) == graph.outputs().rend()) {
       t.setName(node->output()->uniqueName());
       new_init = graph.addInitializerAndCreateValue(t);
-      node->output()->setUniqueName(
-          ONNX_NAMESPACE::to_string(graph.getNextUnique()), false);
+      node->output()->setUniqueName(graph.getNextUniqueName(), false);
     } else {
       new_init = graph.addInitializerAndCreateValue(t);
     }

@@ -104,7 +104,7 @@ struct EliminateDuplicateInitializer final : public FullGraphBasedPass {
     }
     // workaround to  fetch initializer_node_ pointer in graph
     Tensor dummy_tensor;
-    dummy_tensor.setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    dummy_tensor.setName(graph.getNextUniqueName());
     Node *initializer_node =
         graph.addInitializerAndCreateValue(dummy_tensor)->node();
     VLOG(1) << Str("====== Graph: ", graph.name(), "=====");

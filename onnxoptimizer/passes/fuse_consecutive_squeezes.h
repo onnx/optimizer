@@ -44,6 +44,10 @@ struct FuseConsecutiveSqueezes final : public PredicateBasedPass {
         !GetValueFromAttrOrInput(n, kaxes, 1, axes_2)) {
       return false;
     }
+    if (std::any_of(axes_1.begin(), axes_1.end(), [](int64_t v) { return v < 0; }) ||
+        std::any_of(axes_2.begin(), axes_2.end(), [](int64_t v) { return v < 0; })) {
+      return false;
+    }
 
     std::vector<int64_t> &ret = composed_axes;
     ret.clear();

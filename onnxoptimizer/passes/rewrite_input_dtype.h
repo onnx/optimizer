@@ -43,8 +43,7 @@ struct RewriteInputDtype final : public FullGraphBasedPass {
       cast->i_(kto, static_cast<int64_t>(
                         ONNX_NAMESPACE::TensorProto_DataType_INT64));
       cast->addInput(value);
-      cast->output()->setUniqueName(
-          ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+      cast->output()->setUniqueName(graph.getNextUniqueName());
 
       for (auto& use : use_list) {
         if (!cast->isBefore(use.user)) {

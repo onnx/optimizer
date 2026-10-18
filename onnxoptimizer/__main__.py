@@ -12,6 +12,5 @@ This enables users to optimize their models.
 
 from . import main
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

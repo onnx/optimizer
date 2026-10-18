@@ -27,7 +27,7 @@ struct SetUniqueNameForNodes final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
-    node->setName(ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+    node->setName(graph.getNextUniqueName());
     destroy_current = NodeDestroyType::DestroyZero;
     return true;
   }

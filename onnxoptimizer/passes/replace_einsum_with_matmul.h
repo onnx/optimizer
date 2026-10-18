@@ -130,8 +130,7 @@ struct ReplaceEinsumWithMatmul final : public PredicateBasedPass {
     if (need_transpose) {
       Node* transpose_node = graph.create(kTranspose, 1);
       transpose_node->addInput(n->inputs()[1]);
-      transpose_node->output()->setUniqueName(
-          ONNX_NAMESPACE::to_string(graph.getNextUnique()));
+      transpose_node->output()->setUniqueName(graph.getNextUniqueName());
       std::vector<int64_t> perm(shape_size, 0);
       for (int i = 0; i < shape_size - 2; ++i) {
         perm[i] = i;
