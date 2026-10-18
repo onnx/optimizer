@@ -107,14 +107,56 @@ struct FuseAttention final : public PredicateBasedPass {
     if (!CheckKind(dim, kSlice)) {
       return false;
     }
-    // The slice must select the last dimension of the shape.
+    // `q` is rank 4 (checked by the caller), so the slice must select exactly
+    // the last dimension: starts=[-1], ends >= 4, optional axes in {0, -1} and
+    // optional steps=1. Anything else could select more than one dimension.
+    const size_t num_inputs = dim->inputs().size();
     int64_t start;
-    if (dim->inputs().size() < 2 ||
-        !FetchSoleIntValueOfTensor(dim->input(1), start) || start != -1) {
+    int64_t end;
+    if (num_inputs < 3 || num_inputs > 5 ||
+        !FetchSoleIntValueOfTensor(dim->input(1), start) || start != -1 ||
+        !FetchSoleIntValueOfTensor(dim->input(2), end) || end < 4) {
       return false;
     }
+    if (num_inputs >= 4) {
+      int64_t axis;
+      if (!FetchSoleIntValueOfTensor(dim->input(3), axis) ||
+          (axis != 0 && axis != -1)) {
+        return false;
+      }
+    }
+    if (num_inputs == 5) {
+      int64_t step;
+      if (!FetchSoleIntValueOfTensor(dim->input(4), step) || step != 1) {
+        return false;
+      }
+    }
     const Node* shape = dim->input(0)->node();
-    return CheckKind(shape, "Shape") && shape->input(0) == q;
+    if (!CheckKind(shape, "Shape") || shape->input(0) != q) {
+      return false;
+    }
+    // The Shape must cover all of `q`; a start/end selection would shift which
+    // dimension the slice reads.
+    const auto range = FetchStartAndEndAttrOfShape(shape, 4);
+    return range.first == 0 && range.second == 4;
+  }
+
+  // Returns true when `v` is a rank-4 `[batch, heads, seq, head_size]` tensor
+  // whose batch and head dimensions are statically known.
+  static bool IsRank4AttentionLayout(const Value* v) {
+    if (!v->has_sizes() || v->sizes().size() != 4) {
+      return false;
+    }
+    const auto& dims = v->sizes();
+    return dims[0].is_int && dims[1].is_int;
+  }
+
+  // Returns true when `a` and `b` agree on their (static) batch and head
+  // dimensions. Attention requires matching batch and head counts for Q, K, V.
+  static bool HaveSameBatchAndHeads(const Value* a, const Value* b) {
+    const auto& da = a->sizes();
+    const auto& db = b->sizes();
+    return da[0].dim == db[0].dim && da[1].dim == db[1].dim;
   }
 
   bool runTransform(Node* n, Graph& graph,
@@ -215,6 +257,14 @@ struct FuseAttention final : public PredicateBasedPass {
       return false;
     }
 
+    // Attention only represents rank-4 [batch, heads, seq, head_size] inputs
+    // with matching batch and head counts. Leave every other graph unchanged.
+    if (!IsRank4AttentionLayout(query) || !IsRank4AttentionLayout(key) ||
+        !IsRank4AttentionLayout(value) || !HaveSameBatchAndHeads(query, key) ||
+        !HaveSameBatchAndHeads(query, value)) {
+      return false;
+    }
+
     // Resolve the effective scale applied to Q @ K^T.
     bool has_scale = false;
     float scale = 0.0f;
@@ -223,6 +273,14 @@ struct FuseAttention final : public PredicateBasedPass {
     if (FetchSoleValueOfTensor(scale_q, scale_q_val) &&
         FetchSoleValueOfTensor(scale_k, scale_k_val)) {
       // Explicit scale: torch emits sqrt(scale) constants on both branches.
+      // Only scalars are accepted: a higher-rank scale would broadcast Q or K^T
+      // to a larger rank than the fused Attention output.
+      auto is_scalar = [](const Value* v) {
+        return v->has_sizes() && v->sizes().empty();
+      };
+      if (!is_scalar(scale_q) || !is_scalar(scale_k)) {
+        return false;
+      }
       has_scale = true;
       scale = scale_q_val * scale_k_val;
     } else if (CheckKind(scale_q, kSqrt) && CheckKind(scale_k, kSqrt) &&

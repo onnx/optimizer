@@ -5105,6 +5105,37 @@ class TestOptimizer(unittest.TestCase):
         optimized_model = self._optimized(model, ["fuse_attention"])
         assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
 
+    def test_fuse_attention_shape_end_selection_no_fuse(self):  # type: () -> None
+        # Shape(q, end=3) followed by Slice(-1) reads dim 2, not head_size, so
+        # the default scale must not be assumed.
+        model = self._make_sdpa_model(mask="none", scale=None)
+        shape_node = [n for n in model.graph.node if n.op_type == "Shape"][0]
+        shape_node.attribute.append(helper.make_attribute("end", 3))
+        optimized_model = self._optimized(model, ["fuse_attention"])
+        assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
+
+    def test_fuse_attention_leading_dim_scale_no_fuse(self):  # type: () -> None
+        # A [1,1,1,1,1] scale would promote Q/K^T to rank 5; the fused Attention
+        # output would then have the wrong rank.
+        model = self._make_sdpa_model(mask="none", scale=0.125)
+        sf = float(np.sqrt(0.125))
+        for i, init in enumerate(model.graph.initializer):
+            if init.name in ("sqf_q", "sqf_k"):
+                model.graph.initializer[i].CopyFrom(
+                    numpy_helper.from_array(
+                        np.full((1, 1, 1, 1, 1), sf, np.float32), init.name
+                    )
+                )
+        optimized_model = self._optimized(model, ["fuse_attention"])
+        assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
+
+    def test_fuse_attention_batch_mismatch_no_fuse(self):  # type: () -> None
+        # Q has batch 1 while K/V have batch 2; Attention needs matching batches.
+        model = self._make_sdpa_model(mask="none", scale=None)
+        model.graph.input[0].type.tensor_type.shape.dim[0].dim_value = 1
+        optimized_model = self._optimized(model, ["fuse_attention"])
+        assert all(n.op_type != "Attention" for n in optimized_model.graph.node)
+
     @unittest.skipUnless(has_torch, "onnx test needs torch")
     def test_fuse_attention_torch_sdpa_export(self):  # type: () -> None
         # Fuse graphs produced by the real torch.onnx exporter.
