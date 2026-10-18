@@ -41,7 +41,7 @@ namespace optimization {
 
 struct EliminateInitializerFromInput final : public FullGraphBasedPass {
   explicit EliminateInitializerFromInput()
-      : FullGraphBasedPass(PassType::Nop, PassEfficiency::Complete,
+      : FullGraphBasedPass(PassType::Other, PassEfficiency::Complete,
                            PassOptimizationType::Compute) {}
 
   std::string getPassName() const override {
@@ -59,9 +59,19 @@ struct EliminateInitializerFromInput final : public FullGraphBasedPass {
     // Walk inputs back to front so erasing an entry keeps the remaining
     // indices valid.
     for (int i = static_cast<int>(graph.inputs().size()) - 1; i >= 0; --i) {
-      if (initializer_names.count(graph.inputs()[i]->uniqueName()) > 0) {
-        graph.eraseInput(i);
+      Value* input = graph.inputs()[i];
+      if (initializer_names.count(input->uniqueName()) == 0) {
+        continue;
       }
+      // Erasing the input directly leaves its consumers (and graph outputs)
+      // pointing at a value with no producer. Move them onto a fresh value that
+      // is backed by the initializer, then drop the input.
+      const std::string name = input->uniqueName();
+      Tensor tensor = *graph.getInitializer(name);
+      graph.eraseInitializer(name);
+      Value* init_value = graph.addInitializerAndCreateValue(tensor);
+      input->replaceAllUsesWith(init_value);
+      graph.eraseInput(i);
     }
 
     // Subgraphs (If/Loop/Scan bodies) can carry the same legacy encoding.
