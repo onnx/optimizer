@@ -5013,8 +5013,8 @@ class TestOptimizer(unittest.TestCase):
         )
         assert [i.name for i in optimized_model.graph.input] == ["X"]
         assert [i.name for i in optimized_model.graph.initializer] == ["W"]
-        if_out = [n for n in optimized_model.graph.node if n.op_type == "If"][0]
-        then_branch = [a.g for a in if_out.attribute if a.name == "then_branch"][0]
+        if_out = next(n for n in optimized_model.graph.node if n.op_type == "If")
+        then_branch = next(a.g for a in if_out.attribute if a.name == "then_branch")
         assert list(then_branch.node[0].input) == ["X", "W"]
 
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
