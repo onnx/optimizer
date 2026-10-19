@@ -2,11 +2,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import io
 import os
 import unittest
 from collections import OrderedDict
-from typing import Optional
 
 import numpy as np  # type: ignore
 
@@ -41,7 +42,7 @@ except ImportError:
 import onnxoptimizer
 
 TensorShape = list[int]
-TensorShapes = dict[Optional[str], TensorShape]
+TensorShapes = dict[str | None, TensorShape]
 
 LATEST_STABLE_OPSET_VERSION = 13
 
@@ -52,7 +53,7 @@ class TestOptimizer(unittest.TestCase):
         model_opt: onnx.ModelProto,
         model_ori: onnx.ModelProto,
         n_times: int = 5,
-        input_shapes: Optional[TensorShapes] = None,
+        input_shapes: TensorShapes | None = None,
         verbose=True,
     ) -> bool:
         """
@@ -65,7 +66,7 @@ class TestOptimizer(unittest.TestCase):
         def get_shape_from_value_info_proto(v: onnx.ValueInfoProto) -> list[int]:
             return [dim.dim_value for dim in v.type.tensor_type.shape.dim]
 
-        def get_value_info_all(m: onnx.ModelProto, name: str) -> Optional[onnx.ValueInfoProto]:
+        def get_value_info_all(m: onnx.ModelProto, name: str) -> onnx.ValueInfoProto | None:
             for v in m.graph.value_info:
                 if v.name == name:
                     return v
@@ -89,7 +90,7 @@ class TestOptimizer(unittest.TestCase):
                 return get_shape_from_value_info_proto(v)
             raise RuntimeError(f'Cannot get shape of "{name}"')
 
-        def get_elem_type(m: onnx.ModelProto, name: str) -> Optional[int]:
+        def get_elem_type(m: onnx.ModelProto, name: str) -> int | None:
             v = get_value_info_all(m, name)
             if v is not None:
                 return v.type.tensor_type.elem_type
@@ -127,7 +128,7 @@ class TestOptimizer(unittest.TestCase):
             )
             return input_names
 
-        def generate_rand_input(model, input_shapes: Optional[TensorShapes] = None):
+        def generate_rand_input(model, input_shapes: TensorShapes | None = None):
             if input_shapes is None:
                 input_shapes = {}
             input_names = get_input_names(model)
@@ -151,7 +152,7 @@ class TestOptimizer(unittest.TestCase):
             return inputs
 
         def forward(
-            model, inputs=None, input_shapes: Optional[TensorShapes] = None
+            model, inputs=None, input_shapes: TensorShapes | None = None
         ) -> dict[str, np.ndarray]:
             if input_shapes is None:
                 input_shapes = {}
@@ -5203,6 +5204,123 @@ class TestOptimizer(unittest.TestCase):
         assert {i.op_type for i in optimized_model.graph.node} == {"Where", "And", "Sign"}
         assert optimized_model.graph.node[0].input == ["A", "Y", "X"]
         assert optimized_model.graph.node[3].input == ["M", "X", "Y"]
+
+    def test_split_preserves_constant_boundary_metadata(self) -> None:
+        from onnx.reference import ReferenceEvaluator
+
+        for shape in [[], [2]]:
+            for typed in [False, True]:
+                with self.subTest(shape=shape, typed=typed):
+                    graph = helper.make_graph(
+                        [
+                            helper.make_node(
+                                "Constant",
+                                [],
+                                ["constant"],
+                                value=numpy_helper.from_array(
+                                    np.ones(shape, dtype=np.float32)
+                                ),
+                            ),
+                            helper.make_node("Add", ["X", "constant"], ["Y"]),
+                        ],
+                        "constant_boundary",
+                        [helper.make_tensor_value_info("X", TensorProto.FLOAT, shape)],
+                        [helper.make_tensor_value_info("Y", TensorProto.FLOAT, shape)],
+                        value_info=(
+                            [
+                                helper.make_tensor_value_info(
+                                    "constant", TensorProto.FLOAT, None
+                                )
+                            ]
+                            if typed
+                            else []
+                        ),
+                    )
+                    model = helper.make_model(
+                        graph,
+                        ir_version=10,
+                        opset_imports=[helper.make_opsetid("", 13)],
+                    )
+                    parts = {}
+                    for pass_name in ["split_init", "split_predict"]:
+                        result = self._optimized(
+                            model, [pass_name], compare_result=False
+                        )
+                        parts[pass_name] = result
+                        interface = (
+                            result.graph.output
+                            if pass_name == "split_init"
+                            else result.graph.input
+                        )
+                        boundary = next(v for v in interface if v.name == "constant")
+                        assert boundary.type.tensor_type.elem_type == TensorProto.FLOAT
+                        assert boundary.type.tensor_type.HasField("shape")
+                        assert [
+                            d.dim_value for d in boundary.type.tensor_type.shape.dim
+                        ] == shape
+                    inputs = {"X": np.ones(shape, dtype=np.float32)}
+                    initialized = ReferenceEvaluator(parts["split_init"]).run(
+                        None, inputs
+                    )
+                    predict_inputs = {
+                        value.name: data
+                        for value, data in zip(
+                            parts["split_init"].graph.output, initialized
+                        )
+                    }
+                    predict_inputs.update(inputs)
+                    actual = ReferenceEvaluator(parts["split_predict"]).run(
+                        None, predict_inputs
+                    )[0]
+                    expected = ReferenceEvaluator(model).run(None, inputs)[0]
+                    assert actual.shape == expected.shape
+                    np.testing.assert_array_equal(actual, expected)
+
+    def test_split_predict_preserves_elem_type(self):
+        """
+        Test that split_predict pass preserves elem_type information
+        when creating new inputs/outputs.
+
+        This reproduces the bug where intermediate values without explicit
+        value_info cause split_predict to generate invalid models with
+        missing elem_type.
+        """
+        # Create a model where intermediate values don't have value_info
+        # but should have their types inferred from inputs
+        model = parser.parse_model("""
+            <
+                ir_version: 7,
+                opset_import:["": 13]
+            >
+            agraph (float[2] X) => (float[2] Y)
+            {
+                # Pure operation that can go to init net
+                one = Constant<value: tensor = float[2] {1.0, 1.0}>()
+                added = Add(X, one)
+
+                # Impure operation that must stay in predict net
+                # This uses 'added', making it a boundary value
+                random = RandomUniform<dtype: int = 1, shape: ints = [2]>()
+                Y = Add(random, added)
+            }
+        """)
+
+        # Optimize with split_predict
+        optimized_model = self._optimized(
+            model, ['split_predict'], False, compare_result=False, check=True)
+
+        # Verify the optimized model is valid
+        # The key check is that checker.check_model() passes,
+        # which is done by _optimized when check=True
+
+        # Additionally verify all inputs have valid elem_type
+        for input_val in optimized_model.graph.input:
+            self.assertIsNotNone(input_val.type)
+            self.assertTrue(input_val.type.HasField('tensor_type'))
+            # elem_type must not be UNDEFINED (TensorProto.UNDEFINED = 0)
+            self.assertNotEqual(input_val.type.tensor_type.elem_type,
+                              TensorProto.UNDEFINED,
+                              f"Input {input_val.name} has UNDEFINED elem_type")
 
 
 if __name__ == "__main__":
