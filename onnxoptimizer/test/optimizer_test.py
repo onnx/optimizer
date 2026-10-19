@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
 import io
 import os
 import unittest
@@ -52,7 +54,7 @@ class TestOptimizer(unittest.TestCase):
         model_opt: onnx.ModelProto,
         model_ori: onnx.ModelProto,
         n_times: int = 5,
-        input_shapes: Optional[TensorShapes] = None,
+        input_shapes: TensorShapes | None = None,
         verbose=True,
     ) -> bool:
         """
@@ -65,7 +67,7 @@ class TestOptimizer(unittest.TestCase):
         def get_shape_from_value_info_proto(v: onnx.ValueInfoProto) -> list[int]:
             return [dim.dim_value for dim in v.type.tensor_type.shape.dim]
 
-        def get_value_info_all(m: onnx.ModelProto, name: str) -> Optional[onnx.ValueInfoProto]:
+        def get_value_info_all(m: onnx.ModelProto, name: str) -> onnx.ValueInfoProto | None:
             for v in m.graph.value_info:
                 if v.name == name:
                     return v
@@ -89,7 +91,7 @@ class TestOptimizer(unittest.TestCase):
                 return get_shape_from_value_info_proto(v)
             raise RuntimeError(f'Cannot get shape of "{name}"')
 
-        def get_elem_type(m: onnx.ModelProto, name: str) -> Optional[int]:
+        def get_elem_type(m: onnx.ModelProto, name: str) -> int | None:
             v = get_value_info_all(m, name)
             if v is not None:
                 return v.type.tensor_type.elem_type
@@ -127,7 +129,7 @@ class TestOptimizer(unittest.TestCase):
             )
             return input_names
 
-        def generate_rand_input(model, input_shapes: Optional[TensorShapes] = None):
+        def generate_rand_input(model, input_shapes: TensorShapes | None = None):
             if input_shapes is None:
                 input_shapes = {}
             input_names = get_input_names(model)
@@ -151,7 +153,7 @@ class TestOptimizer(unittest.TestCase):
             return inputs
 
         def forward(
-            model, inputs=None, input_shapes: Optional[TensorShapes] = None
+            model, inputs=None, input_shapes: TensorShapes | None = None
         ) -> dict[str, np.ndarray]:
             if input_shapes is None:
                 input_shapes = {}
@@ -3340,6 +3342,107 @@ class TestOptimizer(unittest.TestCase):
                 value_info=[helper.make_tensor_value_info("Y", tensor_type, (5, 3, 24, 24))],
             )
             optimized_model = self._optimized(graph, ["fuse_bn_into_conv"])  # noqa
+
+    def test_fuse_bn_into_conv_channel_layouts_and_opsets(self) -> None:
+        rng = np.random.default_rng(0)
+        for op_type in ["Conv", "ConvTranspose"]:
+            for opset in [11, 12, 13]:
+                for group in [1, 2]:
+                    for with_bias in [False, True]:
+                        with self.subTest(
+                            op_type=op_type, opset=opset, group=group, with_bias=with_bias
+                        ):
+                            channels_in, channels_out = 4, 6
+                            weight_shape = (
+                                [channels_out, channels_in // group, 1, 1]
+                                if op_type == "Conv"
+                                else [channels_in, channels_out // group, 1, 1]
+                            )
+                            tensors = {
+                                "W": rng.normal(size=weight_shape).astype(np.float32),
+                                "scale": np.arange(1, channels_out + 1, dtype=np.float32),
+                                "b": rng.normal(size=channels_out).astype(np.float32),
+                                "mean": rng.normal(size=channels_out).astype(np.float32),
+                                "var": np.arange(1, channels_out + 1, dtype=np.float32),
+                            }
+                            conv_inputs = ["X", "W"]
+                            if with_bias:
+                                tensors["B"] = rng.normal(size=channels_out).astype(np.float32)
+                                conv_inputs.append("B")
+                            graph = helper.make_graph(
+                                [
+                                    helper.make_node(op_type, conv_inputs, ["Y"], group=group),
+                                    helper.make_node(
+                                        "BatchNormalization",
+                                        ["Y", "scale", "b", "mean", "var"],
+                                        ["Z"],
+                                    ),
+                                ],
+                                "bn_channel_layout",
+                                [
+                                    helper.make_tensor_value_info(
+                                        "X", TensorProto.FLOAT, [1, channels_in, 2, 2]
+                                    )
+                                ],
+                                [
+                                    helper.make_tensor_value_info(
+                                        "Z", TensorProto.FLOAT, [1, channels_out, 2, 2]
+                                    )
+                                ],
+                                initializer=[
+                                    numpy_helper.from_array(value, name)
+                                    for name, value in tensors.items()
+                                ],
+                            )
+                            optimized = self._optimized(
+                                graph,
+                                ["fuse_bn_into_conv"],
+                                opset_imports=[helper.make_opsetid("", opset)],
+                            )
+                            has_bn = any(
+                                n.op_type == "BatchNormalization" for n in optimized.graph.node
+                            )
+                            assert has_bn == (op_type == "ConvTranspose" and group != 1)
+
+    def test_fuse_bn_into_conv_transpose_simple(self):  # type: () -> None
+        for (tensor_type, np_type) in [(TensorProto.FLOAT, np.float32)]:
+            conv = helper.make_node("ConvTranspose", ["X", "W", "B"], ["Y"], strides=(2, 2))
+            bn = helper.make_node(
+                "BatchNormalization", ["Y", "scale", "b", "mean", "var"], ["Z"]
+            )
+
+            W = np.random.randn(64, 64, 2, 2).astype(np_type) + 2
+            B = np.random.randn(64,).astype(np_type) + 2
+            scale = np.random.randn(64,).astype(np_type) + 2
+            b = np.random.randn(64,).astype(np_type) + 2
+            mean = np.random.randn(64,).astype(np_type) + 2
+            var = np.abs(np.random.randn(64,).astype(np_type)) + 2
+
+            initializers = [
+                helper.make_tensor(
+                    name, tensor_type, npa.shape, npa.tobytes(), raw=True
+                )
+                for name, npa in [
+                    ("W", W),
+                    ("B", B),
+                    ("scale", scale),
+                    ("b", b),
+                    ("mean", mean),
+                    ("var", var),
+                ]
+            ]
+            graph = helper.make_graph(
+                [conv, bn],
+                "test",
+                [helper.make_tensor_value_info("X", tensor_type, (1, 64, 160, 160))],
+                [helper.make_tensor_value_info("Z", tensor_type, (1, 64, 320, 320))],
+                initializer=initializers,
+                value_info=[
+                    helper.make_tensor_value_info("Y", tensor_type, (1, 64, 320, 320))
+                ],
+            )
+
+            optimized_model = self._optimized(graph, ["fuse_bn_into_conv"])
 
     def _internal_test_deadend_elimination(self, fixed):  # type: (bool) -> None
         softmax = helper.make_node("Softmax", ["X"], ["Y"], axis=2)
