@@ -1735,6 +1735,35 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].attribute[0].name == "pads"
         assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
 
+    def test_fuse_pad_into_conv_nonzero_value_opset10(self):
+        pad = helper.make_node(
+            "Pad",
+            ["X"],
+            ["P"],
+            mode="constant",
+            pads=[0, 0, 0, 0, 0, 0, 1, 1],
+            value=2.0,
+        )
+        conv = helper.make_node("Conv", ["P", "Y"], ["Z"])
+        graph = helper.make_graph(
+            [pad, conv],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 2, 2)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 16, 1, 1))],
+        )
+
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_pad_into_conv"],
+            False,
+            opset_imports=[helper.make_opsetid("", 10)],
+        )
+
+        assert optimized_model.graph == graph
+
     def test_fuse_pad_into_conv_no_optional_value(self):  # type: () -> None
         pad = helper.make_node("Pad", ["X", "Pads"], ["P"], mode="constant")
         conv = helper.make_node("Conv", ["P", "Y"], ["Z"])

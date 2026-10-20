@@ -78,27 +78,22 @@ struct FusePadIntoConv final : public PredicateBasedPass {
 #define Define_GetConstantValueFromInput(token) \
   (GetValueFromInput(pad, 2, cv.token) && cv.token == decltype(cv.token)(0))
 
-      do {
-        if (GetValueFromAttr(pad, kvalue, cv.f64) && cv.f64 == double(0)) {
-          break;
-        }
-        if (pad->inputs().size() >= 3) {
-          if (pad->input(2)->uniqueName().empty()) {
-            break;
-          }
-          if (Define_GetConstantValueFromInput(i32) ||
-              Define_GetConstantValueFromInput(i64) ||
-              Define_GetConstantValueFromInput(f32) ||
-              Define_GetConstantValueFromInput(f64) ||
-              Define_GetConstantValueFromInput(ui8) ||
-              Define_GetConstantValueFromInput(i8) ||
-              Define_GetConstantValueFromInput(ui16) ||
-              Define_GetConstantValueFromInput(i16)) {
-            break;
-          }
+      if (pad->hasAttribute(kvalue)) {
+        if (!GetValueFromAttr(pad, kvalue, cv.f64) || cv.f64 != double(0)) {
           return false;
         }
-      } while (0);
+      } else if (pad->inputs().size() >= 3 &&
+                 !pad->input(2)->uniqueName().empty() &&
+                 !(Define_GetConstantValueFromInput(i32) ||
+                   Define_GetConstantValueFromInput(i64) ||
+                   Define_GetConstantValueFromInput(f32) ||
+                   Define_GetConstantValueFromInput(f64) ||
+                   Define_GetConstantValueFromInput(ui8) ||
+                   Define_GetConstantValueFromInput(i8) ||
+                   Define_GetConstantValueFromInput(ui16) ||
+                   Define_GetConstantValueFromInput(i16))) {
+        return false;
+      }
 
 #undef Define_GetConstantValueFromInput
     }
