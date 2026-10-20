@@ -1078,6 +1078,39 @@ class TestOptimizer(unittest.TestCase):
 
         self.assertEqual([n.op_type for n in optimized_model.graph.node], ["Conv", "Add"])
 
+    def test_extract_constant_to_initializer_uses_output_names(self):
+        first = helper.make_node(
+            "Constant",
+            [],
+            ["out_a"],
+            value=helper.make_tensor("out_a", TensorProto.FLOAT, [1], [1.0]),
+        )
+        second = helper.make_node(
+            "Constant",
+            [],
+            ["out_b"],
+            value=helper.make_tensor("out_a", TensorProto.FLOAT, [1], [2.0]),
+        )
+        graph = helper.make_graph(
+            [first, second],
+            "test",
+            [],
+            [
+                helper.make_tensor_value_info("out_a", TensorProto.FLOAT, [1]),
+                helper.make_tensor_value_info("out_b", TensorProto.FLOAT, [1]),
+            ],
+        )
+
+        optimized_model = self._optimized(
+            graph, ["extract_constant_to_initializer"]
+        )
+
+        checker.check_model(optimized_model, full_check=True)
+        assert [tensor.name for tensor in optimized_model.graph.initializer] == [
+            "out_a",
+            "out_b",
+        ]
+
     def test_fuse_concats(self):  # type: () -> None
         nodes = [
             helper.make_node("Concat", ["A", "B", "C"], ["X"], axis=0),

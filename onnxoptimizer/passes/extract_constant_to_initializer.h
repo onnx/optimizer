@@ -37,10 +37,12 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
                     NodeDestroyType& destroy_current) override {
     Tensor t = node->t(kvalue);
     Value* new_init;
+    if (node->output()->has_unique_name()) {
+      t.setName(node->output()->uniqueName());
+    }
     if (node->output()->has_unique_name() &&
         std::find(graph.outputs().rbegin(), graph.outputs().rend(),
                   node->output()) == graph.outputs().rend()) {
-      t.setName(node->output()->uniqueName());
       new_init = graph.addInitializerAndCreateValue(t);
       node->output()->setUniqueName(graph.getNextUniqueName(), false);
     } else {
