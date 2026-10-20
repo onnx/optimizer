@@ -192,6 +192,7 @@ struct CSENodeHash {
     auto string_hasher = std::hash<std::string>();
     auto sym_hasher = std::hash<Symbol>();
     hash_combine(seed, std::hash<uint32_t>(), static_cast<uint32_t>(n->kind()),
+                 string_hasher, n->domain(), string_hasher, n->overload(),
                  size_t_hasher, inputs.size());
     for (const auto& input : inputs) {
       hash_combine(seed, string_hasher, input->uniqueName());
@@ -255,7 +256,9 @@ struct CSEEqual {
     SymbolCompare cmp;
     std::sort(attr_names_l.begin(), attr_names_l.end(), cmp);
     std::sort(attr_names_r.begin(), attr_names_r.end(), cmp);
-    if (lhs->kind() != rhs->kind() || inputs_l.size() != inputs_r.size() ||
+    if (lhs->kind() != rhs->kind() || lhs->domain() != rhs->domain() ||
+        lhs->overload() != rhs->overload() ||
+        inputs_l.size() != inputs_r.size() ||
         outputs_l.size() != outputs_r.size() || attr_names_l != attr_names_r) {
       return false;
     }
