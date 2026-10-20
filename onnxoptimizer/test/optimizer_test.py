@@ -5159,6 +5159,34 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Reshape"
 
+    def test_eliminate_consecutive_reshape_with_zero_dimension(self):
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 2])
+        first_shape = helper.make_tensor(
+            "first_shape", TensorProto.INT64, [2], [3, 2]
+        )
+        second_shape = helper.make_tensor(
+            "second_shape", TensorProto.INT64, [2], [0, -1]
+        )
+        first_reshape = helper.make_node("Reshape", ["X", "first_shape"], ["R"])
+        second_reshape = helper.make_node("Reshape", ["R", "second_shape"], ["Y"])
+        graph = helper.make_graph(
+            [first_reshape, second_reshape],
+            "test",
+            [X],
+            [Y],
+            [first_shape, second_shape],
+        )
+
+        optimized_model = self._optimized(
+            graph, ["eliminate_consecutive_idempotent_ops", "eliminate_deadend"], True
+        )
+
+        assert [node.op_type for node in optimized_model.graph.node] == [
+            "Reshape",
+            "Reshape",
+        ]
+
     def test_eliminate_consecutive_idempotent_sign_op(self):
         model = parser.parse_model("""
                 <

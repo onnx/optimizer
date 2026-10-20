@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <unordered_set>
+
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/pass_util.h"
 
@@ -34,8 +37,27 @@ struct EliminateConsecutiveIdempotentOps final : public PredicateBasedPass {
     }
     return false;
   }
+
+  static bool reshapeFusionSafe(Node* node) {
+    if (node->hasAttribute(Symbol("allowzero")) &&
+        node->i(Symbol("allowzero")) == 1) {
+      return true;
+    }
+    const Tensor* new_shape_tensor = FetchConstantTensor(node->input(1));
+    if (!new_shape_tensor || new_shape_tensor->elem_type() !=
+                                 ONNX_NAMESPACE::TensorProto_DataType_INT64) {
+      return false;
+    }
+    const auto new_shape = ParseTensorData<int64_t>(new_shape_tensor);
+    return std::none_of(new_shape.begin(), new_shape.end(),
+                        [](int64_t dim) { return dim == 0; });
+  }
+
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
+    if (node->kind() == kReshape && !reshapeFusionSafe(node)) {
+      return false;
+    }
     Node* previous_node = node->input(0)->node();
     std::vector<Dimension> sizes = previous_node->input(0)->sizes();
     bool replacing_success =
