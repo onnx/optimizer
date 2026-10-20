@@ -31,6 +31,9 @@ struct FuseQKV final : public PredicateBasedPass {
   bool runTransform(Node* n, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     destroy_current = NodeDestroyType::DestroyZero;
+    if (n->input(0)->node()->kind() == kParam) {
+      return false;
+    }
     const auto uses = n->input(0)->uses();
     for (const auto& use : uses) {
       if (use.offset != 0 || !CheckKind(use.user, kMatMul) ||

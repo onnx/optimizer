@@ -5096,6 +5096,47 @@ class TestOptimizer(unittest.TestCase):
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
+    def test_fuse_qkv_declines_graph_input(self):  # type: () -> None
+        for weight_shape in ([3], [3, 1]):
+            with self.subTest(weight_shape=weight_shape):
+                X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
+                output_shape = [2] if len(weight_shape) == 1 else [2, 1]
+                outputs = [
+                    helper.make_tensor_value_info(name, TensorProto.FLOAT, output_shape)
+                    for name in ("Y1", "Y2", "Y3")
+                ]
+                weights = [
+                    helper.make_tensor(
+                        f"W{i}",
+                        TensorProto.FLOAT,
+                        weight_shape,
+                        np.ones(weight_shape, dtype=np.float32).flatten(),
+                    )
+                    for i in range(3)
+                ]
+                matmuls = [
+                    helper.make_node("MatMul", ["X", f"W{i}"], [f"M{i}"])
+                    for i in range(3)
+                ]
+                identities = [
+                    helper.make_node("Identity", [f"M{i}"], [f"Y{i + 1}"])
+                    for i in range(3)
+                ]
+                graph = helper.make_graph(
+                    matmuls + identities, "test", [X], outputs, weights
+                )
+
+                optimized_model = self._optimized(graph, ["fuse_qkv"], False)
+
+                assert [node.op_type for node in optimized_model.graph.node] == [
+                    "MatMul",
+                    "MatMul",
+                    "MatMul",
+                    "Identity",
+                    "Identity",
+                    "Identity",
+                ]
+
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
                agraph (float[4, 64, 160, 160] X) => (float[1, 1, 1, 4, 64, 1, 160, 160, 1, 1, 1] Z)
