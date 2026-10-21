@@ -33,7 +33,9 @@ struct FuseConsecutiveLogSoftmax final : public PredicateBasedPass {
     Node* log_softmax_node = graph.create(kLogSoftmax, 1);
 
     // log_softmax_node construction
-    log_softmax_node->i_(kaxis, softmax_node->i(kaxis));
+    if (softmax_node->hasAttribute(kaxis)) {
+      log_softmax_node->i_(kaxis, softmax_node->i(kaxis));
+    }
     log_softmax_node->addInput(softmax_node->input());
     log_softmax_node->insertBefore(softmax_node);
     log_softmax_node->output()->setSizes(log_node_output->sizes());
