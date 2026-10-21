@@ -5126,6 +5126,38 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 6
 
+    def test_eliminate_common_subexpression_respects_domain(self):  # type: () -> None
+        local_add = helper.make_function(
+            "local",
+            "Add",
+            ["A", "B"],
+            ["C"],
+            [helper.make_node("Mul", ["A", "B"], ["C"])],
+            [helper.make_opsetid("", 13)],
+        )
+        graph = helper.make_graph(
+            [
+                helper.make_node("Add", ["X", "X"], ["standard"]),
+                helper.make_node("Add", ["X", "X"], ["local"], domain="local"),
+                helper.make_node("Add", ["standard", "local"], ["Y"]),
+            ],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, [])],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, [])],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[
+                helper.make_opsetid("", 13),
+                helper.make_opsetid("local", 1),
+            ],
+            functions=[local_add],
+            ir_version=10,
+        )
+
+        self._optimized(model, ["eliminate_common_subexpression"])
+
     def _test_fuse_qkv_with_opset(self, opset_version):  # type: (int) -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 4096, 320])
         Y1 = helper.make_tensor_value_info("Y1", TensorProto.FLOAT, [1, 4096, 8, 40])
