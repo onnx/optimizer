@@ -4387,6 +4387,54 @@ class TestOptimizer(unittest.TestCase):
 
         assert len(optimized_model.graph.node) == 3
 
+    def test_eliminate_slice_after_shape_respects_shape_start(self):  # type: () -> None
+        cases = [
+            ([0], [1], [1], [3]),
+            ([-1], [-3], [-1], [4, 3]),
+        ]
+        observed = []
+        for starts, ends, steps, expected in cases:
+            graph = helper.make_graph(
+                [
+                    helper.make_node("Shape", ["X"], ["shape"], start=1, end=3),
+                    helper.make_node(
+                        "Slice",
+                        ["shape", "starts", "ends", "axes", "steps"],
+                        ["Y"],
+                    ),
+                ],
+                "shape_slice_start_offset",
+                [helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3, 4])],
+                [
+                    helper.make_tensor_value_info(
+                        "Y", TensorProto.INT64, [len(expected)]
+                    )
+                ],
+                [
+                    helper.make_tensor("starts", TensorProto.INT64, [1], starts),
+                    helper.make_tensor("ends", TensorProto.INT64, [1], ends),
+                    helper.make_tensor("axes", TensorProto.INT64, [1], [0]),
+                    helper.make_tensor("steps", TensorProto.INT64, [1], steps),
+                ],
+            )
+
+            optimized_model = self._optimized(
+                graph,
+                ["eliminate_slice_after_shape"],
+                compare_result=False,
+                opset_imports=[helper.make_opsetid("", 15)],
+            )
+
+            output_name = optimized_model.graph.output[0].name
+            output_initializer = next(
+                tensor
+                for tensor in optimized_model.graph.initializer
+                if tensor.name == output_name
+            )
+            observed.append(list(output_initializer.int64_data))
+
+        self.assertEqual(observed, [expected for _, _, _, expected in cases])
+
     def test_eliminate_shape_slice(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5])
         Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4, 5])
