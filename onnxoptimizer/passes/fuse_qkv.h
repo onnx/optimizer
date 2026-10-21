@@ -47,7 +47,8 @@ struct FuseQKV final : public PredicateBasedPass {
     const Tensor* q_t = FetchConstantTensor(q->input(1));
     const Tensor* k_t = FetchConstantTensor(k->input(1));
     const Tensor* v_t = FetchConstantTensor(v->input(1));
-    if (q_t->sizes() != k_t->sizes() || q_t->sizes() != v_t->sizes()) {
+    if (q_t->sizes().size() < 2 || q_t->sizes() != k_t->sizes() ||
+        q_t->sizes() != v_t->sizes()) {
       return false;
     }
     Node* prev = PrevNode(n, 0);
