@@ -3096,6 +3096,115 @@ class TestOptimizer(unittest.TestCase):
             for n in optimized_model.graph.node
         )
 
+    def test_fuse_consecutive_softmax_log_optional_axis(self) -> None:
+        fuse = ["fuse_consecutive_log_softmax"]
+        for opset in (11, 13, 18):
+            for axis in (None, 1, -1):
+                modes = [(fuse, False)]
+                if axis is None:
+                    modes += [
+                        (None, False),
+                        (fuse, True),
+                        (None, True),
+                        ([*fuse, "eliminate_deadend"], False),
+                    ]
+                for passes, fixed_point in modes:
+                    with self.subTest(
+                        opset=opset, axis=axis, passes=passes, fixed_point=fixed_point
+                    ):
+                        attributes = {} if axis is None else {"axis": axis}
+                        graph = helper.make_graph(
+                            [
+                                helper.make_node("Softmax", ["X"], ["S"], **attributes),
+                                helper.make_node("Log", ["S"], ["Y"]),
+                            ],
+                            "test",
+                            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 3, 4))],
+                            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (2, 3, 4))],
+                        )
+                        optimized = self._optimized(
+                            graph,
+                            passes,
+                            fixed_point=fixed_point,
+                            opset_imports=[helper.make_opsetid("", opset)],
+                        )
+                        checker.check_model(optimized, full_check=True)
+                        shape_inference.infer_shapes(optimized, strict_mode=True)
+                        fused = [
+                            node
+                            for node in optimized.graph.node
+                            if node.op_type == "LogSoftmax"
+                        ]
+                        self.assertEqual(len(fused), 1)
+                        self.assertFalse(
+                            any(node.op_type == "Log" for node in optimized.graph.node)
+                        )
+                        self.assertEqual(
+                            {attr.name: attr.i for attr in fused[0].attribute}, attributes
+                        )
+                        self.assertEqual(list(fused[0].input), ["X"])
+                        self.assertEqual(fused[0].output[0], optimized.graph.output[0].name)
+                        self.assertEqual(
+                            optimized.graph.output[0].type.tensor_type,
+                            graph.output[0].type.tensor_type,
+                        )
+                        self.assertEqual(
+                            [(item.domain, item.version) for item in optimized.opset_import],
+                            [("", opset)],
+                        )
+                        if passes is not None and "eliminate_deadend" in passes:
+                            self.assertEqual(len(optimized.graph.node), 1)
+
+    def test_fuse_consecutive_softmax_log_multiple_uses(self) -> None:
+        for opset in (11, 13, 18):
+            for extra_use in ("softmax_output", "softmax_consumer", "log_consumer"):
+                with self.subTest(opset=opset, extra_use=extra_use):
+                    nodes = [
+                        helper.make_node("Softmax", ["X"], ["S"]),
+                        helper.make_node("Log", ["S"], ["Y"]),
+                    ]
+                    outputs = [
+                        helper.make_tensor_value_info("Y", TensorProto.FLOAT, (2, 3, 4))
+                    ]
+                    if extra_use == "softmax_output":
+                        outputs.append(
+                            helper.make_tensor_value_info("S", TensorProto.FLOAT, (2, 3, 4))
+                        )
+                    else:
+                        source = "S" if extra_use == "softmax_consumer" else "Y"
+                        nodes.append(helper.make_node("Exp", [source], ["E"]))
+                        outputs.append(
+                            helper.make_tensor_value_info("E", TensorProto.FLOAT, (2, 3, 4))
+                        )
+                    graph = helper.make_graph(
+                        nodes,
+                        "test",
+                        [helper.make_tensor_value_info("X", TensorProto.FLOAT, (2, 3, 4))],
+                        outputs,
+                    )
+                    optimized = self._optimized(
+                        graph,
+                        ["fuse_consecutive_log_softmax"],
+                        opset_imports=[helper.make_opsetid("", opset)],
+                    )
+                    if extra_use != "log_consumer":
+                        self.assertEqual(graph, optimized.graph)
+                    else:
+                        fused = next(
+                            node
+                            for node in optimized.graph.node
+                            if node.op_type == "LogSoftmax"
+                        )
+                        consumer = next(
+                            node for node in optimized.graph.node if node.op_type == "Exp"
+                        )
+                        self.assertFalse(
+                            any(node.op_type == "Log" for node in optimized.graph.node)
+                        )
+                        self.assertEqual(list(consumer.input), list(fused.output))
+                        self.assertEqual(optimized.graph.output[0].name, fused.output[0])
+                        self.assertEqual(list(optimized.graph.output), list(graph.output))
+
     @pytest.mark.xfail
     def test_fuse_consecutive_softmax_log_axis(self):  # type: () -> None
         for axis in range(3):
