@@ -5205,6 +5205,33 @@ class TestOptimizer(unittest.TestCase):
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
+    def test_fuse_qkv_does_not_fuse_vector_weights(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
+        Y0 = helper.make_tensor_value_info("Y0", TensorProto.FLOAT, [2])
+        Y1 = helper.make_tensor_value_info("Y1", TensorProto.FLOAT, [2])
+        Y2 = helper.make_tensor_value_info("Y2", TensorProto.FLOAT, [2])
+
+        W0 = helper.make_tensor("W0", TensorProto.FLOAT, [3], [1, 2, 3])
+        W1 = helper.make_tensor("W1", TensorProto.FLOAT, [3], [4, 1, 2])
+        W2 = helper.make_tensor("W2", TensorProto.FLOAT, [3], [2, 5, 1])
+
+        graph = helper.make_graph(
+            [
+                helper.make_node("MatMul", ["X", "W0"], ["Y0"]),
+                helper.make_node("MatMul", ["X", "W1"], ["Y1"]),
+                helper.make_node("MatMul", ["X", "W2"], ["Y2"]),
+            ],
+            "fuse_qkv_vector_weights",
+            [X],
+            [Y0, Y1, Y2],
+            [W0, W1, W2],
+        )
+
+        optimized_model = self._optimized(graph, ["fuse_qkv"])
+
+        assert len(optimized_model.graph.node) == 3
+        assert all(node.op_type == "MatMul" for node in optimized_model.graph.node)
+
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
                agraph (float[4, 64, 160, 160] X) => (float[1, 1, 1, 4, 64, 1, 160, 160, 1, 1, 1] Z)
