@@ -92,8 +92,12 @@ struct FuseAttention final : public PredicateBasedPass {
     if (!CheckKind(n, kDiv)) {
       return false;
     }
+    // The numerator must be a rank-0 scalar: a [1]-shaped constant would add a
+    // leading dimension to the scale and change the output shape.
+    const Tensor* numerator_tensor = FetchConstantTensor(n->input(0));
     float numerator;
-    if (!FetchSoleValueOfTensor(n->input(0), numerator) || numerator != 1.0f) {
+    if (numerator_tensor == nullptr || !numerator_tensor->sizes().empty() ||
+        !FetchSoleValueOfTensor(n->input(0), numerator) || numerator != 1.0f) {
       return false;
     }
     const Node* sqrt = n->input(1)->node();
@@ -149,6 +153,34 @@ struct FuseAttention final : public PredicateBasedPass {
     }
     const auto& dims = v->sizes();
     return dims[0].is_int && dims[1].is_int;
+  }
+
+  // Returns true when the additive mask `m` broadcasts against the score
+  // matrix [batch, heads, seq_q, seq_k] without expanding the batch, head or
+  // seq_q dimensions of `q`. Attention's output shape is fixed by Q, so a mask
+  // that widens any of those dims would change the result. Masks with unknown
+  // or non-static batch/head/seq_q dims are rejected conservatively.
+  static bool MaskDoesNotExpandOutput(const Value* m, const Value* q) {
+    if (!m->has_sizes() || m->sizes().size() > 4 || !q->has_sizes() ||
+        q->sizes().size() != 4) {
+      return false;
+    }
+    const auto& md = m->sizes();
+    const auto& qd = q->sizes();
+    const size_t offset = 4 - md.size();
+    for (size_t i = 0; i < 3; ++i) {
+      if (i < offset) {
+        continue;  // Mask has no such dim and broadcasts in from the left.
+      }
+      const auto& d = md[i - offset];
+      if (d.is_int && d.dim == 1) {
+        continue;
+      }
+      if (!d.is_int || !qd[i].is_int || d.dim != qd[i].dim) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // Returns true when `a` and `b` agree on their (static) batch and head
@@ -262,6 +294,9 @@ struct FuseAttention final : public PredicateBasedPass {
     if (!IsRank4AttentionLayout(query) || !IsRank4AttentionLayout(key) ||
         !IsRank4AttentionLayout(value) || !HaveSameBatchAndHeads(query, key) ||
         !HaveSameBatchAndHeads(query, value)) {
+      return false;
+    }
+    if (attn_mask != nullptr && !MaskDoesNotExpandOutput(attn_mask, query)) {
       return false;
     }
 
