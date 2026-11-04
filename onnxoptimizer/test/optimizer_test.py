@@ -30,6 +30,7 @@ from onnx import (
     shape_inference,
 )
 from onnx.numpy_helper import to_array
+from onnx.reference import ReferenceEvaluator
 
 try:
     import onnxruntime as rt
@@ -4905,6 +4906,271 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 5
         assert optimized_model.graph.node[3].op_type == "MatMul"
         assert optimized_model.graph.node[4].op_type == "Slice"
+
+    def _make_slice_matmul_model(
+        self,
+        x_shape,
+        rhs_shape,
+        axes,
+        slices,
+        *,
+        constant_nodes=False,
+        index_dtype=np.int64,
+        dtype=np.float32,
+        opset=13,
+    ):
+        X = (np.arange(np.prod(x_shape), dtype=dtype) + 1).reshape(x_shape)
+        B = (np.arange(np.prod(rhs_shape), dtype=dtype) + 1).reshape(rhs_shape)
+        constants = {"X": X, "B": B, "axes": np.array(axes, dtype=index_dtype)}
+        dynamic = len(slices) > 1
+        inputs = []
+        cases = []
+        for starts, ends, steps in slices:
+            indices = {
+                "starts": np.array(starts, dtype=index_dtype),
+                "ends": np.array(ends, dtype=index_dtype),
+            }
+            if steps is not None:
+                indices["steps"] = np.array(steps, dtype=index_dtype)
+            selection = [slice(None)] * X.ndim
+            for i, axis in enumerate(axes):
+                step = steps[i] if steps is not None else 1
+                selection[axis] = slice(starts[i], ends[i], step)
+            cases.append((indices if dynamic else {}, [X[tuple(selection)] @ B]))
+        if dynamic:
+            inputs = [
+                helper.make_tensor_value_info(
+                    name, numpy_helper.from_array(value).data_type, value.shape
+                )
+                for name, value in indices.items()
+            ]
+        else:
+            constants.update(indices)
+        nodes = []
+        initializers = []
+        for name, value in constants.items():
+            tensor = numpy_helper.from_array(value, name)
+            if constant_nodes:
+                nodes.append(helper.make_node("Constant", [], [name], value=tensor))
+            else:
+                initializers.append(tensor)
+        slice_inputs = ["X", "starts", "ends", "axes"]
+        if "steps" in indices:
+            slice_inputs.append("steps")
+        nodes.extend(
+            [
+                helper.make_node("Slice", slice_inputs, ["sliced"]),
+                helper.make_node("MatMul", ["sliced", "B"], ["Y"]),
+            ]
+        )
+        expected = cases[0][1][0]
+        output_shape = [None] * expected.ndim if dynamic else expected.shape
+        graph = helper.make_graph(
+            nodes,
+            "slice_matmul",
+            inputs,
+            [
+                helper.make_tensor_value_info(
+                    "Y", numpy_helper.from_array(expected).data_type, output_shape
+                )
+            ],
+            initializers,
+        )
+        # Leave intermediate value_info absent: the guard must use Tensor ranks.
+        model = helper.make_model(
+            graph, opset_imports=[helper.make_opsetid("", opset)], ir_version=10
+        )
+        return model, cases
+
+    def _assert_slice_matmul(self, model, cases, reorder, *, fixed_point=False, passes=None):
+        if passes is None:
+            passes = ["adjust_slice_and_matmul", "eliminate_deadend"]
+        optimized = onnxoptimizer.optimize(model, passes, fixed_point)
+        evaluators = []
+        for candidate in (model, optimized):
+            checker.check_model(candidate, full_check=True)
+            inferred = shape_inference.infer_shapes(candidate, strict_mode=True)
+            checker.check_model(inferred, full_check=True)
+            evaluators.append(ReferenceEvaluator(candidate))
+            if has_ort:
+                options = rt.SessionOptions()
+                options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_DISABLE_ALL
+                options.log_severity_level = 3
+                evaluators.append(
+                    rt.InferenceSession(
+                        candidate.SerializeToString(),
+                        options,
+                        providers=["CPUExecutionProvider"],
+                    )
+                )
+        for feeds, expected_outputs in cases:
+            for evaluator in evaluators:
+                actual_outputs = evaluator.run(None, feeds)
+                self.assertEqual(len(actual_outputs), len(expected_outputs))
+                for actual, expected in zip(actual_outputs, expected_outputs):
+                    self.assertEqual(actual.shape, expected.shape)
+                    np.testing.assert_allclose(actual, expected, rtol=1e-5, atol=1e-6)
+        producer = next(node for node in optimized.graph.node if "Y" in node.output)
+        self.assertEqual(producer.op_type, "Slice" if reorder else "MatMul")
+        if reorder:
+            matmul = next(
+                node for node in optimized.graph.node if node.output[0] == producer.input[0]
+            )
+            self.assertEqual(matmul.op_type, "MatMul")
+            self.assertEqual(list(matmul.input), ["X", "B"])
+        else:
+            self.assertEqual(producer.input[0], "sliced")
+        return optimized
+
+    def test_adjust_slice_and_matmul_broadcast_batch(self):
+        # Reversing a singleton X batch must not reverse the broadcasted B batches.
+        variants = [
+            ((1, 3, 4), (2, 4, 5), [0], [-1], [np.iinfo(np.int64).min], [-1]),
+            ((2, 3, 4), (2, 4, 5), [0], [1], [2], [1]),
+            ((3, 4), (2, 4, 5), [0], [1], [2], [1]),
+            ((2, 3, 4), (2, 1, 4, 5), [-2], [1], [2], [1]),
+            ((2, 3, 4), (1, 4, 5), [-2], [1], [2], [1]),
+        ]
+        for x_shape, rhs_shape, axes, starts, ends, steps in variants:
+            with self.subTest(x_shape=x_shape, rhs_shape=rhs_shape, axes=axes):
+                model, cases = self._make_slice_matmul_model(
+                    x_shape, rhs_shape, axes, [(starts, ends, steps)]
+                )
+                self._assert_slice_matmul(model, cases, False)
+
+    def test_adjust_slice_and_matmul_vector_rhs(self):
+        for axis in (-3, -2, 0):
+            with self.subTest(axis=axis):
+                model, cases = self._make_slice_matmul_model(
+                    (2, 3, 4), (4,), [axis], [([1], [2], [1])]
+                )
+                self._assert_slice_matmul(model, cases, False)
+
+    def test_adjust_slice_and_matmul_matrix_rhs(self):
+        variants = [
+            ((3, 4), [0], [1], [3], None),
+            ((2, 3, 4), [-2], [1], [3], [1]),
+            ((2, 3, 4, 5), [0, -2], [-1, 2], [-3, -4], [-1, -1]),
+            ((3, 4), [0], [1], [1], [1]),
+            ((2, 0), [0], [0], [1], None),
+        ]
+        for constant_nodes in (False, True):
+            for x_shape, axes, starts, ends, steps in variants:
+                with self.subTest(x_shape=x_shape, axes=axes, constant_nodes=constant_nodes):
+                    model, cases = self._make_slice_matmul_model(
+                        x_shape,
+                        (x_shape[-1], 5),
+                        axes,
+                        [(starts, ends, steps)],
+                        constant_nodes=constant_nodes,
+                    )
+                    self._assert_slice_matmul(model, cases, True)
+
+    def test_adjust_slice_and_matmul_dynamic_indices(self):
+        # Reuse one optimized graph for different bounds, directions and empty slices.
+        for constant_nodes in (False, True):
+            for index_dtype in (np.int32, np.int64):
+                for opset in (13, 18):
+                    with self.subTest(
+                        constant_nodes=constant_nodes, index_dtype=index_dtype, opset=opset
+                    ):
+                        model, cases = self._make_slice_matmul_model(
+                            (2, 3, 4),
+                            (4, 5),
+                            [-2],
+                            [
+                                ([0], [2], [1]),
+                                ([-1], [np.iinfo(index_dtype).min], [-1]),
+                                ([1], [1], [1]),
+                            ],
+                            constant_nodes=constant_nodes,
+                            index_dtype=index_dtype,
+                            opset=opset,
+                        )
+                        self._assert_slice_matmul(model, cases, True, fixed_point=True)
+
+    def test_adjust_slice_and_matmul_contracting_axis(self):
+        for x_shape, rhs_shape, axis in (
+            ((3, 4), (2, 5), -1),
+            ((3, 4), (2, 5), 1),
+            ((4,), (2, 5), 0),
+        ):
+            with self.subTest(x_shape=x_shape, axis=axis):
+                model, cases = self._make_slice_matmul_model(
+                    x_shape, rhs_shape, [axis], [([0], [2], [1])]
+                )
+                self._assert_slice_matmul(model, cases, False)
+
+    def test_adjust_slice_and_matmul_shared_inputs(self):
+        for shared in ("axes", "sliced", "X"):
+            with self.subTest(shared=shared):
+                model, cases = self._make_slice_matmul_model(
+                    (2, 3, 4), (4, 5), [-2], [([1], [2], [1])]
+                )
+                X = to_array(next(t for t in model.graph.initializer if t.name == "X"))
+                expected = {
+                    "axes": np.array([-2], dtype=np.int64),
+                    "sliced": X[:, 1:2],
+                    "X": X,
+                }
+                value = expected[shared]
+                model.graph.node.append(helper.make_node("Identity", [shared], ["copy"]))
+                model.graph.output.append(
+                    helper.make_tensor_value_info(
+                        "copy", numpy_helper.from_array(value).data_type, value.shape
+                    )
+                )
+                cases[0][1].append(value)
+                optimized = self._assert_slice_matmul(model, cases, shared != "sliced")
+                original_axes = next(t for t in model.graph.initializer if t.name == "axes")
+                optimized_axes = next(
+                    t for t in optimized.graph.initializer if t.name == "axes"
+                )
+                self.assertEqual(original_axes, optimized_axes)
+
+    def test_adjust_slice_and_matmul_unavailable_constants(self):
+        for kind in ("overridable", "dynamic_axes", "value_ints", "implicit_axes"):
+            with self.subTest(kind=kind):
+                model, cases = self._make_slice_matmul_model(
+                    (3, 4), (4, 5), [0], [([1], [2], None)]
+                )
+                if kind in ("overridable", "dynamic_axes"):
+                    name = "X" if kind == "overridable" else "axes"
+                    tensor = next(t for t in model.graph.initializer if t.name == name)
+                    value = to_array(tensor)
+                    model.graph.input.append(
+                        helper.make_tensor_value_info(name, tensor.data_type, tensor.dims)
+                    )
+                    if kind == "dynamic_axes":
+                        model.graph.initializer.remove(tensor)
+                    else:
+                        value = value + 10
+                        B = to_array(next(t for t in model.graph.initializer if t.name == "B"))
+                        cases[0][1][0] = value[1:2] @ B
+                    cases[0][0][name] = value
+                elif kind == "value_ints":
+                    tensor = next(t for t in model.graph.initializer if t.name == "axes")
+                    model.graph.initializer.remove(tensor)
+                    model.graph.node.insert(
+                        0, helper.make_node("Constant", [], ["axes"], value_ints=[0])
+                    )
+                else:
+                    del model.graph.node[0].input[3:]
+                self._assert_slice_matmul(model, cases, False)
+
+    def test_adjust_slice_and_matmul_call_modes(self):
+        for passes, fixed_point, reorder in (
+            (["adjust_slice_and_matmul"], False, True),
+            (["adjust_slice_and_matmul"], True, True),
+            (onnxoptimizer.get_fuse_and_elimination_passes(), False, False),
+        ):
+            with self.subTest(passes=passes, fixed_point=fixed_point):
+                model, cases = self._make_slice_matmul_model(
+                    (3, 4), (4, 5), [-2], [([1], [2], None)], dtype=np.float64
+                )
+                self._assert_slice_matmul(
+                    model, cases, reorder, passes=passes, fixed_point=fixed_point
+                )
 
     @pytest.mark.xfail
     def test_fuse_consecutive_slices_1(self):  # type: () -> None
