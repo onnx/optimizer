@@ -5662,6 +5662,27 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Reshape"
 
+    def test_eliminate_consecutive_idempotent_reshape_with_zero_dim(self):
+        model = parser.parse_model("""
+                <
+                    ir_version: 7,
+                    opset_import:["": 11]
+                >
+               agraph (float[2, 3, 4] X) => (float[3, 8] Z)
+               {
+                  Shape1 = Constant<value=int64[3]{3, 2, 4}>()
+                  Shape2 = Constant<value=int64[2]{0, -1}>()
+                  T1 = Reshape(X, Shape1)
+                  Z = Reshape(T1, Shape2)
+               }
+            """)
+
+        optimized_model = self._optimized(
+            model, ["eliminate_consecutive_idempotent_ops", "eliminate_deadend"], True
+        )
+
+        assert [node.op_type for node in optimized_model.graph.node].count("Reshape") == 2
+
     def test_eliminate_consecutive_idempotent_sign_op(self):
         model = parser.parse_model("""
                 <

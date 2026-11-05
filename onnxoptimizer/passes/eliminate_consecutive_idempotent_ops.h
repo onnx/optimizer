@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include <algorithm>
+
 #include "onnxoptimizer/pass.h"
 #include "onnxoptimizer/passes/pass_util.h"
 
@@ -34,8 +36,31 @@ struct EliminateConsecutiveIdempotentOps final : public PredicateBasedPass {
     }
     return false;
   }
+
+  // Reshape(Reshape(X, s1), s2) equals Reshape(X, s2) only if no `0` entry
+  // of s2 copies a dimension from the input. With the default allowzero=0,
+  // a `0` copies the dimension from the intermediate tensor, which differs
+  // from the dimension of X once the first Reshape is bypassed.
+  static bool IsReshapeFusionSafe(Node* node) {
+    if (node->hasAttribute(Symbol("allowzero")) &&
+        node->i(Symbol("allowzero")) == 1) {
+      return true;
+    }
+    const Tensor* shape = FetchConstantTensor(node->input(1));
+    if (shape == nullptr ||
+        shape->elem_type() != ONNX_NAMESPACE::TensorProto_DataType_INT64) {
+      return false;
+    }
+    const auto dims = ParseTensorData<int64_t>(shape);
+    return std::none_of(dims.begin(), dims.end(),
+                        [](int64_t d) { return d == 0; });
+  }
+
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
+    if (node->kind() == kReshape && !IsReshapeFusionSafe(node)) {
+      return false;
+    }
     Node* previous_node = node->input(0)->node();
     std::vector<Dimension> sizes = previous_node->input(0)->sizes();
     bool replacing_success =
