@@ -6,6 +6,8 @@
 // ATTENTION: The code in this file is highly EXPERIMENTAL.
 // Adventurous users should note that the APIs will probably change.
 
+#include <map>
+#include <string>
 #include <vector>
 #include "onnxoptimizer/pass.h"
 
@@ -13,7 +15,14 @@ namespace ONNX_NAMESPACE {
 namespace optimization {
 
 // An analysis returned from the run done by a manager
-struct PassManagerAnalysis {};
+struct PassManagerAnalysis {
+  virtual ~PassManagerAnalysis() = default;
+  // Maps a pass name to the total number of positive (successful) transforms
+  // that pass applied to the graph during the run. A pass is only present in
+  // the map when it was given a chance to report a count (i.e. count-based
+  // passes); a value of 0 means the pass ran but did not modify the graph.
+  std::map<std::string, unsigned int> transform_counts;
+};
 struct EmptyPassManagerAnalysis : PassManagerAnalysis {};
 
 // Base class of all PassManager's. The class should be able to add new passes

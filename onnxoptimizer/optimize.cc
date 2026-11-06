@@ -31,15 +31,17 @@ Optimizer::~Optimizer() {}
 
 ModelProto Optimize(
     const ModelProto& mp_in,
-    const std::vector<std::string>& names) {
+    const std::vector<std::string>& names,
+    std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, false);
-  return current_opt.optimize(mp_in);
+  return current_opt.optimize(mp_in, report);
 }
 ModelProto OptimizeFixed(
     const ModelProto& mp_in,
-    const std::vector<std::string>& names) {
+    const std::vector<std::string>& names,
+    std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, true);
-  return current_opt.optimize(mp_in);
+  return current_opt.optimize(mp_in, report);
 }
 const std::vector<std::string> GetAvailablePasses() {
   return Optimizer::passes.GetAvailablePasses();
