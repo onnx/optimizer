@@ -8,10 +8,15 @@ import onnxoptimizer
 import pytest
 from onnx import TensorProto, checker, helper
 
-ort = pytest.importorskip("onnxruntime")
+try:
+    import onnxruntime as ort
+except ImportError:
+    ort = None
 
 
 def _run(model):
+    if ort is None:
+        return None
     options = ort.SessionOptions()
     options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_DISABLE_ALL
     return ort.InferenceSession(
@@ -54,8 +59,9 @@ def test_extract_constant_graph_outputs(attribute_names):
     names = [tensor.name for tensor in optimized.graph.initializer]
     assert len(names) == len(set(names))
     assert set(names) == {"out_a", "out_b"}
-    for actual, original in zip(_run(optimized), expected):
-        np.testing.assert_array_equal(actual, original)
+    if expected is not None:
+        for actual, original in zip(_run(optimized), expected):
+            np.testing.assert_array_equal(actual, original)
 
 
 def test_extract_constant_shared_uses():
@@ -88,5 +94,6 @@ def test_extract_constant_shared_uses():
     checker.check_model(optimized, full_check=True)
     assert [tensor.name for tensor in optimized.graph.initializer] == ["constant"]
     assert [node.input[0] for node in optimized.graph.node] == ["constant", "constant"]
-    for actual, original in zip(_run(optimized), expected):
-        np.testing.assert_array_equal(actual, original)
+    if expected is not None:
+        for actual, original in zip(_run(optimized), expected):
+            np.testing.assert_array_equal(actual, original)
