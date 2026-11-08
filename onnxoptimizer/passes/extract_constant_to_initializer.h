@@ -36,15 +36,18 @@ struct ExtractConstantToInitializer final : public PredicateBasedPass {
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
     Tensor t = node->t(kvalue);
-    Value* new_init;
-    if (node->output()->has_unique_name() &&
-        std::find(graph.outputs().rbegin(), graph.outputs().rend(),
-                  node->output()) == graph.outputs().rend()) {
+    // The attribute TensorProto name is independent of the Constant's output.
+    // In particular, multiple Constants may carry tensors with the same name.
+    // replaceAllUsesWith preserves a graph output's name on the new value.
+    if (node->output()->has_unique_name()) {
       t.setName(node->output()->uniqueName());
-      new_init = graph.addInitializerAndCreateValue(t);
-      node->output()->setUniqueName(graph.getNextUniqueName(), false);
     } else {
-      new_init = graph.addInitializerAndCreateValue(t);
+      t.setName(graph.getNextUniqueName());
+    }
+    Value* new_init = graph.addInitializerAndCreateValue(t);
+    if (std::find(graph.outputs().rbegin(), graph.outputs().rend(),
+                  node->output()) == graph.outputs().rend()) {
+      node->output()->setUniqueName(graph.getNextUniqueName(), false);
     }
     const bool replacing_success =
         tryReplacingAllUsesWith(node->output(), new_init);
