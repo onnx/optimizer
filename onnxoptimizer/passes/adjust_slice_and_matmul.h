@@ -9,9 +9,9 @@
 
 /*
 Before
-  Y = Matmul(Slice(data, start, end, axes) ,rhs) , where data and rhs are
-constant tensor, axes of slice should be constant tensor as well as the value of
-axes should not represent the last shape.
+  Y = Matmul(Slice(data, start, end, axes), rhs), where data and rhs are
+constant tensors, data has rank >= 2, rhs has rank 2, and constant axes do not
+include the last (contracting) axis of data.
 
 After
   Y = Slice(Matmul(data, rhs), start, end, axes) , where Matmul can be folded.
@@ -35,7 +35,6 @@ struct AdjustSliceAndMatmul final : public PredicateBasedPass {
   }
 
   bool patternMatchPredicate(Node* node) override {
-    int64_t slice_axis;
     const bool result = CheckKind(node, kMatMul, 0, kSlice) &&
                         // rhs should be constant tensor
                         IsConstantTensor(node, 1) &&
@@ -50,10 +49,32 @@ struct AdjustSliceAndMatmul final : public PredicateBasedPass {
       return false;
     }
     Node* slice = PrevNode(node, 0);
-    const int64_t rank = slice->input(0)->sizes().size();
-    std::vector<int64_t> axes = GetIntsFromValue(slice->input(3));
-    return std::none_of(axes.cbegin(), axes.cend(), [&rank](int64_t d) {
-      return AddYIfNegative<int64_t>(d, rank) == rank - 1;
+    const Tensor* rhs = FetchConstantTensor(node->input(1));
+    // A matrix RHS preserves data's rank and non-contracting axis positions,
+    // without changing batch pairing when Slice moves after MatMul.
+    if (!rhs || rhs->sizes().size() != 2) {
+      return false;
+    }
+    const Tensor* data = FetchConstantTensor(slice->input(0));
+    if (!data || data->sizes().size() < 2) {
+      return false;
+    }
+    const int64_t rank = static_cast<int64_t>(data->sizes().size());
+    const Tensor* axes_tensor = FetchConstantTensor(slice->input(3));
+    if (!axes_tensor || axes_tensor->sizes().size() != 1) {
+      return false;
+    }
+    std::vector<int64_t> axes;
+    if (!GetValueFromInput(slice->input(3), axes)) {
+      std::vector<int32_t> axes_i32;
+      if (!GetValueFromInput(slice->input(3), axes_i32)) {
+        return false;
+      }
+      axes.assign(axes_i32.cbegin(), axes_i32.cend());
+    }
+    return std::none_of(axes.cbegin(), axes.cend(), [rank](int64_t axis) {
+      return axis < -rank || axis >= rank ||
+             AddYIfNegative<int64_t>(axis, rank) == rank - 1;
     });
   }
 

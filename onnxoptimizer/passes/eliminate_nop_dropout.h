@@ -31,13 +31,14 @@ struct EliminateNopDropout final : public PredicateBasedPass {
 
   bool runTransform(Node* node, Graph& graph,
                     NodeDestroyType& destroy_current) override {
-    // Don't assume that theres only one output.
-    for (size_t i = 0; i < node->outputs().size(); ++i) {
-      const bool replacing_success =
-          tryReplacingAllUsesWith(node->outputs()[i], node->input());
-      if (!replacing_success) {
-        return false;
-      }
+    // The optional mask is all ones, not the data input.
+    if (node->outputs().size() > 1 && !node->outputs()[1]->uses().empty()) {
+      return false;
+    }
+    const bool replacing_success =
+        tryReplacingAllUsesWith(node->outputs()[0], node->input());
+    if (!replacing_success) {
+      return false;
     }
     destroy_current = NodeDestroyType::DestroyOne;
     return true;
