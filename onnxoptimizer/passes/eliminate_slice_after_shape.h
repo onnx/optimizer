@@ -72,7 +72,7 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
       slice_end = std::clamp<int64_t>(slice_end, 0, result_of_shape_op.size());
       for (; slice_start < slice_end; slice_start += slice_step) {
         assert(slice_start < result_of_shape_op.size());
-        const auto &d = dims_of_shape_node_input[slice_start];
+        const auto &d = result_of_shape_op[slice_start];
         if (!d.is_int) {
           return false;
         }
@@ -84,7 +84,7 @@ struct EliminateSliceAfterShape final : public PredicateBasedPass {
       slice_end = std::clamp<int64_t>(slice_end, -1, result_of_shape_op.size());
       for (; slice_start > slice_end; slice_start += slice_step) {
         assert(slice_start < result_of_shape_op.size() && slice_start >= 0);
-        const auto &d = dims_of_shape_node_input[slice_start];
+        const auto &d = result_of_shape_op[slice_start];
         if (!d.is_int) {
           return false;
         }
