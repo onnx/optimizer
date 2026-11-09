@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import numpy as np
-import onnx
-import onnxoptimizer
 import pytest
 from onnx import TensorProto, checker, helper
+
+import onnxoptimizer
 
 try:
     import onnxruntime as ort
