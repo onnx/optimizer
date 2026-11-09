@@ -5662,26 +5662,60 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Constant"
         assert optimized_model.graph.node[1].op_type == "Reshape"
 
-    def test_eliminate_consecutive_idempotent_reshape_with_zero_dim(self):
-        model = parser.parse_model("""
+    def _assert_consecutive_reshapes(self, outer_shape, expected_shape, expected_reshapes):
+        model = parser.parse_model(f"""
                 <
                     ir_version: 7,
                     opset_import:["": 11]
                 >
-               agraph (float[2, 3, 4] X) => (float[3, 8] Z)
-               {
-                  Shape1 = Constant<value=int64[3]{3, 2, 4}>()
-                  Shape2 = Constant<value=int64[2]{0, -1}>()
+               agraph (float[2, 3, 4] X) => (float[{expected_shape[0]}, {expected_shape[1]}] Z)
+               {{
+                  Shape1 = Constant<value=int64[3]{{3, 2, 4}}>()
+                  Shape2 = Constant<value=int64[2]{{{outer_shape[0]}, {outer_shape[1]}}}>()
                   T1 = Reshape(X, Shape1)
                   Z = Reshape(T1, Shape2)
-               }
+               }}
             """)
 
-        optimized_model = self._optimized(
+        optimized = onnxoptimizer.optimize(
             model, ["eliminate_consecutive_idempotent_ops", "eliminate_deadend"], True
         )
 
-        assert [node.op_type for node in optimized_model.graph.node].count("Reshape") == 2
+        x = np.arange(24, dtype=np.float32).reshape(2, 3, 4)
+        expected = x.reshape(3, 2, 4).reshape(expected_shape)
+        evaluators = []
+        for candidate in (model, optimized):
+            checker.check_model(candidate, full_check=True)
+            inferred = shape_inference.infer_shapes(candidate, strict_mode=True)
+            checker.check_model(inferred, full_check=True)
+            evaluators.append(ReferenceEvaluator(candidate))
+            if has_ort:
+                options = rt.SessionOptions()
+                options.graph_optimization_level = rt.GraphOptimizationLevel.ORT_DISABLE_ALL
+                options.log_severity_level = 3
+                evaluators.append(
+                    rt.InferenceSession(
+                        candidate.SerializeToString(),
+                        options,
+                        providers=["CPUExecutionProvider"],
+                    )
+                )
+        for evaluator in evaluators:
+            (actual,) = evaluator.run(None, {"X": x})
+            self.assertEqual(actual.shape, expected.shape)
+            np.testing.assert_array_equal(actual, expected)
+
+        reshapes = [node for node in optimized.graph.node if node.op_type == "Reshape"]
+        self.assertEqual(len(reshapes), expected_reshapes)
+
+    def test_eliminate_consecutive_idempotent_reshape_with_zero_dim(self):
+        # The `0` in the outer shape copies dim 0 of the intermediate tensor (3),
+        # not of X (2), so the two Reshapes must not be fused.
+        self._assert_consecutive_reshapes((0, -1), (3, 8), expected_reshapes=2)
+
+    def test_eliminate_consecutive_idempotent_reshape_without_zero_dim(self):
+        # Without a `0` in the outer shape the pair is still fused.
+        self._assert_consecutive_reshapes((3, -1), (3, 8), expected_reshapes=1)
 
     def test_eliminate_consecutive_idempotent_sign_op(self):
         model = parser.parse_model("""
