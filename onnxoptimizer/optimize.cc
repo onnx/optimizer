@@ -41,6 +41,14 @@ ModelProto OptimizeFixed(
   Optimizer current_opt(names, true);
   return current_opt.optimize(mp_in);
 }
+void OptimizeGraph(Graph& graph, const std::vector<std::string>& names) {
+  Optimizer current_opt(names, false);
+  current_opt.optimize(graph);
+}
+void OptimizeGraphFixed(Graph& graph, const std::vector<std::string>& names) {
+  Optimizer current_opt(names, true);
+  current_opt.optimize(graph);
+}
 const std::vector<std::string> GetAvailablePasses() {
   return Optimizer::passes.GetAvailablePasses();
 }
