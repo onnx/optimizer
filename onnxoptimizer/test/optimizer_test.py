@@ -1547,6 +1547,151 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].op_type == "Conv"
         assert optimized_model.graph.node[1].op_type == "Add"
 
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_with_non_constant_bias(self):
+        nodes = [helper.make_node("Conv", ["X", "Y"], ["Z"]),
+                 helper.make_node("Sin", ["A"], ["B"]),
+                 helper.make_node("Add", ["Z", "B"], ["C"])]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+             helper.make_tensor_value_info(
+                 "Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+             helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1))],
+            [helper.make_tensor_value_info(
+                "C", TensorProto.FLOAT, (1, 16, 1, 1))],
+            value_info=[helper.make_tensor_value_info(
+                "B", TensorProto.FLOAT, (16, 1, 1))]
+        )
+        optimized_model = self._optimized(graph, ["fuse_add_bias_into_conv"])
+
+        assert len(list(optimized_model.graph.node)) == 3
+        assert optimized_model.graph.node[0].op_type == 'Sin'
+        assert optimized_model.graph.node[1].op_type == 'Squeeze'
+        assert optimized_model.graph.node[2].op_type == 'Conv'
+        assert optimized_model.graph.output[0].name == 'C'
+
+    # type: () -> None
+    def test_fuse_add_bias_into_conv_with_quanted_bias(self):
+        nodes = [
+            helper.make_node("Conv", ["X", "Y"], ["Z"]),
+            helper.make_node("QuantizeLinear", ["A", "scale", "zero_point"], ["B"], axis=0),
+            helper.make_node("DequantizeLinear", ["B", "scale", "zero_point"], ["C"], axis=0),
+            helper.make_node("Add", ["Z", "C"], ["D"]),
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 5, 3, 3)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (16, 5, 3, 3)),
+                helper.make_tensor_value_info("A", TensorProto.FLOAT, (16, 1, 1)),
+            ],
+            [helper.make_tensor_value_info("D", TensorProto.FLOAT, (1, 16, 1, 1))],
+            [
+                helper.make_tensor(
+                    "scale",
+                    TensorProto.FLOAT,
+                    dims=(16,),
+                    vals=np.random.rand(16).astype(np.float32).tobytes(),
+                    raw=True,
+                ),
+                helper.make_tensor(
+                    "zero_point",
+                    TensorProto.INT8,
+                    dims=(16,),
+                    vals=np.zeros([16]).astype(np.int8).tobytes(),
+                    raw=True,
+                ),
+            ],
+            value_info=[helper.make_tensor_value_info("C", TensorProto.FLOAT, (16, 1, 1))],
+        )
+        optimized_model = self._optimized(
+            graph, ["fuse_add_bias_into_conv"], opset_imports=[helper.make_opsetid("", 13)]
+        )
+
+        assert len(list(optimized_model.graph.node)) == 4
+        assert optimized_model.graph.node[0].op_type == "QuantizeLinear"
+        assert optimized_model.graph.node[1].op_type == "DequantizeLinear"
+        assert optimized_model.graph.node[2].op_type == "Squeeze"
+        assert optimized_model.graph.node[3].op_type == "Conv"
+        assert optimized_model.graph.output[0].name == "D"
+
+    def test_fuse_add_bias_into_conv_dependency_chain(self) -> None:
+        for bias_shape in [[1], [2, 1, 1]]:
+            with self.subTest(bias_shape=bias_shape):
+                graph = helper.make_graph(
+                    [
+                        helper.make_node("Conv", ["X", "W"], ["conv"]),
+                        helper.make_node("Sin", ["A"], ["sin"]),
+                        helper.make_node("Cos", ["sin"], ["bias"]),
+                        helper.make_node("Add", ["conv", "bias"], ["Y"]),
+                    ],
+                    "bias_dependency_chain",
+                    [
+                        helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 1, 2, 2]),
+                        helper.make_tensor_value_info("A", TensorProto.FLOAT, bias_shape),
+                    ],
+                    [helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 2, 2, 2])],
+                    initializer=[
+                        numpy_helper.from_array(np.ones([2, 1, 1, 1], np.float32), "W")
+                    ],
+                    value_info=[
+                        helper.make_tensor_value_info("bias", TensorProto.FLOAT, bias_shape)
+                    ],
+                )
+                optimized = self._optimized(graph, ["fuse_add_bias_into_conv"])
+                assert all(n.op_type != "Add" for n in optimized.graph.node)
+                assert optimized.graph.node[-1].op_type == "Conv"
+
+    def test_fuse_add_bias_into_conv_per_channel_qdq(self) -> None:
+        for axis in [1, -3]:
+            with self.subTest(axis=axis):
+                graph = helper.make_graph(
+                    [
+                        helper.make_node("Conv", ["X", "W"], ["conv"]),
+                        helper.make_node(
+                            "QuantizeLinear", ["A", "scale", "zero"], ["quantized"], axis=axis
+                        ),
+                        helper.make_node(
+                            "DequantizeLinear",
+                            ["quantized", "scale", "zero"],
+                            ["bias"],
+                            axis=axis,
+                        ),
+                        helper.make_node("Add", ["conv", "bias"], ["Y"]),
+                    ],
+                    "per_channel_bias",
+                    [
+                        helper.make_tensor_value_info("X", TensorProto.FLOAT, [1, 1, 2, 2]),
+                        helper.make_tensor_value_info("A", TensorProto.FLOAT, [1, 2, 1, 1]),
+                    ],
+                    [
+                        helper.make_tensor_value_info("Y", TensorProto.FLOAT, [1, 2, 2, 2]),
+                        helper.make_tensor_value_info(
+                            "quantized", TensorProto.INT8, [1, 2, 1, 1]
+                        ),
+                    ],
+                    initializer=[
+                        numpy_helper.from_array(np.ones([2, 1, 1, 1], np.float32), "W"),
+                        numpy_helper.from_array(np.array([0.1, 0.2], np.float32), "scale"),
+                        numpy_helper.from_array(np.zeros(2, np.int8), "zero"),
+                    ],
+                    value_info=[
+                        helper.make_tensor_value_info(
+                            "bias", TensorProto.FLOAT, [1, 2, 1, 1]
+                        )
+                    ],
+                )
+                optimized = self._optimized(graph, ["fuse_add_bias_into_conv"])
+                assert [n.op_type for n in optimized.graph.node] == [
+                    "QuantizeLinear", "DequantizeLinear", "Squeeze", "Conv"
+                ]
+                assert next(
+                    a.i for a in optimized.graph.node[0].attribute if a.name == "axis"
+                ) == axis
+
     def test_fuse_matmul_add_bias_into_gemm(self):  # type: () -> None
         matmul = helper.make_node("MatMul", ["X", "Y"], ["Z"])
         add = helper.make_node("Add", ["Z", "B"], ["A"])
