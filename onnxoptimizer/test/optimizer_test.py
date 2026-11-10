@@ -2811,6 +2811,75 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].attribute[1].name == "pads"
         assert list(optimized_model.graph.node[0].attribute[1].ints) == [1, 1, 1, 1]
 
+    def _pad_into_avgpool_model(self, opset, pool_attrs, output_len):
+        # X = [3, 9] is padded with one zero at the beginning of the spatial
+        # axis, so the AveragePool sees [0, 3, 9] as real data.
+        pads = [0, 0, 1, 0, 0, 0]
+        if opset <= 10:
+            pad = helper.make_node("Pad", ["X"], ["P"], mode="constant", pads=pads)
+            initializers = []
+        else:
+            pad = helper.make_node("Pad", ["X", "Pads"], ["P"], mode="constant")
+            initializers = [numpy_helper.from_array(np.array(pads, np.int64), "Pads")]
+        avg_pool = helper.make_node(
+            "AveragePool", ["P"], ["Z"], kernel_shape=[3], **pool_attrs
+        )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 1, 2))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 1, output_len))],
+            initializers,
+        )
+        return helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", opset)],
+            ir_version=10,
+        )
+
+    def test_fuse_pad_into_avgpool_existing_pad_excluded_from_count_keeps_values(self):
+        # count_include_pad=0 (also the default) excludes the pool's own
+        # padding from the divisor, while the zero added by Pad is data and
+        # must be counted. A single count_include_pad cannot express both, so
+        # fusing changes the result (onnx/optimizer#347).
+        x = np.array([[[3.0, 9.0]]], dtype=np.float32)
+        # Windows over [0, 3, 9, <pool pad>]: (0+3+9)/3 and (3+9)/2.
+        expected = np.array([[[4.0, 6.0]]], dtype=np.float32)
+        for opset in (10, 13):
+            for pool_attrs in (
+                {"pads": [0, 1]},
+                {"pads": [0, 1], "count_include_pad": 0},
+            ):
+                with self.subTest(opset=opset, pool_attrs=pool_attrs):
+                    model = self._pad_into_avgpool_model(opset, pool_attrs, 2)
+                    optimized_model = self._optimized(model, ["fuse_pad_into_pool"])
+
+                    for candidate in (model, optimized_model):
+                        (actual,) = ReferenceEvaluator(candidate).run(None, {"X": x})
+                        np.testing.assert_array_equal(actual, expected)
+
+    def test_fuse_pad_into_avgpool_without_existing_pad_excluded_from_count(self):
+        # Without nonzero pool padding, counting every padded element is
+        # exactly what Pad + AveragePool computes, so the fusion still applies.
+        x = np.array([[[3.0, 9.0]]], dtype=np.float32)
+        expected = np.array([[[4.0]]], dtype=np.float32)  # (0+3+9)/3
+        for opset in (10, 13):
+            for pool_attrs in ({}, {"count_include_pad": 0, "pads": [0, 0]}):
+                with self.subTest(opset=opset, pool_attrs=pool_attrs):
+                    model = self._pad_into_avgpool_model(opset, pool_attrs, 1)
+                    optimized_model = self._optimized(model, ["fuse_pad_into_pool"])
+
+                    assert [n.op_type for n in optimized_model.graph.node] == ["AveragePool"]
+                    attrs = {
+                        a.name: helper.get_attribute_value(a)
+                        for a in optimized_model.graph.node[0].attribute
+                    }
+                    assert attrs["pads"] == [1, 0]
+                    assert attrs["count_include_pad"] == 1
+                    (actual,) = ReferenceEvaluator(optimized_model).run(None, {"X": x})
+                    np.testing.assert_array_equal(actual, expected)
+
     def test_fuse_pad_into_avgpool_pad_feature_no_fuse_opset10(self):
         pad = helper.make_node(
             "Pad", ["X"], ["P"], mode="constant", pads=[0, 1, 0, 0, 0, 0, 0, 0]

@@ -149,6 +149,22 @@ struct FusePadIntoPool final : public PredicateBasedPass {
       return false;
     }
 
+    // The fused AveragePool must count the zeros added by Pad, which are real
+    // data, so the pass sets count_include_pad=1 below. If the pool already has
+    // nonzero padding excluded from the divisor (count_include_pad=0, also the
+    // default), a single count_include_pad cannot express both rules, so do not
+    // fuse.
+    if (pool->kind() == Symbol("AveragePool") && pool->hasAttribute(kpads)) {
+      const int64_t existing_count_include_pad =
+          GetValueFromAttrWithDefault(pool, kcount_include_pad, int64_t{0});
+      const auto& existing_pool_pads = pool->is(kpads);
+      if (existing_count_include_pad == 0 &&
+          std::any_of(existing_pool_pads.begin(), existing_pool_pads.end(),
+                      [](int64_t local_value) { return local_value != 0; })) {
+        return false;
+      }
+    }
+
     int pool_pads_size = pads_size - 4;
     std::vector<int64_t> pool_pads(pool_pads_size, 0);
     // Fuse into existing padding, if available
