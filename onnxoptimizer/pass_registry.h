@@ -52,6 +52,7 @@
 #include "onnxoptimizer/passes/fuse_pad_into_conv.h"
 #include "onnxoptimizer/passes/fuse_pad_into_pool.h"
 #include "onnxoptimizer/passes/fuse_transpose_into_gemm.h"
+#include "onnxoptimizer/passes/fuse_constant_reshape.h"
 #include "onnxoptimizer/passes/lift_lexical_references.h"
 #include "onnxoptimizer/passes/nop.h"
 #include "onnxoptimizer/passes/rename_input_output.h"
@@ -94,6 +95,7 @@ struct GlobalPassRegistry {
     registerPass<EliminateShapeGather>();
     registerPass<EliminateSliceAfterShape>();
     registerPass<EliminateNopTranspose>();
+    registerPass<FuseConstantReshape>();
     registerPass<FuseAddBiasIntoConv>();
     registerPass<FuseBNIntoConv>();
     registerPass<FuseConsecutiveConcats>();
