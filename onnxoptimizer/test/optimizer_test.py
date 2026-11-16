@@ -5944,6 +5944,61 @@ class TestOptimizer(unittest.TestCase):
         assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
         assert any(node.op_type == "Erf" for node in optimized_model.graph.node)
 
+    def test_fuse_gelu_does_not_fuse_higher_rank_constant(self):  # type: () -> None
+        # A rank-4 constant broadcasts the rank-3 input to a rank-4 result, which
+        # Gelu(x) (rank 3) cannot reproduce, so the decomposition must be kept.
+        graph = self._make_gelu_graph()
+        for i, init in enumerate(graph.initializer):
+            if init.name == "sqrt2":
+                graph.initializer[i].CopyFrom(
+                    helper.make_tensor("sqrt2", TensorProto.FLOAT, [1, 1, 1, 1], [np.sqrt(2.0)])
+                )
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_gelu", "eliminate_deadend"],
+            opset_imports=[helper.make_opsetid("", 20)],
+            check=False,
+            compare_result=False,
+        )
+        assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
+        assert any(node.op_type == "Erf" for node in optimized_model.graph.node)
+
+    def test_fuse_gelu_fuses_same_rank_unit_constants(self):  # type: () -> None
+        # Unit-dimension constants of the same rank as x keep the output shape
+        # equal to x's, so the fusion still applies.
+        graph = self._make_gelu_graph()
+        for i, init in enumerate(graph.initializer):
+            if init.name == "sqrt2":
+                graph.initializer[i].CopyFrom(
+                    helper.make_tensor("sqrt2", TensorProto.FLOAT, [1, 1, 1], [np.sqrt(2.0)])
+                )
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_gelu", "eliminate_deadend"],
+            opset_imports=[helper.make_opsetid("", 20)],
+        )
+        assert [node.op_type for node in optimized_model.graph.node] == ["Gelu"]
+
+    def test_fuse_gelu_does_not_fuse_custom_domain_ops(self):  # type: () -> None
+        # An Erf in a custom domain is a different operator, even though its
+        # name matches the standard one.
+        graph = self._make_gelu_graph()
+        for node in graph.node:
+            if node.op_type == "Erf":
+                node.domain = "custom.domain"
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_gelu", "eliminate_deadend"],
+            opset_imports=[
+                helper.make_opsetid("", 20),
+                helper.make_opsetid("custom.domain", 1),
+            ],
+            check=False,
+            compare_result=False,
+        )
+        assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
+        assert any(node.op_type == "Erf" for node in optimized_model.graph.node)
+
     @unittest.skipUnless(has_torch, "This test needs torch")
     def test_fuse_gelu_torch_exported(self):  # type: () -> None
         # Exercise the pass against a real graph produced by torch.onnx. With
