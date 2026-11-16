@@ -1,0 +1,25 @@
+# Copyright (c) ONNX Project Contributors
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[workspace]
+authors = ["ONNX Optimizer Authors <onnx-technical-discuss@lists.lfai.foundation>"]
+channels = ["conda-forge"]
+description = "Development tools for ONNX Optimizer"
+name = "onnxoptimizer"
+platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+
+[tasks.lint]
+cmd = "ruff check --exclude third_party ."
+
+[tasks.typecheck]
+cmd = "python tools/mypy-onnx.py"
+
+[tasks.clang-format-check]
+cmd = "clang-format --dry-run --Werror"
+
+[dependencies]
+clang-format = "==18.1.8"
+mypy = "==1.18.2"
+python = "3.12.*"
+ruff = "==0.14.6"
