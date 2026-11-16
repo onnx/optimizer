@@ -79,8 +79,11 @@ struct FusePadIntoConv final : public PredicateBasedPass {
   (GetValueFromInput(pad, 2, cv.token) && cv.token == decltype(cv.token)(0))
 
       do {
-        if (GetValueFromAttr(pad, kvalue, cv.f64) && cv.f64 == double(0)) {
-          break;
+        if (GetValueFromAttr(pad, kvalue, cv.f64)) {
+          if (cv.f64 == double(0)) {
+            break;
+          }
+          return false;
         }
         if (pad->inputs().size() >= 3) {
           if (pad->input(2)->uniqueName().empty()) {
