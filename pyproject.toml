@@ -44,6 +44,11 @@ testpaths = [
 [tool.mypy]
 # follow-imports = silent  # TODO remove this
 mypy_path = "stubs:third_party/onnx/third_party/pybind11"
+# Type-check first-party runtime and tooling code; tests are not typed yet.
+exclude = [
+  "^onnxoptimizer/test/",
+  "^third_party/",
+]
 strict_optional = true
 warn_return_any = true
 warn_no_return = true
@@ -64,7 +69,11 @@ module = "onnxoptimizer.*"
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = "onnx_opt_cpp2py_export"
+module = [
+  "onnx_opt_cpp2py_export",
+  "onnxoptimizer.onnx_opt_cpp2py_export",
+  "onnxoptimizer.version",
+]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

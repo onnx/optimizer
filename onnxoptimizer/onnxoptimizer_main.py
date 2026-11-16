@@ -10,6 +10,8 @@
 This enables users to optimize their models.
 """
 
+from __future__ import annotations
+
 import argparse
 import pathlib
 import sys
@@ -22,7 +24,7 @@ import onnxoptimizer
 _USAGE = "python -m onnxoptimizer input_model.onnx output_model.onnx "
 
 
-def format_argv(argv):
+def format_argv(argv: list[str]) -> list[str]:
     argv_ = argv[1:]
     if len(argv_) == 1:
         return argv_
@@ -33,7 +35,7 @@ def format_argv(argv):
         sys.exit(1)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         prog="onnxoptimizer", usage=_USAGE, description="onnxoptimizer command-line api"
     )

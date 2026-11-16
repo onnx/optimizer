@@ -4,25 +4,18 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-import os
+from __future__ import annotations
+
+import pathlib
 import subprocess
+import sys
 
 
-def main():  # type: () -> None
-    try:
-        root_folder = os.path.realpath(
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        )
-        os.chdir(root_folder)
-
-        subprocess.check_call(["mypy", "."])
-        subprocess.check_call(["mypy", "--py2", "."])
-
-        exit(0)
-    except subprocess.CalledProcessError:
-        # Catch this exception because we don't want it to output a backtrace that would clutter the mypy output
-        exit(1)
+def main() -> int:
+    root_folder = pathlib.Path(__file__).resolve().parents[1]
+    result = subprocess.run([sys.executable, "-m", "mypy", "."], cwd=root_folder, check=False)
+    return result.returncode
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
