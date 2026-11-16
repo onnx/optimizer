@@ -30,6 +30,7 @@ from onnx import (
     shape_inference,
 )
 from onnx.numpy_helper import to_array
+from onnx.reference import ReferenceEvaluator
 
 try:
     import onnxruntime as rt
@@ -4938,6 +4939,17 @@ class TestOptimizer(unittest.TestCase):
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
+    def _assert_checked_and_equivalent(self, original, optimized, feeds):
+        # The legacy model lists W as a graph input too, but ONNX treats the
+        # initializer as its value, so feeding only `feeds` must give the same
+        # outputs before and after the pass. Also run the checker on the result.
+        onnx.checker.check_model(optimized, full_check=True)
+        expected = ReferenceEvaluator(original).run(None, feeds)
+        actual = ReferenceEvaluator(optimized).run(None, feeds)
+        assert len(expected) == len(actual)
+        for e, a in zip(expected, actual):
+            np.testing.assert_allclose(a, e, rtol=1e-6, atol=1e-6)
+
     def test_eliminate_initializer_from_input_redirects_uses(self):  # type: () -> None
         # IR<4 models list the weight as a graph input too. The weight feeds a
         # MatMul and is also a graph output, so both uses must move onto the
@@ -4959,13 +4971,15 @@ class TestOptimizer(unittest.TestCase):
             opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
             ir_version=3,
         )
-        optimized_model = self._optimized(
-            model, ["eliminate_initializer_from_input"], compare_result=False
+        optimized_model = onnxoptimizer.optimize(
+            model, ["eliminate_initializer_from_input"]
         )
         assert [i.name for i in optimized_model.graph.input] == ["X"]
         assert [i.name for i in optimized_model.graph.initializer] == ["W"]
         assert list(optimized_model.graph.node[0].input) == ["X", "W"]
         assert [o.name for o in optimized_model.graph.output] == ["Y", "W"]
+        x = np.random.rand(2, 2).astype(np.float32)
+        self._assert_checked_and_equivalent(model, optimized_model, {"X": x})
 
     def test_eliminate_initializer_from_input_captured_weight(self):  # type: () -> None
         # A subgraph reads the legacy weight from the outer scope, and the weight
@@ -5008,14 +5022,16 @@ class TestOptimizer(unittest.TestCase):
             opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
             ir_version=3,
         )
-        optimized_model = self._optimized(
-            model, ["eliminate_initializer_from_input"], compare_result=False
+        optimized_model = onnxoptimizer.optimize(
+            model, ["eliminate_initializer_from_input"]
         )
         assert [i.name for i in optimized_model.graph.input] == ["X"]
         assert [i.name for i in optimized_model.graph.initializer] == ["W"]
         if_out = next(n for n in optimized_model.graph.node if n.op_type == "If")
         then_branch = next(a.g for a in if_out.attribute if a.name == "then_branch")
         assert list(then_branch.node[0].input) == ["X", "W"]
+        x = np.random.rand(2, 2).astype(np.float32)
+        self._assert_checked_and_equivalent(model, optimized_model, {"X": x})
 
     def test_fuse_consecutive_unsqueezes_opset13(self):  # type: () -> None
         graph = parser.parse_graph("""
