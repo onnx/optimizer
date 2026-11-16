@@ -18,6 +18,9 @@ The primary motivation is to share work between the many ONNX backend implementa
 
 You may be interested in invoking the provided passes, or in implementing new ones (or both).
 
+If you want to understand the implementation or contribute a pass, start with
+the [optimizer internals and pass contribution guide](docs/optimizer-internals.md).
+
 ## Installation
 
 You can install onnxoptimizer from PyPI:
