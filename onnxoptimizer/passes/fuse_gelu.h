@@ -67,6 +67,36 @@ struct FuseGelu final : public PredicateBasedPass {
     return n->output()->uses().size() == 1;
   }
 
+  // Only the default (standard) domain is fused. A custom-domain node that
+  // happens to be named Erf, Div, Add or Mul is a different operator.
+  static bool InDefaultDomain(const Node* n) {
+    return n->domain().empty();
+  }
+
+  // The constants broadcast against `x`. A constant is only accepted when that
+  // broadcast cannot change the output shape: it is a scalar, or every dim is 1
+  // and its rank does not exceed rank(x). Otherwise the decomposition can
+  // produce a higher-rank output than Gelu(x), which has x's shape.
+  static bool KeepsOutputShapeOf(const Value* constant, const Value* x) {
+    const Tensor* t = FetchConstantTensor(constant);
+    if (!t) {
+      return false;
+    }
+    const auto& dims = t->sizes();
+    if (dims.empty()) {
+      return true;
+    }
+    if (!x->has_sizes() || dims.size() > x->sizes().size()) {
+      return false;
+    }
+    for (int64_t d : dims) {
+      if (d != 1) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool patternMatchPredicate(Node* node) override {
     // Anchor on the final `Mul` (out = mul * 0.5).
     return CheckKind(node, kMul) && node->inputs().size() == 2;
@@ -83,12 +113,14 @@ struct FuseGelu final : public PredicateBasedPass {
 
     // out = Mul(mul0, 0.5): locate the 0.5 scalar and the inner `Mul` node.
     Node* mul0 = nullptr;
+    Value* half = nullptr;
     for (int i = 0; i < 2; ++i) {
       Value* a = mul1->input(i);
       Value* b = mul1->input(1 - i);
       if (IsScalarEqualTo(b, 0.5) && CheckKind(a, kMul) &&
           a->node()->inputs().size() == 2 && SingleUse(a->node())) {
         mul0 = a->node();
+        half = b;
         break;
       }
     }
@@ -115,12 +147,14 @@ struct FuseGelu final : public PredicateBasedPass {
 
     // add = Add(erf, 1): locate the `Erf` node and check the addend.
     Node* erf = nullptr;
+    Value* one = nullptr;
     for (int i = 0; i < 2; ++i) {
       Value* a = add->input(i);
       Value* b = add->input(1 - i);
       if (CheckKind(a, "Erf") && a->node()->inputs().size() == 1 &&
           SingleUse(a->node()) && IsScalarEqualTo(b, 1.0)) {
         erf = a->node();
+        one = b;
         break;
       }
     }
@@ -134,8 +168,20 @@ struct FuseGelu final : public PredicateBasedPass {
     if (!CheckKind(div, kDiv) || div->inputs().size() != 2 || !SingleUse(div)) {
       return false;
     }
-    if (div->input(0) != x ||
-        !IsScalarEqualTo(div->input(1), std::sqrt(2.0))) {
+    Value* sqrt2 = div->input(1);
+    if (div->input(0) != x || !IsScalarEqualTo(sqrt2, std::sqrt(2.0))) {
+      return false;
+    }
+
+    // Only the standard-domain operators are fused, and every constant must
+    // leave the output shape equal to x's (see KeepsOutputShapeOf).
+    if (!InDefaultDomain(mul1) || !InDefaultDomain(mul0) ||
+        !InDefaultDomain(add) || !InDefaultDomain(erf) ||
+        !InDefaultDomain(div)) {
+      return false;
+    }
+    if (!KeepsOutputShapeOf(half, x) || !KeepsOutputShapeOf(one, x) ||
+        !KeepsOutputShapeOf(sqrt2, x)) {
       return false;
     }
 
