@@ -5871,6 +5871,100 @@ class TestOptimizer(unittest.TestCase):
             self._test_fuse_qkv_with_opset(opset_version)
         self._test_fuse_qkv_with_opset(LATEST_STABLE_OPSET_VERSION)
 
+    def _assert_checked_and_equivalent(self, original, optimized, feeds):
+        # The legacy model lists W as a graph input too, but ONNX treats the
+        # initializer as its value, so feeding only `feeds` must give the same
+        # outputs before and after the pass. Also run the checker on the result.
+        onnx.checker.check_model(optimized, full_check=True)
+        expected = ReferenceEvaluator(original).run(None, feeds)
+        actual = ReferenceEvaluator(optimized).run(None, feeds)
+        assert len(expected) == len(actual)
+        for e, a in zip(expected, actual):
+            np.testing.assert_allclose(a, e, rtol=1e-6, atol=1e-6)
+
+    def test_eliminate_initializer_from_input_redirects_uses(self):  # type: () -> None
+        # IR<4 models list the weight as a graph input too. The weight feeds a
+        # MatMul and is also a graph output, so both uses must move onto the
+        # initializer-backed value instead of a removed input.
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        weight = numpy_helper.from_array(np.ones((2, 2), np.float32), "W")
+        graph = helper.make_graph(
+            [helper.make_node("MatMul", ["X", "W"], ["Y"])],
+            "legacy",
+            [vi("X", (2, 2)), vi("W", (2, 2))],
+            [vi("Y", (2, 2)), vi("W", (2, 2))],
+            [weight],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=3,
+        )
+        optimized_model = onnxoptimizer.optimize(
+            model, ["eliminate_initializer_from_input"]
+        )
+        assert [i.name for i in optimized_model.graph.input] == ["X"]
+        assert [i.name for i in optimized_model.graph.initializer] == ["W"]
+        assert list(optimized_model.graph.node[0].input) == ["X", "W"]
+        assert [o.name for o in optimized_model.graph.output] == ["Y", "W"]
+        x = np.random.rand(2, 2).astype(np.float32)
+        self._assert_checked_and_equivalent(model, optimized_model, {"X": x})
+
+    def test_eliminate_initializer_from_input_captured_weight(self):  # type: () -> None
+        # A subgraph reads the legacy weight from the outer scope, and the weight
+        # is not a graph output. The captured use must be redirected too.
+        def vi(name, shape):
+            return helper.make_tensor_value_info(name, TensorProto.FLOAT, shape)
+
+        weight = numpy_helper.from_array(np.ones((2, 2), np.float32), "W")
+        then_graph = helper.make_graph(
+            [helper.make_node("MatMul", ["X", "W"], ["T"])],
+            "then",
+            [],
+            [vi("T", (2, 2))],
+        )
+        else_graph = helper.make_graph(
+            [helper.make_node("Identity", ["X"], ["E"])],
+            "else",
+            [],
+            [vi("E", (2, 2))],
+        )
+        cond = helper.make_node(
+            "Constant",
+            [],
+            ["C"],
+            value=helper.make_tensor("C", TensorProto.BOOL, [], [True]),
+        )
+        if_node = helper.make_node(
+            "If", ["C"], ["Y"], then_branch=then_graph, else_branch=else_graph
+        )
+        graph = helper.make_graph(
+            [cond, if_node],
+            "legacy_if",
+            [vi("X", (2, 2)), vi("W", (2, 2))],
+            [vi("Y", (2, 2))],
+            [weight],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=3,
+        )
+        optimized_model = onnxoptimizer.optimize(
+            model, ["eliminate_initializer_from_input"]
+        )
+        assert [i.name for i in optimized_model.graph.input] == ["X"]
+        assert [i.name for i in optimized_model.graph.initializer] == ["W"]
+        if_out = next(n for n in optimized_model.graph.node if n.op_type == "If")
+        then_branch = next(a.g for a in if_out.attribute if a.name == "then_branch")
+        assert list(then_branch.node[0].input) == ["X", "W"]
+        x = np.random.rand(2, 2).astype(np.float32)
+        self._assert_checked_and_equivalent(model, optimized_model, {"X": x})
+
     def test_fuse_qkv_does_not_fuse_vector_weights(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 3])
         Y0 = helper.make_tensor_value_info("Y0", TensorProto.FLOAT, [2])

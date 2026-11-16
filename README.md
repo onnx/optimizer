@@ -66,6 +66,17 @@ optional arguments:
                         list of optimization passes name, if no set, fuse_and_elimination_passes will be used
   --fixed_point         fixed point
 ```
+
+## Passes that change model semantics
+
+Most passes preserve the model's behavior exactly. `eliminate_initializer_from_input` is an exception and is **not** part of the default pass set; request it explicitly with `-p` or `passes=`.
+
+It targets legacy (IR version < 4) models that list every initializer as a graph input too. Under ONNX semantics such an input is an overridable default, so the optimizer cannot treat the weight as a constant. The pass removes the redundant graph input and keeps the initializer, so constant-dependent passes (for example `fuse_bn_into_conv`) can apply. The trade-off: the weight is no longer an overridable input. Callers that supplied a different value for it at runtime will get the stored initializer value instead. Place the pass before the constant-dependent fusions:
+
+```
+python -m onnxoptimizer input_model.onnx output_model.onnx -p eliminate_initializer_from_input fuse_bn_into_conv
+```
+
 ## Roadmap
 
 * More built-in pass
