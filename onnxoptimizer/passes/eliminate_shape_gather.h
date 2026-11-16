@@ -45,16 +45,23 @@ struct EliminateShapeGather final : public PredicateBasedPass {
     indices_val = AddYIfNegative(indices_val, end - start);
     indices_val += start;
 
-    ONNX_ASSERT(indices_val < dims.size());
+    // The Gather index may not resolve to a valid axis of the shaped tensor:
+    // an index beyond the rank, or a negative result after the adjustment
+    // above. Skipping the rewrite (rather than asserting) lets simplification
+    // continue on dynamic-shape graphs instead of aborting the process. Note
+    // dims.size() is unsigned, so a negative indices_val must be rejected
+    // before the comparison to avoid it promoting to a large unsigned value.
+    if (indices_val < 0 ||
+        indices_val >= static_cast<int64_t>(dims.size())) {
+      return false;
+    }
 
     if (!dims[indices_val].is_int || dims[indices_val].dim == -1) {
       return false;
     }
 
     Tensor tensor;
-    if (indices->sizes().size() == 1) {
-      tensor.sizes().push_back(1);
-    }
+    tensor.sizes() = FetchConstantTensor(indices)->sizes();
     tensor.elem_type() = ONNX_NAMESPACE::TensorProto_DataType_INT64;
     tensor.int64s().push_back(dims[indices_val].dim);
     Value *value = graph.addInitializerAndCreateValue(tensor);
