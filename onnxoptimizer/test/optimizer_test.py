@@ -6,6 +6,7 @@ import io
 import os
 import unittest
 from collections import OrderedDict
+from unittest import mock
 from typing import Optional
 
 import numpy as np  # type: ignore
@@ -430,6 +431,67 @@ class TestOptimizer(unittest.TestCase):
         )
         # Direct indexing: a missing entry must fail rather than default to 0.
         assert report["eliminate_identity"] == 0
+
+    @staticmethod
+    def _identity_chain_model(length):  # type: (int) -> ModelProto
+        # X -> Identity -> Identity -> ... -> Y, `length` Identity nodes.
+        names = ["X"] + [f"t{i}" for i in range(length - 1)] + ["Y"]
+        nodes = [
+            helper.make_node("Identity", [names[i]], [names[i + 1]])
+            for i in range(length)
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "identity_chain",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,))],
+        )
+        return helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+
+    def test_optimize_return_report_fixed_point(self):  # type: () -> None
+        # The fixed-point manager runs the pass list repeatedly. The reported
+        # count must match the single-run count: the first round removes all
+        # Identity nodes and later rounds add nothing, so nothing is
+        # double-counted.
+        model = self._identity_chain_model(3)
+        _, single = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        optimized_model, fixed = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], fixed_point=True, return_report=True
+        )
+        # The last Identity feeds the graph output, so it is kept: 3 nodes -> 1.
+        assert len(optimized_model.graph.node) == 1
+        assert fixed["eliminate_identity"] == 2
+        assert fixed["eliminate_identity"] == single["eliminate_identity"]
+
+    def test_optimize_return_report_external_data_fallback(self):  # type: () -> None
+        # Models too large for one protobuf message take the external-data path
+        # (the ValueError fallback in optimize()). Force that fallback here so the
+        # path-based report functions are exercised with return_report=True.
+        model = self._identity_chain_model(2)
+        for fixed_point, report_fn in [
+            (False, "optimize_report"),
+            (True, "optimize_fixedpoint_report"),
+        ]:
+            with mock.patch.object(
+                onnxoptimizer._c, report_fn, side_effect=ValueError("forced")
+            ):
+                optimized_model, report = onnxoptimizer.optimize(
+                    model,
+                    ["eliminate_identity"],
+                    fixed_point=fixed_point,
+                    return_report=True,
+                )
+            assert isinstance(optimized_model, ModelProto)
+            # Identity -> graph output is kept, so 2 nodes -> 1 with one removal.
+            assert len(optimized_model.graph.node) == 1
+            assert report["eliminate_identity"] == 1
 
     # type: () -> None
     def test_eliminate_identity_both_graph_input_and_output(self):
