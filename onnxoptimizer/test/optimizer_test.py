@@ -4996,6 +4996,21 @@ class TestOptimizer(unittest.TestCase):
         )
         assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
 
+    def test_fuse_gelu_does_not_fuse_near_miss_constant(self):  # type: () -> None
+        # A constant that is close to 1.0 but not equal to it (1.00005 here) is a
+        # different function from GELU, so the decomposition must be preserved.
+        graph = self._make_gelu_graph()
+        for init in graph.initializer:
+            if init.name == "one":
+                init.CopyFrom(helper.make_tensor("one", TensorProto.FLOAT, [], [1.00005]))
+        optimized_model = self._optimized(
+            graph,
+            ["fuse_gelu", "eliminate_deadend"],
+            opset_imports=[helper.make_opsetid("", 20)],
+        )
+        assert all(node.op_type != "Gelu" for node in optimized_model.graph.node)
+        assert any(node.op_type == "Erf" for node in optimized_model.graph.node)
+
     @unittest.skipUnless(has_torch, "This test needs torch")
     def test_fuse_gelu_torch_exported(self):  # type: () -> None
         # Exercise the pass against a real graph produced by torch.onnx. With

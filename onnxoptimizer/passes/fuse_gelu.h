@@ -44,16 +44,19 @@ struct FuseGelu final : public PredicateBasedPass {
     return "fuse_gelu";
   }
 
-  // Returns true when `v` is a constant tensor holding a single float or double
-  // element approximately equal to `target`.
-  static bool IsScalarCloseTo(const Value* v, double target) {
+  // Returns true when `v` is a constant tensor holding a single element that is
+  // exactly `target` in the tensor's own precision. A float tensor must equal
+  // float32(target), which is how exporters materialize the GELU constants
+  // (e.g. float32(sqrt(2))). A tolerance is deliberately not used: a nearby
+  // constant such as 1.00005 is a different function, not GELU.
+  static bool IsScalarEqualTo(const Value* v, double target) {
     float f;
     if (FetchSoleValueOfTensor<float>(v, f)) {
-      return std::abs(static_cast<double>(f) - target) < 1e-4;
+      return f == static_cast<float>(target);
     }
     double d;
     if (FetchSoleValueOfTensor<double>(v, d)) {
-      return std::abs(d - target) < 1e-4;
+      return d == target;
     }
     return false;
   }
@@ -83,7 +86,7 @@ struct FuseGelu final : public PredicateBasedPass {
     for (int i = 0; i < 2; ++i) {
       Value* a = mul1->input(i);
       Value* b = mul1->input(1 - i);
-      if (IsScalarCloseTo(b, 0.5) && CheckKind(a, kMul) &&
+      if (IsScalarEqualTo(b, 0.5) && CheckKind(a, kMul) &&
           a->node()->inputs().size() == 2 && SingleUse(a->node())) {
         mul0 = a->node();
         break;
@@ -116,7 +119,7 @@ struct FuseGelu final : public PredicateBasedPass {
       Value* a = add->input(i);
       Value* b = add->input(1 - i);
       if (CheckKind(a, "Erf") && a->node()->inputs().size() == 1 &&
-          SingleUse(a->node()) && IsScalarCloseTo(b, 1.0)) {
+          SingleUse(a->node()) && IsScalarEqualTo(b, 1.0)) {
         erf = a->node();
         break;
       }
@@ -132,7 +135,7 @@ struct FuseGelu final : public PredicateBasedPass {
       return false;
     }
     if (div->input(0) != x ||
-        !IsScalarCloseTo(div->input(1), std::sqrt(2.0))) {
+        !IsScalarEqualTo(div->input(1), std::sqrt(2.0))) {
       return false;
     }
 
