@@ -31,23 +31,27 @@ Optimizer::~Optimizer() {}
 
 ModelProto Optimize(
     const ModelProto& mp_in,
-    const std::vector<std::string>& names) {
+    const std::vector<std::string>& names,
+    std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, false);
-  return current_opt.optimize(mp_in);
+  return current_opt.optimize(mp_in, report);
 }
 ModelProto OptimizeFixed(
     const ModelProto& mp_in,
-    const std::vector<std::string>& names) {
+    const std::vector<std::string>& names,
+    std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, true);
-  return current_opt.optimize(mp_in);
+  return current_opt.optimize(mp_in, report);
 }
-void OptimizeGraph(Graph& graph, const std::vector<std::string>& names) {
+void OptimizeGraph(Graph& graph, const std::vector<std::string>& names,
+                   std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, false);
-  current_opt.optimize(graph);
+  current_opt.optimize(graph, report);
 }
-void OptimizeGraphFixed(Graph& graph, const std::vector<std::string>& names) {
+void OptimizeGraphFixed(Graph& graph, const std::vector<std::string>& names,
+                        std::map<std::string, unsigned int>* report) {
   Optimizer current_opt(names, true);
-  current_opt.optimize(graph);
+  current_opt.optimize(graph, report);
 }
 const std::vector<std::string> GetAvailablePasses() {
   return Optimizer::passes.GetAvailablePasses();

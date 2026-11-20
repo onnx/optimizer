@@ -32,11 +32,28 @@ struct Optimizer {
   // hand or produced by another IR pass). Proto-level concerns such as the
   // ir_version upgrade and function copying are the caller's responsibility,
   // since those live on ModelProto rather than on Graph.
-  void optimize(Graph &graph) {
-    this->pass_manager->run(graph);
+  //
+  // If `report` is non-null it is filled with a map from pass name to the
+  // total number of positive transforms that pass applied to the graph.
+  void optimize(Graph &graph,
+                std::map<std::string, unsigned int> *report = nullptr) {
+    if (report != nullptr) {
+      report->clear();
+    }
+    auto analysis = this->pass_manager->run(graph);
+    if (report != nullptr && analysis != nullptr) {
+      *report = analysis->transform_counts;
+    }
   }
 
-  ModelProto optimize(const ModelProto &_mp_in) {
+  // If `report` is non-null it is filled with a map from pass name to the
+  // total number of positive transforms that pass applied to the graph.
+  ModelProto optimize(const ModelProto &_mp_in,
+                      std::map<std::string, unsigned int> *report = nullptr) {
+    // Clear first so an early return never leaves counts from a previous run.
+    if (report != nullptr) {
+      report->clear();
+    }
     const ModelProto* mp_in = &_mp_in;
     std::unique_ptr<ModelProto> copy_in;
     if (mp_in->ir_version() == 3) {
@@ -56,7 +73,7 @@ struct Optimizer {
     }
 
     ModelProto mp_out = PrepareOutput(*mp_in);
-    this->optimize(*g);
+    this->optimize(*g, report);
     ExportModelProto(&mp_out, g);
 
     // Maybe we can optimize these functions, now just copy
@@ -105,16 +122,20 @@ const std::vector<std::string> GetAvailablePasses();
 const std::vector<std::string> GetFuseAndEliminationPass();
 
 ModelProto Optimize(const ModelProto &mp_in,
-                    const std::vector<std::string> &names);
+                    const std::vector<std::string> &names,
+                    std::map<std::string, unsigned int> *report = nullptr);
 
 ModelProto OptimizeFixed(const ModelProto &mp_in,
-                         const std::vector<std::string> &names);
+                         const std::vector<std::string> &names,
+                         std::map<std::string, unsigned int> *report = nullptr);
 
 // In-place counterparts that operate directly on the ONNX C++ IR (Graph),
 // skipping the ModelProto <-> Graph conversion. For C++ callers that already
 // hold a Graph.
-void OptimizeGraph(Graph &graph, const std::vector<std::string> &names);
+void OptimizeGraph(Graph &graph, const std::vector<std::string> &names,
+                   std::map<std::string, unsigned int> *report = nullptr);
 
-void OptimizeGraphFixed(Graph &graph, const std::vector<std::string> &names);
+void OptimizeGraphFixed(Graph &graph, const std::vector<std::string> &names,
+                        std::map<std::string, unsigned int> *report = nullptr);
 }  // namespace optimization
 }  // namespace ONNX_NAMESPACE

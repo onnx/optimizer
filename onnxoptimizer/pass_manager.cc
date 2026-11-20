@@ -19,14 +19,23 @@ void GeneralPassManager::add(std::shared_ptr<Pass> pass) {
 }
 
 std::shared_ptr<PassManagerAnalysis> GeneralPassManager::run(Graph& graph) {
+  auto report = std::make_shared<PassManagerAnalysis>();
   for (const std::shared_ptr<Pass>& pass : this->passes) {
-    auto pass_analysis = pass->runPass(graph);
+    std::shared_ptr<PostPassAnalysis> analysis = pass->runPass(graph);
+    if (pass->getPassAnalysisType() == PassAnalysisType::Empty) {
+      continue;
+    }
+    std::shared_ptr<CountBasedPassAnalysis> count_analysis =
+        std::static_pointer_cast<CountBasedPassAnalysis>(analysis);
+    report->transform_counts[pass->getPassName()] +=
+        count_analysis->num_positive_transforms;
   }
-  return std::shared_ptr<PassManagerAnalysis>(new EmptyPassManagerAnalysis());
+  return report;
 }
 
 std::shared_ptr<PassManagerAnalysis> FixedPointPassManager::run(Graph& graph) {
   bool fixed_point_optimization_done;
+  auto report = std::make_shared<PassManagerAnalysis>();
 
   do {
     fixed_point_optimization_done = false;
@@ -37,6 +46,8 @@ std::shared_ptr<PassManagerAnalysis> FixedPointPassManager::run(Graph& graph) {
       }
       std::shared_ptr<CountBasedPassAnalysis> count_analysis =
           std::static_pointer_cast<CountBasedPassAnalysis>(analysis);
+      report->transform_counts[pass->getPassName()] +=
+          count_analysis->num_positive_transforms;
       if (count_analysis->num_positive_transforms != 0) {
         VLOG(1) << "Pass " << pass->getPassName() << " transformed " << count_analysis->num_positive_transforms;
       }
@@ -44,6 +55,8 @@ std::shared_ptr<PassManagerAnalysis> FixedPointPassManager::run(Graph& graph) {
       while (count_analysis->fixedPointOptimizationNeeded()) {
         count_analysis = std::static_pointer_cast<CountBasedPassAnalysis>(
             pass->runPass(graph));
+        report->transform_counts[pass->getPassName()] +=
+            count_analysis->num_positive_transforms;
         if (count_analysis->num_positive_transforms != 0) {
           VLOG(1) << "Pass " << pass->getPassName() << " transformed " << count_analysis->num_positive_transforms;
         }
@@ -52,7 +65,7 @@ std::shared_ptr<PassManagerAnalysis> FixedPointPassManager::run(Graph& graph) {
     }
   } while (fixed_point_optimization_done);
 
-  return std::shared_ptr<PassManagerAnalysis>(new EmptyPassManagerAnalysis());
+  return report;
 }
 } // namespace optimization
 } // namespace ONNX_NAMESPACE
