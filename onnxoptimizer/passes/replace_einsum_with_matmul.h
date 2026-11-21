@@ -114,6 +114,11 @@ struct ReplaceEinsumWithMatmul final : public PredicateBasedPass {
     char term2_n = term2[shape_size - 1];
     char result_n = right_equation[shape_size - 1];
 
+    // The contraction label must not appear in the output.
+    if (right_equation.find(term1_k) != std::string::npos) {
+      return false;
+    }
+
     bool need_transpose = false;
     if (isEqual(term1_m, result_m) && isEqual(term1_k, term2_k) &&
         isEqual(term2_n, result_n)) {  // "ij,jd->id"
