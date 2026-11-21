@@ -2880,6 +2880,28 @@ class TestOptimizer(unittest.TestCase):
                     (actual,) = ReferenceEvaluator(optimized_model).run(None, {"X": x})
                     np.testing.assert_array_equal(actual, expected)
 
+    def test_fuse_pad_into_avgpool_with_valid_autopad(self):
+        pad = helper.make_node("Pad", ["X", "Pads"], ["P"])
+        avg_pool = helper.make_node(
+            "AveragePool", ["P"], ["Z"], kernel_shape=[1, 2], auto_pad="VALID"
+        )
+        graph = helper.make_graph(
+            [pad, avg_pool],
+            "test",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 1, 1, 2))],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (1, 1, 1, 3))],
+            [helper.make_tensor("Pads", TensorProto.INT64, (8,), [0, 0, 0, 1, 0, 0, 0, 1])],
+        )
+        optimized_model = self._optimized(graph, ["fuse_pad_into_pool"])
+
+        assert len(optimized_model.graph.node) == 1
+        pool = optimized_model.graph.node[0]
+        assert pool.op_type == "AveragePool"
+        attrs = {attr.name: helper.get_attribute_value(attr) for attr in pool.attribute}
+        assert "auto_pad" not in attrs
+        assert attrs["pads"] == [0, 1, 0, 1]
+        assert attrs["count_include_pad"] == 1
+
     def test_fuse_pad_into_avgpool_pad_feature_no_fuse_opset10(self):
         pad = helper.make_node(
             "Pad", ["X"], ["P"], mode="constant", pads=[0, 1, 0, 0, 0, 0, 0, 0]
