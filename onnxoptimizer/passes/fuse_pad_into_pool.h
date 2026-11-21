@@ -56,6 +56,11 @@ struct FusePadIntoPool final : public PredicateBasedPass {
     Node* pool = n;
     Node* pad = n->inputs()[0]->node();
 
+    // The pads below assume the default axis order.
+    if (pad->inputs().size() >= 4 && !pad->input(3)->uniqueName().empty()) {
+      return false;
+    }
+
     // MaxPool indices address the explicitly padded input before fusion.
     if (pool->kind() == Symbol("MaxPool") && pool->outputs().size() > 1 &&
         !pool->outputs()[1]->uses().empty()) {
