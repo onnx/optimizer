@@ -9,6 +9,7 @@ import os
 import unittest
 from collections import OrderedDict
 from typing import Optional
+from unittest import mock
 
 import numpy as np  # type: ignore
 
@@ -372,6 +373,177 @@ class TestOptimizer(unittest.TestCase):
         # have been replaced with the input to that identity node
         assert len(optimized_model.graph.node[3].attribute[0].g.output) == 2
         assert optimized_model.graph.node[3].attribute[0].g.output[1].name == "_B2"
+
+    def test_optimize_return_report(self):  # type: () -> None
+        # `return_report=True` should return a (model, report) tuple, where the
+        # report maps each pass name to how many times it modified the graph.
+        nodes = [
+            helper.make_node("Add", ["X", "Y"], ["A"]),
+            helper.make_node("Identity", ["A"], ["B"]),
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,)),
+            ],
+            [helper.make_tensor_value_info("B", TensorProto.FLOAT, (5,))],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+
+        result = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        assert isinstance(result, tuple)
+        optimized_model, report = result
+        assert isinstance(optimized_model, ModelProto)
+        assert isinstance(report, dict)
+        # The single Identity node should have been eliminated exactly once.
+        assert report.get("eliminate_identity", 0) == 1
+
+        # Without return_report the return value stays a bare model (backward compat).
+        optimized_only = onnxoptimizer.optimize(model, ["eliminate_identity"])
+        assert isinstance(optimized_only, ModelProto)
+
+    def test_optimize_return_report_no_change(self):  # type: () -> None
+        # A pass that matches nothing should still be reportable and count 0.
+        node = helper.make_node("Add", ["X", "Y"], ["Z"])
+        graph = helper.make_graph(
+            [node],
+            "test",
+            [
+                helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,)),
+                helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,)),
+            ],
+            [helper.make_tensor_value_info("Z", TensorProto.FLOAT, (5,))],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+        _, report = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        # Direct indexing: a missing entry must fail rather than default to 0.
+        assert report["eliminate_identity"] == 0
+
+    @staticmethod
+    def _identity_chain_model(length):  # type: (int) -> ModelProto
+        # X -> Identity -> Identity -> ... -> Y, `length` Identity nodes.
+        names = ["X"] + [f"t{i}" for i in range(length - 1)] + ["Y"]
+        nodes = [
+            helper.make_node("Identity", [names[i]], [names[i + 1]])
+            for i in range(length)
+        ]
+        graph = helper.make_graph(
+            nodes,
+            "identity_chain",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (5,))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (5,))],
+        )
+        return helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+
+    def test_optimize_return_report_fixed_point(self):  # type: () -> None
+        # The fixed-point manager runs the pass list repeatedly. The reported
+        # count must match the single-run count: the first round removes all
+        # Identity nodes and later rounds add nothing, so nothing is
+        # double-counted.
+        model = self._identity_chain_model(3)
+        _, single = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], return_report=True
+        )
+        optimized_model, fixed = onnxoptimizer.optimize(
+            model, ["eliminate_identity"], fixed_point=True, return_report=True
+        )
+        # The last Identity feeds the graph output, so it is kept: 3 nodes -> 1.
+        assert len(optimized_model.graph.node) == 1
+        assert fixed["eliminate_identity"] == 2
+        assert fixed["eliminate_identity"] == single["eliminate_identity"]
+
+    def test_optimize_return_report_external_data_fallback(self):  # type: () -> None
+        # Models too large for one protobuf message take the external-data path
+        # (the ValueError fallback in optimize()). Force that fallback here so the
+        # path-based report functions are exercised with return_report=True.
+        model = self._identity_chain_model(2)
+        for fixed_point, report_fn in [
+            (False, "optimize_report"),
+            (True, "optimize_fixedpoint_report"),
+        ]:
+            with mock.patch.object(
+                onnxoptimizer._c, report_fn, side_effect=ValueError("forced")
+            ):
+                optimized_model, report = onnxoptimizer.optimize(
+                    model,
+                    ["eliminate_identity"],
+                    fixed_point=fixed_point,
+                    return_report=True,
+                )
+            assert isinstance(optimized_model, ModelProto)
+            # Identity -> graph output is kept, so 2 nodes -> 1 with one removal.
+            assert len(optimized_model.graph.node) == 1
+            assert report["eliminate_identity"] == 1
+
+    def test_optimize_external_data_fallback_keeps_weights(self):  # type: () -> None
+        # The external-data fallback writes the model and its weights to
+        # temporary files. The optimized model must keep the weight values, and
+        # the caller's model must be left unchanged, so it can be optimized
+        # again (the second call here would otherwise find no weight data).
+        # 4 KiB, above onnx.save's 1 KiB threshold, so it is really written to
+        # the external data file.
+        weight = np.arange(32 * 32, dtype=np.float32).reshape(32, 32)
+        graph = helper.make_graph(
+            [
+                helper.make_node("Identity", ["X"], ["A"]),
+                helper.make_node("MatMul", ["A", "W"], ["Y"]),
+            ],
+            "fallback_with_weight",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (32, 32))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (32, 32))],
+            [numpy_helper.from_array(weight, "W")],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+        for fixed_point in (False, True):
+            for return_report in (False, True):
+                fn = "optimize_fixedpoint" if fixed_point else "optimize"
+                if return_report:
+                    fn += "_report"
+                with mock.patch.object(
+                    onnxoptimizer._c, fn, side_effect=ValueError("forced")
+                ):
+                    result = onnxoptimizer.optimize(
+                        model,
+                        ["eliminate_identity"],
+                        fixed_point=fixed_point,
+                        return_report=return_report,
+                    )
+                optimized_model = result[0] if return_report else result
+                assert [n.op_type for n in optimized_model.graph.node] == ["MatMul"]
+                np.testing.assert_array_equal(
+                    numpy_helper.to_array(optimized_model.graph.initializer[0]),
+                    weight,
+                )
+                # The caller's weight is still inline and unchanged.
+                init = model.graph.initializer[0]
+                assert len(init.external_data) == 0
+                np.testing.assert_array_equal(numpy_helper.to_array(init), weight)
 
     # type: () -> None
     def test_eliminate_identity_both_graph_input_and_output(self):
