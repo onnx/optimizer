@@ -165,6 +165,15 @@ struct FusePadIntoPool final : public PredicateBasedPass {
       }
     }
 
+    // Explicit pads cannot be combined with auto_pad.
+    if (pool->hasAttribute(Symbol("auto_pad"))) {
+      const auto& auto_pad = pool->s(Symbol("auto_pad"));
+      if (auto_pad != "NOTSET" && auto_pad != "VALID") {
+        return false;
+      }
+      pool->removeAttribute(Symbol("auto_pad"));
+    }
+
     int pool_pads_size = pads_size - 4;
     std::vector<int64_t> pool_pads(pool_pads_size, 0);
     // Fuse into existing padding, if available
