@@ -8,8 +8,8 @@ import io
 import os
 import unittest
 from collections import OrderedDict
-from unittest import mock
 from typing import Optional
+from unittest import mock
 
 import numpy as np  # type: ignore
 
