@@ -14,6 +14,7 @@ path = [
   "CMakeLists.txt",
   "MANIFEST.in",
   "VERSION_NUMBER",
+  "pixi.lock",
   "cmake/ONNXOptimizerConfigVersion.cmake.in",
   "cmake/ONNXOptimizerConfig.cmake.in"
 ]
