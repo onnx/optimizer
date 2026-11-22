@@ -2138,6 +2138,43 @@ class TestOptimizer(unittest.TestCase):
         assert optimized_model.graph.node[0].attribute[0].name == "pads"
         assert list(optimized_model.graph.node[0].attribute[0].ints) == [0, 0, 1, 1]
 
+    def test_fuse_pad_with_axes_no_fuse(self):  # type: () -> None
+        for op_type, pass_name in [
+            ("Conv", "fuse_pad_into_conv"),
+            ("AveragePool", "fuse_pad_into_pool"),
+        ]:
+            with self.subTest(op_type=op_type):
+                pad = helper.make_node("Pad", ["X", "Pads", "", "Axes"], ["P"])
+                inputs = [helper.make_tensor_value_info("X", TensorProto.FLOAT, (1, 1, 2, 2))]
+                if op_type == "Conv":
+                    following = helper.make_node("Conv", ["P", "W"], ["Z"])
+                    inputs.append(
+                        helper.make_tensor_value_info("W", TensorProto.FLOAT, (1, 1, 1, 1))
+                    )
+                    output_shape = (1, 1, 3, 3)
+                else:
+                    following = helper.make_node(
+                        "AveragePool", ["P"], ["Z"], kernel_shape=[2, 2]
+                    )
+                    output_shape = (1, 1, 2, 2)
+                graph = helper.make_graph(
+                    [pad, following],
+                    "test",
+                    inputs,
+                    [helper.make_tensor_value_info("Z", TensorProto.FLOAT, output_shape)],
+                    [
+                        helper.make_tensor(
+                            "Pads", TensorProto.INT64, [8], [0, 0, 1, 0, 0, 0, 0, 1]
+                        ),
+                        helper.make_tensor("Axes", TensorProto.INT64, [4], [0, 1, 3, 2]),
+                    ],
+                )
+                optimized_model = self._optimized(
+                    graph, [pass_name], opset_imports=[helper.make_opsetid("", 18)]
+                )
+
+                assert optimized_model.graph == graph
+
     def test_fuse_pad_into_maxpool_indices(self) -> None:
         for indices_use in ["graph_output", "consumer", "unused"]:
             with self.subTest(indices_use=indices_use):

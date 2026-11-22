@@ -47,6 +47,11 @@ struct FusePadIntoConv final : public PredicateBasedPass {
     Node* conv = n;
     Node* pad = PrevNode(n, 0);
 
+    // The pads below assume the default axis order.
+    if (pad->inputs().size() >= 4 && !pad->input(3)->uniqueName().empty()) {
+      return false;
+    }
+
     // Process 'pads' data
     std::vector<int64_t> pads;
     if (!GetValueFromAttrOrInput(pad, kpads, 1, pads)) {
