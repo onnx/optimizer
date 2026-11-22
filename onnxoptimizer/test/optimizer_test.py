@@ -496,6 +496,55 @@ class TestOptimizer(unittest.TestCase):
             assert len(optimized_model.graph.node) == 1
             assert report["eliminate_identity"] == 1
 
+    def test_optimize_external_data_fallback_keeps_weights(self):  # type: () -> None
+        # The external-data fallback writes the model and its weights to
+        # temporary files. The optimized model must keep the weight values, and
+        # the caller's model must be left unchanged, so it can be optimized
+        # again (the second call here would otherwise find no weight data).
+        # 4 KiB, above onnx.save's 1 KiB threshold, so it is really written to
+        # the external data file.
+        weight = np.arange(32 * 32, dtype=np.float32).reshape(32, 32)
+        graph = helper.make_graph(
+            [
+                helper.make_node("Identity", ["X"], ["A"]),
+                helper.make_node("MatMul", ["A", "W"], ["Y"]),
+            ],
+            "fallback_with_weight",
+            [helper.make_tensor_value_info("X", TensorProto.FLOAT, (32, 32))],
+            [helper.make_tensor_value_info("Y", TensorProto.FLOAT, (32, 32))],
+            [numpy_helper.from_array(weight, "W")],
+        )
+        model = helper.make_model(
+            graph,
+            producer_name="onnx-test",
+            opset_imports=[helper.make_opsetid("", LATEST_STABLE_OPSET_VERSION)],
+            ir_version=10,
+        )
+        for fixed_point in (False, True):
+            for return_report in (False, True):
+                fn = "optimize_fixedpoint" if fixed_point else "optimize"
+                if return_report:
+                    fn += "_report"
+                with mock.patch.object(
+                    onnxoptimizer._c, fn, side_effect=ValueError("forced")
+                ):
+                    result = onnxoptimizer.optimize(
+                        model,
+                        ["eliminate_identity"],
+                        fixed_point=fixed_point,
+                        return_report=return_report,
+                    )
+                optimized_model = result[0] if return_report else result
+                assert [n.op_type for n in optimized_model.graph.node] == ["MatMul"]
+                np.testing.assert_array_equal(
+                    numpy_helper.to_array(optimized_model.graph.initializer[0]),
+                    weight,
+                )
+                # The caller's weight is still inline and unchanged.
+                init = model.graph.initializer[0]
+                assert len(init.external_data) == 0
+                np.testing.assert_array_equal(numpy_helper.to_array(init), weight)
+
     # type: () -> None
     def test_eliminate_identity_both_graph_input_and_output(self):
         # We should not eliminate an op when its input is also graph input,

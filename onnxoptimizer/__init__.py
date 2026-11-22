@@ -77,50 +77,43 @@ def optimize(
 
         return onnx.load_from_string(optimized_model_str)
     except ValueError:
-        with (
-            tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as file_src,
-            tempfile.NamedTemporaryFile(suffix=".onnx", delete=False) as file_dest,
-            tempfile.NamedTemporaryFile(delete=False) as data_file_src,
-            tempfile.NamedTemporaryFile(delete=False) as data_file_dest,
-        ):
-            data_src_rel_filename = os.path.relpath(
-                data_file_src.name, os.path.dirname(file_src.name)
+        # Use plain paths in a temporary directory instead of open
+        # NamedTemporaryFile handles: Windows cannot reopen for writing, or
+        # delete, a file that another handle still holds open.
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            src_path = os.path.join(tmp_dir, "model.onnx")
+            dest_path = os.path.join(tmp_dir, "optimized.onnx")
+            # External data locations are relative to each model's directory.
+            data_src_rel_filename = "model.onnx.data"
+            data_dest_rel_filename = "optimized.onnx.data"
+            onnx.save(
+                model,
+                src_path,
+                save_as_external_data=True,
+                location=data_src_rel_filename,
+                convert_attribute=True,
             )
-            data_dest_rel_filename = os.path.relpath(
-                data_file_dest.name, os.path.dirname(file_dest.name)
-            )
-            try:
-                onnx.save(
-                    model,
-                    file_src.name,
-                    save_as_external_data=True,
-                    location=data_src_rel_filename,
-                    convert_attribute=True,
-                )
-                report = None
-                if return_report:
-                    if fixed_point:
-                        report = _c.optimize_fixedpoint_from_path_report(
-                            file_src.name, file_dest.name, passes, data_dest_rel_filename
-                        )
-                    else:
-                        report = _c.optimize_from_path_report(
-                            file_src.name, file_dest.name, passes, data_dest_rel_filename
-                        )
-                elif fixed_point:
-                    _c.optimize_fixedpoint_from_path(
-                        file_src.name, file_dest.name, passes, data_dest_rel_filename
+            # Saving with external data moves the caller's tensor bytes out of
+            # `model` and points it at the temporary file. Load them back so the
+            # caller's model is left unchanged once the directory is removed.
+            onnx.load_external_data_for_model(model, tmp_dir)
+            report = None
+            if return_report:
+                if fixed_point:
+                    report = _c.optimize_fixedpoint_from_path_report(
+                        src_path, dest_path, passes, data_dest_rel_filename
                     )
                 else:
-                    _c.optimize_from_path(
-                        file_src.name, file_dest.name, passes, data_dest_rel_filename
+                    report = _c.optimize_from_path_report(
+                        src_path, dest_path, passes, data_dest_rel_filename
                     )
-                optimized_model = onnx.load(file_dest.name, load_external_data=True)
-                if return_report:
-                    return optimized_model, report
-                return optimized_model
-            finally:
-                os.remove(file_src.name)
-                os.remove(file_dest.name)
-                os.remove(data_file_src.name)
-                os.remove(data_file_dest.name)
+            elif fixed_point:
+                _c.optimize_fixedpoint_from_path(
+                    src_path, dest_path, passes, data_dest_rel_filename
+                )
+            else:
+                _c.optimize_from_path(src_path, dest_path, passes, data_dest_rel_filename)
+            optimized_model = onnx.load(dest_path, load_external_data=True)
+            if return_report:
+                return optimized_model, report
+            return optimized_model
