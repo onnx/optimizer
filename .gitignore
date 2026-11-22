@@ -80,5 +80,6 @@ compile_commands.json
 *.gcov
 
 .mypy_cache
+.pixi
 virtualenv
 venv
