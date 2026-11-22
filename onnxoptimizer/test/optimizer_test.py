@@ -4895,6 +4895,17 @@ class TestOptimizer(unittest.TestCase):
         assert len(optimized_model.graph.node) == 2
         assert optimized_model.graph.node[0].op_type == "MatMul"
 
+    def test_fuse_einsum_into_matmul_diagonal(self):  # type: () -> None
+        X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [2, 2])
+        Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [2, 2])
+        Z = helper.make_tensor_value_info("Z", TensorProto.FLOAT, [2, 2])
+
+        node_def = helper.make_node("Einsum", ["X", "Y"], ["Z"], equation="ii,ij->ij")
+        graph = helper.make_graph([node_def], "test", [X, Y], [Z])
+        optimized_model = self._optimized(graph, ["replace_einsum_with_matmul"], False)
+
+        assert optimized_model.graph == graph
+
     def test_eliminate_nop_concat(self):  # type: () -> None
         X = helper.make_tensor_value_info("X", TensorProto.FLOAT, [3, 4, 5, 6])
         Y = helper.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 4, 6, 5])
