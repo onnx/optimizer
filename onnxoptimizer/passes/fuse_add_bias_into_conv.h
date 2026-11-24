@@ -37,13 +37,13 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     return CheckKind(node, kAdd, 0, kConv) &&
            GetInputsOfPreNode(node, 0).size() == 2;
   }
-  static Node *makeSqueezeOrUnsqueeze(Graph &graph, std::vector<int64_t> &axes,
-                                      Value *input, Node *target_node,
+  static Node* makeSqueezeOrUnsqueeze(Graph& graph, std::vector<int64_t>& axes,
+                                      Value* input, Node* target_node,
                                       BuiltinSymbol k) {
     assert(k == kSqueeze || k == kUnsqueeze);
     Node *squeeze = graph.create(k, 1);
-    int opset_version = getOpsetVersion(graph);
     squeeze->addInput(input);
+    int opset_version = getOpsetVersion(graph);
     int version_threshold = 13;
     if (opset_version < version_threshold && opset_version != 0) {
       squeeze->is_(kaxes, std::move(axes));
@@ -65,16 +65,15 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
     destroy_current = NodeDestroyType::DestroyZero;
     auto orig_conv = n->inputs()[0];
     auto orig_bias = n->inputs()[1];
-    // check if bias is Const or in graph's initializers
-    if (orig_bias->node()->kind() != kConstant &&
-        orig_bias->node()->kind() != kParam) {
-      return false;
-    }
     // check if conv is only used by Add
     if (orig_conv->uses().size() > 1) {
       return false;
     }
     auto conv_shape = orig_conv->sizes();
+    // We need the size of bias
+    if (!orig_bias->has_sizes()) {
+      return false;
+    }
     auto bias_shape = orig_bias->sizes();
     auto weight_shape = orig_conv->node()->inputs()[1]->sizes();
     int64_t M = -1;
@@ -109,20 +108,18 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
       return false;
     }
     if (num_el == 1) {
-      if (orig_bias->node()->kind() != kParam &&
-          orig_conv->node()->isBefore(orig_bias->node())) {
-        orig_bias->node()->moveBefore(orig_conv->node());
-      }
+      // Conv feeds only this Add, so it can follow every bias dependency.
+      orig_conv->node()->moveBefore(n);
       Value *conv_3rd_input = orig_bias;
       if (bias_shape.size() > 1) {
         std::vector<int64_t> axes(bias_shape.size() - 1);
         std::iota(axes.begin(), axes.end(), 0);
-        Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
+        Node* squeeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
                                                orig_conv->node(), kSqueeze);
         conv_3rd_input = squeeze->output();
       } else if (bias_shape.size() == 0) {
         std::vector<int64_t> axes = {0};
-        Node *unsqueeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
+        Node* unsqueeze = makeSqueezeOrUnsqueeze(graph, axes, conv_3rd_input,
                                                  orig_conv->node(), kUnsqueeze);
         conv_3rd_input = unsqueeze->output();
       }
@@ -151,17 +148,15 @@ struct FuseAddBiasIntoConv final : public PredicateBasedPass {
                bias_shape[1 + bias_shape.size() - static_cast<unsigned>(rank)]
                        .dim == M) {
       ONNX_ASSERT(bias_shape.size() > 1);
-      if (orig_bias->node()->kind() != kParam &&
-          orig_conv->node()->isBefore(orig_bias->node())) {
-        orig_bias->node()->moveBefore(orig_conv->node());
-      }
+      orig_conv->node()->moveBefore(n);
       std::vector<int64_t> axes(bias_shape.size());
       std::iota(axes.begin(), axes.end(), static_cast<int64_t>(0));
       axes.erase(axes.begin() +
                  (1 + bias_shape.size() - static_cast<unsigned>(rank)));
-      Node *squeeze = makeSqueezeOrUnsqueeze(graph, axes, orig_bias,
-                                             orig_conv->node(), kSqueeze);
-      orig_conv->node()->addInput(squeeze->output());
+
+      Node* new_bias = makeSqueezeOrUnsqueeze(graph, axes, orig_bias,
+                                              orig_conv->node(), kSqueeze);
+      orig_conv->node()->addInput(new_bias->output());
     } else {
       return false;
     }
